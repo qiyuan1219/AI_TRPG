@@ -1,0 +1,70 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - paragraph [ref=e7]: D&D AI-TRPG
+      - heading "碎冠之影" [level=1] [ref=e8]
+    - paragraph [ref=e9]: 王冠城的雾正在升起，地下裂隙等待回应。
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - generic [ref=e12]: 冒险者姓名
+      - textbox "冒险者姓名" [ref=e13]: 冒险者
+      - listbox "选择职业" [ref=e14]:
+        - button "W 战士 前排坦克，高 AC 高 HP。近战输出主力，每场战斗冲在最前面。" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: W
+          - generic [ref=e17]:
+            - strong [ref=e18]: 战士
+            - generic [ref=e19]: 前排坦克，高 AC 高 HP。近战输出主力，每场战斗冲在最前面。
+        - button "R 游荡者 灵活刺客，高爆发偷袭。潜行、开锁、陷阱全精通。" [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: R
+          - generic [ref=e22]:
+            - strong [ref=e23]: 游荡者
+            - generic [ref=e24]: 灵活刺客，高爆发偷袭。潜行、开锁、陷阱全精通。
+        - button "M 法师 远程炮台，法术轰炸。火球术清怪最快，解谜核心。" [active] [ref=e25] [cursor=pointer]:
+          - generic [ref=e26]: M
+          - generic [ref=e27]:
+            - strong [ref=e28]: 法师
+            - generic [ref=e29]: 远程炮台，法术轰炸。火球术清怪最快，解谜核心。
+        - button "C 牧师 治疗辅助，亡灵克星。加血加 buff，团队生存保障。" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: C
+          - generic [ref=e32]:
+            - strong [ref=e33]: 牧师
+            - generic [ref=e34]: 治疗辅助，亡灵克星。加血加 buff，团队生存保障。
+        - button "P 圣骑士 攻守兼备，魅力领袖。能打能奶，社交最强。" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]: P
+          - generic [ref=e37]:
+            - strong [ref=e38]: 圣骑士
+            - generic [ref=e39]: 攻守兼备，魅力领袖。能打能奶，社交最强。
+    - generic [ref=e86]:
+      - generic [ref=e87]:
+        - generic [ref=e88]: 法师
+        - generic [ref=e89]: HP 42 / AC 13
+      - generic [ref=e90]:
+        - generic [ref=e91]:
+          - generic [ref=e92]: 力量
+          - generic [ref=e95]: 8 (-1)
+        - generic [ref=e96]:
+          - generic [ref=e97]: 敏捷
+          - generic [ref=e100]: 13 (+1)
+        - generic [ref=e101]:
+          - generic [ref=e102]: 体质
+          - generic [ref=e105]: 14 (+2)
+        - generic [ref=e106]:
+          - generic [ref=e107]: 智力
+          - generic [ref=e110]: 16 (+3)
+        - generic [ref=e111]:
+          - generic [ref=e112]: 感知
+          - generic [ref=e115]: 12 (+1)
+        - generic [ref=e116]:
+          - generic [ref=e117]: 魅力
+          - generic [ref=e120]: 10 (+0)
+      - generic [ref=e121]:
+        - generic [ref=e122]:
+          - heading "优势" [level=3] [ref=e123]
+          - paragraph [ref=e124]: AOE 清怪最强
+          - paragraph [ref=e125]: 解谜调查主力
+          - paragraph [ref=e126]: 法术花样多
+        - generic [ref=e127]:
+          - heading "限制" [level=3] [ref=e128]
+          - paragraph [ref=e129]: AC 最低最脆
+          - paragraph [ref=e130]: 法术位有限
+      - button "深入地下城" [ref=e131] [cursor=pointer]

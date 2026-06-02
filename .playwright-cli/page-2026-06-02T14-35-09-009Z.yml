@@ -1,0 +1,70 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - paragraph [ref=e7]: D&D AI-TRPG
+      - heading "碎冠之影" [level=1] [ref=e8]
+    - paragraph [ref=e9]: 王冠城的雾正在升起，地下裂隙等待回应。
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - generic [ref=e12]: 冒险者姓名
+      - textbox "冒险者姓名" [ref=e13]: 冒险者
+      - listbox "选择职业" [ref=e14]:
+        - button "W 战士 前排坦克，高 AC 高 HP。近战输出主力，每场战斗冲在最前面。" [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: W
+          - generic [ref=e17]:
+            - strong [ref=e18]: 战士
+            - generic [ref=e19]: 前排坦克，高 AC 高 HP。近战输出主力，每场战斗冲在最前面。
+        - button "R 游荡者 灵活刺客，高爆发偷袭。潜行、开锁、陷阱全精通。" [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: R
+          - generic [ref=e22]:
+            - strong [ref=e23]: 游荡者
+            - generic [ref=e24]: 灵活刺客，高爆发偷袭。潜行、开锁、陷阱全精通。
+        - button "M 法师 远程炮台，法术轰炸。火球术清怪最快，解谜核心。" [ref=e25] [cursor=pointer]:
+          - generic [ref=e26]: M
+          - generic [ref=e27]:
+            - strong [ref=e28]: 法师
+            - generic [ref=e29]: 远程炮台，法术轰炸。火球术清怪最快，解谜核心。
+        - button "C 牧师 治疗辅助，亡灵克星。加血加 buff，团队生存保障。" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: C
+          - generic [ref=e32]:
+            - strong [ref=e33]: 牧师
+            - generic [ref=e34]: 治疗辅助，亡灵克星。加血加 buff，团队生存保障。
+        - button "P 圣骑士 攻守兼备，魅力领袖。能打能奶，社交最强。" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]: P
+          - generic [ref=e37]:
+            - strong [ref=e38]: 圣骑士
+            - generic [ref=e39]: 攻守兼备，魅力领袖。能打能奶，社交最强。
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]: 战士
+        - generic [ref=e43]: HP 45 / AC 18
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - generic [ref=e46]: 力量
+          - generic [ref=e49]: 16 (+3)
+        - generic [ref=e50]:
+          - generic [ref=e51]: 敏捷
+          - generic [ref=e54]: 13 (+1)
+        - generic [ref=e55]:
+          - generic [ref=e56]: 体质
+          - generic [ref=e59]: 15 (+2)
+        - generic [ref=e60]:
+          - generic [ref=e61]: 智力
+          - generic [ref=e64]: 10 (+0)
+        - generic [ref=e65]:
+          - generic [ref=e66]: 感知
+          - generic [ref=e69]: 12 (+1)
+        - generic [ref=e70]:
+          - generic [ref=e71]: 魅力
+          - generic [ref=e74]: 8 (-1)
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - heading "优势" [level=3] [ref=e77]
+          - paragraph [ref=e78]: 最高 AC 和 HP
+          - paragraph [ref=e79]: 近战伤害最高
+          - paragraph [ref=e80]: 能嘲讽保护同伴
+        - generic [ref=e81]:
+          - heading "限制" [level=3] [ref=e82]
+          - paragraph [ref=e83]: 远程乏力
+          - paragraph [ref=e84]: 解谜和社交较弱
+      - button "深入地下城" [ref=e85] [cursor=pointer]
