@@ -1,8 +1,10 @@
-import { abilityModifier } from '../data/dndClasses';
-import type { GameState } from '../types/game';
+import type { ReactNode } from 'react';
+import { abilityModifier, DND_CLASSES, DND_COMPANIONS } from '../data/dndClasses';
+import type { GameState, SkillEntry } from '../types/game';
 
 interface CharacterPanelProps {
   state: GameState;
+  savePanel?: ReactNode;
 }
 
 const ATTRS = [
@@ -14,7 +16,7 @@ const ATTRS = [
   ['cha', '魅'],
 ] as const;
 
-export function CharacterPanel({ state }: CharacterPanelProps) {
+export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
   const currentHp = Number(state.current_hp ?? 30);
   const maxHp = Number(state.max_hp ?? 30);
   const hpPercent = Math.max(0, Math.min(100, (currentHp / Math.max(maxHp, 1)) * 100));
@@ -22,6 +24,7 @@ export function CharacterPanel({ state }: CharacterPanelProps) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+  const classPreset = DND_CLASSES.find((item) => item.name === state.char_class || item.id === state.char_class);
 
   return (
     <aside className="character-panel">
@@ -31,6 +34,8 @@ export function CharacterPanel({ state }: CharacterPanelProps) {
           {state.char_class || '战士'} Lv.{state.level || 3}
         </strong>
       </div>
+
+      {savePanel && <div className="panel-block">{savePanel}</div>}
 
       <div className="panel-block">
         <div className="meter-label">
@@ -66,11 +71,35 @@ export function CharacterPanel({ state }: CharacterPanelProps) {
         <b>{state.gold || 200} GP</b>
       </div>
 
+      {classPreset && (
+        <div className="panel-block skill-block">
+          <h2>职业技能</h2>
+          <SkillGroup label="战斗" skills={classPreset.skills.combat} />
+          <SkillGroup label="探索/对话" skills={classPreset.skills.nonCombat} />
+        </div>
+      )}
+
       <div className="panel-block">
         <h2>同伴信任</h2>
-        <TrustRow name="格鲁姆" value={state.gm_trust ?? 60} />
-        <TrustRow name="丽莎" value={state.ls_trust ?? 45} />
-        <TrustRow name="塔莉亚" value={state.tl_trust ?? 75} />
+        {DND_COMPANIONS.map((companion) => (
+          <TrustRow
+            key={companion.id}
+            name={companion.name}
+            value={Number(state[companion.trustKey] ?? 50)}
+          />
+        ))}
+      </div>
+
+      <div className="panel-block companion-skill-block">
+        <h2>队友技能</h2>
+        {DND_COMPANIONS.map((companion) => (
+          <div key={companion.id} className="companion-skill">
+            <strong>{companion.name}</strong>
+            <small>{companion.role}</small>
+            <p>{companion.skills.combat[0].name}: {companion.skills.combat[0].check}</p>
+            <p>{companion.skills.nonCombat[0].name}: {companion.skills.nonCombat[0].check}</p>
+          </div>
+        ))}
       </div>
 
       <div className="panel-block inventory-block">
@@ -80,6 +109,20 @@ export function CharacterPanel({ state }: CharacterPanelProps) {
         ))}
       </div>
     </aside>
+  );
+}
+
+function SkillGroup({ label, skills }: { label: string; skills: SkillEntry[] }) {
+  return (
+    <div className="skill-group">
+      <span>{label}</span>
+      {skills.map((skill) => (
+        <p key={skill.name}>
+          <b>{skill.name}</b>
+          <small>{skill.check}</small>
+        </p>
+      ))}
+    </div>
   );
 }
 

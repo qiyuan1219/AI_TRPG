@@ -102,7 +102,7 @@ def attack_roll(weapon: str, stat_mod: int, prof_bonus: int,
     if hit:
         damage = roll_dice(damage_dice) + dmg_mod
         if roll == 20:
-            damage += roll_dice(damage_dice)  # 暴击翻倍骰子
+            damage += roll_dice(damage_dice) + dmg_mod  # 暴击: 伤害骰和修正值都翻倍
     return AttackResult(roll=roll, bonus=bonus, total=total, target_ac=target_ac,
                         hit=hit, critical=(roll==20), fumble=(roll==1),
                         damage=damage, weapon=weapon)

@@ -70,8 +70,15 @@ def _inventory(state: dict, data: dict) -> dict:
     inventory = _split_inventory(state.get("inventory", ""))
     if op == "add" and item not in inventory:
         inventory.append(item)
-    elif op == "remove" and item in inventory:
-        inventory.remove(item)
+    elif op == "remove":
+        # 模糊匹配: "治疗药水" 能匹配 "治疗药水x2"
+        matched = None
+        for inv_item in inventory:
+            if inv_item == item or inv_item.startswith(item.rstrip("x0123456789")):
+                matched = inv_item
+                break
+        if matched:
+            inventory.remove(matched)
 
     state["inventory"] = ",".join(inventory)
     return {"type": "inventory", "op": op, "item": item, "inventory": state["inventory"]}
@@ -120,7 +127,10 @@ def _area(state: dict, data: dict) -> dict:
 
 def _level_up(state: dict, data: dict) -> dict:
     old_level = int(state.get("level", 3))
-    new_level = int(data.get("level", old_level + 1))
+    new_level = min(7, int(data.get("level", old_level + 1)))
+    if new_level <= old_level:
+        return {"type": "level_up", "old": old_level, "new": old_level,
+                "reason": f"已达等级上限7" if old_level >= 7 else "等级未变化"}
     old_max = int(state.get("max_hp", 30))
     hp_gain = int(data.get("hp_gain", 5))
     state["level"] = new_level
@@ -158,7 +168,7 @@ def _attribute(state: dict, data: dict) -> dict:
 
     amount = _amount(data)
     old = int(state.get(attr, 12))
-    state[attr] = old + amount
+    state[attr] = max(3, min(22, old + amount))
     return {
         "type": "attribute",
         "attr": attr,
@@ -172,7 +182,7 @@ def _attribute(state: dict, data: dict) -> dict:
 def _xp(state: dict, data: dict) -> dict:
     amount = _amount(data)
     old = int(state.get("xp", 0))
-    state["xp"] = old + amount
+    state["xp"] = max(0, old + amount)
     return {
         "type": "xp",
         "old": old,
@@ -184,12 +194,29 @@ def _xp(state: dict, data: dict) -> dict:
 
 def _complete_chapter(state: dict, data: dict) -> dict:
     old = int(state.get("cleared_levels", 0))
-    state["cleared_levels"] = int(data.get("cleared_levels", old + 1))
+    new_val = int(data.get("cleared_levels", old + 1))
+    state["cleared_levels"] = min(5, max(0, new_val))
     return {
         "type": "complete_chapter",
         "old": old,
         "new": state["cleared_levels"],
         "reason": data.get("reason", ""),
+    }
+
+
+def _trigger_event(state: dict, data: dict) -> dict:
+    event_name = str(data.get("event_name", data.get("event", ""))).strip()
+    if not event_name:
+        return {"type": "unknown", "reason": "trigger_event 指令缺少 event_name"}
+
+    events = _split_inventory(state.get("triggered_events", ""))
+    if event_name not in events:
+        events.append(event_name)
+    state["triggered_events"] = ",".join(events)
+    return {
+        "type": "trigger_event",
+        "event_name": event_name,
+        "events": state["triggered_events"],
     }
 
 
@@ -213,6 +240,7 @@ DIRECTIVE_HANDLERS: dict[str, ChangeHandler] = {
     "xp": _xp,
     "add_xp": _xp,
     "complete_chapter": _complete_chapter,
+    "trigger_event": _trigger_event,
 }
 
 

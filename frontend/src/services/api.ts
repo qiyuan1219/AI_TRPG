@@ -1,4 +1,11 @@
-import type { CreateGamePayload, CreateGameResult } from '../types/game';
+import type {
+  CreateGamePayload,
+  CreateGameResult,
+  LoadGameResult,
+  SaveGamePayload,
+  SaveSlotKey,
+  SaveSlotSummary,
+} from '../types/game';
 
 const BASE = '/api/dnd';
 
@@ -20,6 +27,38 @@ export async function createGame(payload: CreateGamePayload): Promise<CreateGame
 export async function getState(gameId: string) {
   const response = await fetch(`${BASE}/game/${gameId}/state`);
   if (!response.ok) throw new Error('获取状态失败');
+  return response.json();
+}
+
+export async function listSaves(): Promise<{ saves: SaveSlotSummary[] }> {
+  const response = await fetch(`${BASE}/saves`);
+  if (!response.ok) throw new Error('获取存档失败');
+  return response.json();
+}
+
+export async function saveGame(gameId: string, payload: SaveGamePayload): Promise<{ save: SaveSlotSummary }> {
+  const response = await fetch(`${BASE}/game/${gameId}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.detail || '保存失败');
+  }
+
+  return response.json();
+}
+
+export async function loadGame(slotKey: SaveSlotKey): Promise<LoadGameResult> {
+  const response = await fetch(`${BASE}/saves/${slotKey}/load`, { method: 'POST' });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.detail || '读取存档失败');
+  }
+
   return response.json();
 }
 

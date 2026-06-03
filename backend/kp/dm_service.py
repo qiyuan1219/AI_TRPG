@@ -213,6 +213,20 @@ TOOLS = [
                 "required": ["reason"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "trigger_event",
+            "description": "触发特定剧情事件(如龙血觉醒、丽莎复仇等), 仅记录不修改数值",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "event_name": {"type": "string", "description": "事件名: 龙血觉醒/丽莎复仇/格鲁姆债主/盲眼修女/公主赏赐"},
+                },
+                "required": ["event_name"]
+            }
+        }
     }
 ]
 
@@ -225,8 +239,7 @@ def execute_tool(name: str, args: dict) -> dict:
         return r.to_dict()
     elif name == "skill_check":
         r = skill_check(args["stat_mod"], args.get("prof_bonus", 2), args["dc"])
-        r.attr = args.get("attribute", "")
-        return r.to_dict() if hasattr(r, 'attr') else {**r.to_dict(), "属性": args.get("attribute","")}
+        return {**r.to_dict(), "属性": args.get("attribute", "")}
     elif name == "roll_dice_tool":
         return {"骰子": args["dice_str"], "结果": roll_dice(args["dice_str"])}
     elif name == "update_gold":
@@ -249,6 +262,8 @@ def execute_tool(name: str, args: dict) -> dict:
         return {"action": "xp", "amount": args["amount"], "reason": args["reason"]}
     elif name == "complete_chapter":
         return {"action": "complete_chapter", "reason": args["reason"]}
+    elif name == "trigger_event":
+        return {"action": "trigger_event", "event_name": args["event_name"]}
     return {"error": f"未知: {name}"}
 
 
@@ -258,7 +273,7 @@ async def dm_chat_stream(
 ) -> AsyncGenerator[str, None]:
     sp = build_system_prompt(game_state, recent_memory)
     messages = [{"role": "system", "content": sp}]
-    messages.extend(history[-10:])
+    messages.extend(history[-20:])
     messages.append({"role": "user", "content": user_input})
 
     for _ in range(2):
@@ -293,13 +308,22 @@ async def dm_chat_stream(
                     # 状态变更用 STATE 前缀，检定掷骰用 SYSTEM 前缀
                     STATE_TOOLS = ("update_gold","update_inventory","update_hp","update_trust",
                                    "update_area","level_up","update_npc_hp","update_attribute",
-                                   "add_xp","complete_chapter")
+                                   "add_xp","complete_chapter","trigger_event")
                     is_state = tc["function"]["name"] in STATE_TOOLS
                     prefix = "[STATE:" if is_state else "[SYSTEM:"
                     yield f"{prefix}{tc['function']['name']}:{json.dumps(result, ensure_ascii=False)}]\n"
                     messages.append({"role":"tool","tool_call_id":tc["id"],
                                      "content": json.dumps(result, ensure_ascii=False)})
-                except: pass
+                except json.JSONDecodeError as e:
+                    err_info = {"error": "JSON解析失败", "args": tc["function"]["arguments"][:100], "detail": str(e)}
+                    yield f"[SYSTEM:error:{json.dumps(err_info, ensure_ascii=False)}]\n"
+                    messages.append({"role":"tool","tool_call_id":tc["id"],
+                                     "content": json.dumps(err_info, ensure_ascii=False)})
+                except Exception as e:
+                    err_info = {"error": f"工具执行失败: {tc['function']['name']}", "detail": str(e)}
+                    yield f"[SYSTEM:error:{json.dumps(err_info, ensure_ascii=False)}]\n"
+                    messages.append({"role":"tool","tool_call_id":tc["id"],
+                                     "content": json.dumps(err_info, ensure_ascii=False)})
             continue
         return
 

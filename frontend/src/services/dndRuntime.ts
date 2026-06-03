@@ -66,6 +66,7 @@ function formatStateChange(change: Record<string, any>) {
   if (change.type === 'attribute') return `${change.attr} ${signed}${reason}`;
   if (change.type === 'xp') return `经验 ${signed}${reason}`;
   if (change.type === 'complete_chapter') return change.reason || '章节完成';
+  if (change.type === 'trigger_event') return `剧情事件：${change.event_name}`;
 
   return '';
 }
@@ -94,6 +95,7 @@ function applyStateChange(state: GameState, change: Record<string, any>): GameSt
   } else if (change.type === 'attribute') next[change.attr] = change.new;
   else if (change.type === 'xp') next.xp = change.new;
   else if (change.type === 'complete_chapter') next.cleared_levels = change.new;
+  else if (change.type === 'trigger_event') next.triggered_events = change.events;
 
   return next;
 }

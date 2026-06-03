@@ -1,10 +1,17 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { abilityModifier, DND_CLASSES, presetAc, presetHp } from '../data/dndClasses';
-import type { CharacterPreset, CreateGamePayload } from '../types/game';
+import type { CharacterPreset, CreateGamePayload, SaveSlotKey, SaveSlotSummary } from '../types/game';
+import { SaveLoadPanel, SAVE_SLOT_KEYS } from './SaveLoadPanel';
 
 interface StartDNDProps {
   onStart: (payload: CreateGamePayload) => void;
+  saves?: SaveSlotSummary[];
+  saveBusySlot?: SaveSlotKey | '';
+  saveMessage?: string;
+  saveMessageTone?: 'neutral' | 'success' | 'error';
+  onRefreshSaves?: () => void;
+  onLoadSave?: (slotKey: SaveSlotKey) => void;
 }
 
 const ATTRS: Array<{ key: keyof CharacterPreset['stats']; name: string }> = [
@@ -16,9 +23,18 @@ const ATTRS: Array<{ key: keyof CharacterPreset['stats']; name: string }> = [
   { key: 'cha', name: '魅力' },
 ];
 
-export function StartDND({ onStart }: StartDNDProps) {
+export function StartDND({
+  onStart,
+  saves = [],
+  saveBusySlot = '',
+  saveMessage = '',
+  saveMessageTone = 'neutral',
+  onRefreshSaves,
+  onLoadSave,
+}: StartDNDProps) {
   const [name, setName] = useState('冒险者');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showSaves, setShowSaves] = useState(false);
   const currentClass = DND_CLASSES[selectedIndex];
 
   function submit() {
@@ -118,12 +134,83 @@ export function StartDND({ onStart }: StartDNDProps) {
               </div>
             </div>
 
+            <div className="skill-preview">
+              <div>
+                <h3>战斗技能</h3>
+                {currentClass.skills.combat.map((skill) => (
+                  <p key={skill.name}>
+                    <b>{skill.name}</b>
+                    <span>{skill.check}</span>
+                  </p>
+                ))}
+              </div>
+              <div>
+                <h3>非战斗技能</h3>
+                {currentClass.skills.nonCombat.map((skill) => (
+                  <p key={skill.name}>
+                    <b>{skill.name}</b>
+                    <span>{skill.check}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+
             <button type="button" onClick={submit} className="start-button">
               深入地下城
             </button>
           </motion.div>
         </section>
       </motion.div>
+
+      {/* 右下角读取存档按钮 */}
+      {onLoadSave && (
+        <button
+          type="button"
+          className="load-save-fab"
+          onClick={() => setShowSaves(true)}
+          title="读取存档"
+        >
+          📂
+        </button>
+      )}
+
+      {/* 存档弹窗 */}
+      <AnimatePresence>
+        {showSaves && (
+          <motion.div
+            className="save-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowSaves(false)}
+          >
+            <motion.div
+              className="save-modal"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="save-modal-header">
+                <span>读取存档</span>
+                <button type="button" onClick={() => setShowSaves(false)}>✕</button>
+              </div>
+              <SaveLoadPanel
+                title="读取存档"
+                saves={saves}
+                busySlot={saveBusySlot}
+                message={saveMessage}
+                messageTone={saveMessageTone}
+                onRefresh={onRefreshSaves}
+                onLoad={(slotKey) => {
+                  onLoadSave?.(slotKey);
+                  setShowSaves(false);
+                }}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

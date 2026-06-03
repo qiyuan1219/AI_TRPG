@@ -80,6 +80,18 @@ export function VisualNovelStage({
     if (canAdvance) onAdvance();
   }
 
+  // 空格键推进
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === ' ' && !isActionPhase && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        advance();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isActionPhase, canAdvance, done, isStreaming, line]);
+
   return (
     <main className={`vn-canvas ${scene.themeClass}`} onClick={advance}>
       <div className="scene-layer" />

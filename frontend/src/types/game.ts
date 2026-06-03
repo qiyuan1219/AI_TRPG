@@ -28,6 +28,15 @@ export interface GameState {
   [key: string]: any;
 }
 
+export type SkillKind = 'combat' | 'noncombat' | 'support' | 'story';
+
+export interface SkillEntry {
+  name: string;
+  kind: SkillKind;
+  check: string;
+  effect: string;
+}
+
 export interface CharacterPreset {
   id: string;
   name: string;
@@ -43,6 +52,26 @@ export interface CharacterPreset {
   };
   pros: string[];
   cons: string[];
+  skills: {
+    combat: SkillEntry[];
+    nonCombat: SkillEntry[];
+  };
+}
+
+export interface CompanionPreset {
+  id: string;
+  name: string;
+  title: string;
+  role: string;
+  hp: number;
+  ac: number;
+  trustKey: string;
+  hpKey: string;
+  skills: {
+    combat: SkillEntry[];
+    nonCombat: SkillEntry[];
+    story: SkillEntry[];
+  };
 }
 
 export interface CreateGamePayload {
@@ -62,6 +91,39 @@ export interface CreateGameResult {
   session_id?: string;
   opening: string;
   state: GameState;
+}
+
+export type SaveSlotKey = 'slot-1' | 'slot-2' | 'slot-3' | 'slot-4' | 'slot-5';
+
+export interface SaveSlotSummary {
+  slot_key: SaveSlotKey;
+  title: string;
+  source_game_id: string;
+  player_name: string;
+  char_class: string;
+  level: number;
+  current_area: string;
+  last_event: string;
+  saved_at: string;
+}
+
+export interface SaveGamePayload {
+  slot_key: SaveSlotKey;
+  title?: string;
+  story: StoryLine[];
+  suggestions: ActionSuggestion[];
+  active_index: number;
+  phase: 'narrating' | 'action';
+}
+
+export interface LoadGameResult {
+  game_id: string;
+  state: GameState;
+  story: StoryLine[];
+  suggestions: ActionSuggestion[];
+  active_index: number;
+  phase: 'narrating' | 'action';
+  save: SaveSlotSummary;
 }
 
 export interface StreamCallbacks {

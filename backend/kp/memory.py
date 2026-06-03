@@ -7,7 +7,7 @@ import sqlite3
 import os
 import json
 from datetime import datetime
-from config import DATABASE_PATH
+from config import DATABASE_PATH, LEGACY_DATABASE_PATHS, SAVE_DIR
 
 
 # ============================================================
@@ -79,9 +79,25 @@ def init_db():
             state_json TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        -- 手动存档槽。保留前端叙事文本、行动建议、后端短期上下文与长期记忆快照。
+        CREATE TABLE IF NOT EXISTS game_saves (
+            slot_key TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            source_game_id TEXT NOT NULL,
+            state_json TEXT NOT NULL,
+            story_json TEXT NOT NULL DEFAULT '[]',
+            suggestions_json TEXT NOT NULL DEFAULT '[]',
+            active_index INTEGER DEFAULT 0,
+            phase TEXT DEFAULT 'action',
+            chat_history_json TEXT NOT NULL DEFAULT '[]',
+            memories_json TEXT NOT NULL DEFAULT '[]',
+            saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     conn.commit()
     conn.close()
+    sync_save_files()
 
 
 # ============================================================
@@ -248,3 +264,404 @@ def load_game_state(game_id: str) -> dict:
         state[f"{prefix}_trust"] = npc["trust"]
         state[f"{prefix}_alive"] = bool(npc["alive"])
     return state
+
+
+# ============================================================
+# 手动存档槽
+# ============================================================
+def _json_or_default(raw: str, default):
+    try:
+        return json.loads(raw) if raw else default
+    except json.JSONDecodeError:
+        return default
+
+
+def _now_timestamp() -> str:
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _ensure_save_dir():
+    os.makedirs(SAVE_DIR, exist_ok=True)
+
+
+def _safe_slot_filename(slot_key: str) -> str:
+    safe = "".join(ch for ch in str(slot_key) if ch.isalnum() or ch in {"-", "_"})
+    return safe or "slot"
+
+
+def _save_file_path(slot_key: str) -> str:
+    return os.path.join(str(SAVE_DIR), f"{_safe_slot_filename(slot_key)}.json")
+
+
+def _coerce_list(value) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _coerce_dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _save_payload_from_row(row: sqlite3.Row) -> dict:
+    return {
+        "schema_version": 1,
+        "slot_key": row["slot_key"],
+        "title": row["title"],
+        "source_game_id": row["source_game_id"],
+        "state": _json_or_default(row["state_json"], {}),
+        "story": _json_or_default(row["story_json"], []),
+        "suggestions": _json_or_default(row["suggestions_json"], []),
+        "active_index": int(row["active_index"] or 0),
+        "phase": row["phase"] or "action",
+        "chat_history": _json_or_default(row["chat_history_json"], []),
+        "memories": _json_or_default(row["memories_json"], []),
+        "saved_at": row["saved_at"] or _now_timestamp(),
+    }
+
+
+def _normalize_save_payload(data: dict) -> dict | None:
+    if not isinstance(data, dict):
+        return None
+
+    state = _coerce_dict(data.get("state"))
+    story = _coerce_list(data.get("story"))
+    suggestions = _coerce_list(data.get("suggestions"))
+    chat_history = _coerce_list(data.get("chat_history"))
+    memories = _coerce_list(data.get("memories"))
+
+    if not state:
+        state = _json_or_default(str(data.get("state_json", "")), {})
+    if not story:
+        story = _json_or_default(str(data.get("story_json", "")), [])
+    if not suggestions:
+        suggestions = _json_or_default(str(data.get("suggestions_json", "")), [])
+    if not chat_history:
+        chat_history = _json_or_default(str(data.get("chat_history_json", "")), [])
+    if not memories:
+        memories = _json_or_default(str(data.get("memories_json", "")), [])
+
+    slot_key = str(data.get("slot_key") or "").strip()
+    source_game_id = str(data.get("source_game_id") or data.get("game_id") or "").strip()
+    if not slot_key or not source_game_id:
+        return None
+
+    try:
+        active_index = int(data.get("active_index", 0) or 0)
+    except (TypeError, ValueError):
+        active_index = 0
+
+    phase = str(data.get("phase") or "action")
+    if phase not in {"narrating", "action"}:
+        phase = "action"
+
+    return {
+        "schema_version": int(data.get("schema_version") or 1),
+        "slot_key": slot_key,
+        "title": str(data.get("title") or "Save"),
+        "source_game_id": source_game_id,
+        "state": state,
+        "story": story,
+        "suggestions": suggestions,
+        "active_index": max(0, active_index),
+        "phase": phase,
+        "chat_history": chat_history,
+        "memories": memories,
+        "saved_at": str(data.get("saved_at") or _now_timestamp()),
+    }
+
+
+def _read_save_file(path: str) -> dict | None:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    if isinstance(data, dict) and not data.get("slot_key"):
+        data["slot_key"] = os.path.splitext(os.path.basename(path))[0]
+    return _normalize_save_payload(data)
+
+
+def _write_save_file(payload: dict):
+    _ensure_save_dir()
+    path = _save_file_path(payload["slot_key"])
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, path)
+
+
+def _save_summary_from_payload(payload: dict) -> dict:
+    state = _coerce_dict(payload.get("state"))
+    story = _coerce_list(payload.get("story"))
+    last_line = ""
+    for line in reversed(story):
+        text = str(line.get("text", "")).strip() if isinstance(line, dict) else ""
+        if text:
+            last_line = text
+            break
+
+    return {
+        "slot_key": payload["slot_key"],
+        "title": payload["title"],
+        "source_game_id": payload["source_game_id"],
+        "player_name": state.get("player_name", "Adventurer"),
+        "char_class": state.get("char_class", "Unknown"),
+        "level": state.get("level", 1),
+        "current_area": state.get("current_area", "Unknown area"),
+        "last_event": state.get("last_event") or last_line[:80],
+        "saved_at": payload["saved_at"],
+    }
+
+
+def _upsert_save_payload(conn: sqlite3.Connection, payload: dict):
+    conn.execute("""
+        INSERT OR REPLACE INTO game_saves (
+            slot_key, title, source_game_id, state_json, story_json,
+            suggestions_json, active_index, phase, chat_history_json,
+            memories_json, saved_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        payload["slot_key"],
+        payload["title"],
+        payload["source_game_id"],
+        json.dumps(payload["state"], ensure_ascii=False),
+        json.dumps(payload["story"], ensure_ascii=False),
+        json.dumps(payload["suggestions"], ensure_ascii=False),
+        int(payload["active_index"]),
+        payload["phase"],
+        json.dumps(payload["chat_history"], ensure_ascii=False),
+        json.dumps(payload["memories"], ensure_ascii=False),
+        payload["saved_at"],
+    ))
+
+
+def _timestamp_key(value: str) -> str:
+    return str(value or "")
+
+
+def _should_overwrite_save_file(payload: dict) -> bool:
+    current = _read_save_file(_save_file_path(payload["slot_key"]))
+    if not current:
+        return True
+    return _timestamp_key(payload["saved_at"]) > _timestamp_key(current["saved_at"])
+
+
+def _db_has_saves_table(conn: sqlite3.Connection) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'game_saves'"
+    ).fetchone()
+    return bool(row)
+
+
+def _database_paths_for_import() -> list[str]:
+    paths = [DATABASE_PATH, *LEGACY_DATABASE_PATHS]
+    result = []
+    seen = set()
+    for path in paths:
+        full = os.path.abspath(str(path))
+        if full not in seen and os.path.exists(full):
+            seen.add(full)
+            result.append(full)
+    return result
+
+
+def _sync_database_saves_to_files():
+    _ensure_save_dir()
+    for db_path in _database_paths_for_import():
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            if not _db_has_saves_table(conn):
+                conn.close()
+                continue
+            rows = conn.execute("SELECT * FROM game_saves").fetchall()
+            conn.close()
+        except sqlite3.Error:
+            continue
+
+        for row in rows:
+            payload = _save_payload_from_row(row)
+            if _should_overwrite_save_file(payload):
+                _write_save_file(payload)
+
+
+def _sync_save_files_to_db():
+    _ensure_save_dir()
+    payloads = []
+    for name in os.listdir(SAVE_DIR):
+        if not name.endswith(".json"):
+            continue
+        payload = _read_save_file(os.path.join(str(SAVE_DIR), name))
+        if payload:
+            payloads.append(payload)
+
+    conn = get_db()
+    for payload in payloads:
+        _upsert_save_payload(conn, payload)
+    conn.commit()
+    conn.close()
+
+
+def sync_save_files():
+    _sync_database_saves_to_files()
+    _sync_save_files_to_db()
+
+
+def _save_summary(row: sqlite3.Row) -> dict:
+    state = _json_or_default(row["state_json"], {})
+    story = _json_or_default(row["story_json"], [])
+    last_line = ""
+    for line in reversed(story):
+        text = str(line.get("text", "")).strip() if isinstance(line, dict) else ""
+        if text:
+            last_line = text
+            break
+
+    return {
+        "slot_key": row["slot_key"],
+        "title": row["title"],
+        "source_game_id": row["source_game_id"],
+        "player_name": state.get("player_name", "冒险者"),
+        "char_class": state.get("char_class", "未知职业"),
+        "level": state.get("level", 1),
+        "current_area": state.get("current_area", "未知区域"),
+        "last_event": state.get("last_event") or last_line[:80],
+        "saved_at": row["saved_at"],
+    }
+
+
+def list_game_saves() -> list[dict]:
+    sync_save_files()
+    payloads = []
+    for name in os.listdir(SAVE_DIR):
+        if not name.endswith(".json"):
+            continue
+        payload = _read_save_file(os.path.join(str(SAVE_DIR), name))
+        if payload:
+            payloads.append(payload)
+    if payloads:
+        return [
+            _save_summary_from_payload(payload)
+            for payload in sorted(payloads, key=lambda item: item["slot_key"])
+        ]
+
+    """列出所有手动存档摘要。"""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM game_saves ORDER BY slot_key"
+    ).fetchall()
+    conn.close()
+    return [_save_summary(row) for row in rows]
+
+
+def get_game_memories(game_id: str) -> list[dict]:
+    """获取某局游戏的完整长期记忆快照。"""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT event, event_type, created_at FROM game_memories "
+        "WHERE game_id = ? ORDER BY id ASC",
+        (game_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def replace_game_memories(game_id: str, memories: list[dict]):
+    """用存档中的长期记忆替换当前记忆，避免读档后泄露未来事件。"""
+    conn = get_db()
+    conn.execute("DELETE FROM game_memories WHERE game_id = ?", (game_id,))
+    for memory in memories:
+        conn.execute(
+            "INSERT INTO game_memories (game_id, event, event_type, created_at) "
+            "VALUES (?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))",
+            (
+                game_id,
+                str(memory.get("event", "")),
+                str(memory.get("event_type", "general")),
+                memory.get("created_at"),
+            )
+        )
+    conn.commit()
+    conn.close()
+
+
+def save_game_slot(
+    slot_key: str,
+    title: str,
+    source_game_id: str,
+    state: dict,
+    story: list[dict],
+    suggestions: list[dict],
+    active_index: int,
+    phase: str,
+    chat_history: list[dict],
+    memories: list[dict],
+) -> dict:
+    """写入或覆盖一个手动存档槽。"""
+    conn = get_db()
+    conn.execute("""
+        INSERT OR REPLACE INTO game_saves (
+            slot_key, title, source_game_id, state_json, story_json,
+            suggestions_json, active_index, phase, chat_history_json,
+            memories_json, saved_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    """, (
+        slot_key,
+        title,
+        source_game_id,
+        json.dumps(state, ensure_ascii=False),
+        json.dumps(story, ensure_ascii=False),
+        json.dumps(suggestions, ensure_ascii=False),
+        int(active_index),
+        phase,
+        json.dumps(chat_history, ensure_ascii=False),
+        json.dumps(memories, ensure_ascii=False),
+    ))
+    row = conn.execute(
+        "SELECT * FROM game_saves WHERE slot_key = ?", (slot_key,)
+    ).fetchone()
+    conn.commit()
+    conn.close()
+    payload = _save_payload_from_row(row)
+    _write_save_file(payload)
+    return _save_summary_from_payload(payload)
+
+
+def load_game_save(slot_key: str) -> dict | None:
+    sync_save_files()
+    payload = _read_save_file(_save_file_path(slot_key))
+    if payload:
+        return {
+            "summary": _save_summary_from_payload(payload),
+            "game_id": payload["source_game_id"],
+            "state": payload["state"],
+            "story": payload["story"],
+            "suggestions": payload["suggestions"],
+            "active_index": int(payload["active_index"] or 0),
+            "phase": payload["phase"] or "action",
+            "chat_history": payload["chat_history"],
+            "memories": payload["memories"],
+        }
+
+    """读取一个手动存档槽的完整内容。"""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM game_saves WHERE slot_key = ?", (slot_key,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+
+    return {
+        "summary": _save_summary(row),
+        "game_id": row["source_game_id"],
+        "state": _json_or_default(row["state_json"], {}),
+        "story": _json_or_default(row["story_json"], []),
+        "suggestions": _json_or_default(row["suggestions_json"], []),
+        "active_index": int(row["active_index"] or 0),
+        "phase": row["phase"] or "action",
+        "chat_history": _json_or_default(row["chat_history_json"], []),
+        "memories": _json_or_default(row["memories_json"], []),
+    }

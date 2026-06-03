@@ -2,21 +2,37 @@
 游戏配置文件 —— D&D 碎冠之影
 """
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
+BACKEND_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BACKEND_DIR.parent
+
+
+def _resolve_project_path(value) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path.resolve()
+    return (PROJECT_ROOT / path).resolve()
+
 # ============================================================
 # AI 模型配置
 # ============================================================
-LLM_API_KEY = os.getenv("DEEPSEEK_API_KEY", "your-api-key-here")
+LLM_API_KEY = os.getenv("DEEPSEEK_API_KEY", "your-api-key-here").strip()
 LLM_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-v4-pro")
 
 # ============================================================
 # 数据库配置（纯 SQLite）
 # ============================================================
-DATABASE_PATH = "data/game.db"
+DATA_DIR = _resolve_project_path(os.getenv("GAME_DATA_DIR") or PROJECT_ROOT / "data")
+SAVE_DIR = _resolve_project_path(os.getenv("GAME_SAVE_DIR") or DATA_DIR / "saves")
+DATABASE_PATH = str(_resolve_project_path(os.getenv("DATABASE_PATH") or DATA_DIR / "game.db"))
+LEGACY_DATABASE_PATHS = [
+    str((BACKEND_DIR / "data" / "game.db").resolve()),
+]
 
 # ============================================================
 # D&D 游戏数值平衡
