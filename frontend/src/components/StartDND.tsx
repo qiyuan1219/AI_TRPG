@@ -6,6 +6,7 @@ import { SaveLoadPanel, SAVE_SLOT_KEYS } from './SaveLoadPanel';
 
 interface StartDNDProps {
   onStart: (payload: CreateGamePayload) => void;
+  onBack?: () => void;
   saves?: SaveSlotSummary[];
   saveBusySlot?: SaveSlotKey | '';
   saveMessage?: string;
@@ -25,6 +26,7 @@ const ATTRS: Array<{ key: keyof CharacterPreset['stats']; name: string }> = [
 
 export function StartDND({
   onStart,
+  onBack,
   saves = [],
   saveBusySlot = '',
   saveMessage = '',
@@ -59,7 +61,14 @@ export function StartDND({
             <p className="eyebrow">D&D AI-TRPG</p>
             <h1>碎冠之影</h1>
           </div>
-          <p>王冠城的雾正在升起，地下裂隙等待回应。</p>
+          <div className="start-header-copy">
+            <p>王冠城的雾正在升起，地下裂隙等待回应。</p>
+            {onBack && (
+              <button type="button" className="ghost-button" onClick={onBack}>
+                返回
+              </button>
+            )}
+          </div>
         </header>
 
         <section className="creator-grid">

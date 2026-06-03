@@ -1,271 +1,414 @@
-import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import * as THREE from 'three';
-import type { DiceResult } from '../types/game';
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import * as THREE from "three";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import type { DiceResult } from "../types/game";
+
+export type DieType = "d4" | "d8" | "d12" | "d20";
 
 export interface DiceRollOverlayProps {
   dice: DiceResult | null;
+  dieType?: DieType;
   onClose: () => void;
 }
 
-// ── 结果格式化 ──
-function formatResult(dice: DiceResult) {
+const DIE_SIDES: Record<DieType, number> = {
+  d4: 4,
+  d8: 8,
+  d12: 12,
+  d20: 20,
+};
+
+interface FormattedDiceResult {
+  dieLabel: string;
+  roll: string;
+  total: string;
+  dc?: string;
+  success?: boolean;
+  attr?: string;
+  verdict?: string;
+}
+
+function dieTypeFromDice(dice: DiceResult, fallback: DieType): DieType {
+  const raw = String(dice.data["骰子"] ?? dice.data.die ?? fallback).toLowerCase();
+  if (raw.includes("d4")) return "d4";
+  if (raw.includes("d8")) return "d8";
+  if (raw.includes("d12")) return "d12";
+  if (raw.includes("d20")) return "d20";
+  return fallback;
+}
+
+function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDiceResult {
   const d = dice.data;
-  if (dice.type === 'skill_check') {
-    const raw = d['掷骰']?.replace('D20=', '') || '?';
+  const resolvedDieType = dieTypeFromDice(dice, fallbackDieType);
+  const dieLabel = `D${DIE_SIDES[resolvedDieType]}`;
+
+  if (dice.type === "dice_test") {
+    const raw = String(d["结果"] ?? d.roll ?? d["掷骰"]?.match(/D\d+=(\d+)/)?.[1] ?? "?");
     return {
-      label: d['成功'] ? '检定成功' : '检定失败',
+      dieLabel,
       roll: raw,
-      total: String(d['总计'] ?? '?'),
-      dc: String(d['DC'] ?? '?'),
-      success: Boolean(d['成功']),
-      attr: String(d['属性'] ?? ''),
+      total: raw,
+      attr: "骰子测试",
+      verdict: "结果已生成",
     };
   }
-  if (dice.type === 'attack_roll') {
-    const raw = d['攻击掷骰']?.match(/D20=(\d+)/)?.[1] || '?';
+
+  if (dice.type === "skill_check") {
+    const raw = d["掷骰"]?.replace("D20=", "") || "?";
     return {
-      label: d['命中'] ? '命中!' : '未命中',
+      dieLabel: "D20",
       roll: raw,
-      total: String(d['总计'] ?? '?'),
-      dc: 'AC' + String(d['目标AC'] ?? '?'),
-      success: Boolean(d['命中']),
-      attr: String(d['武器'] ?? ''),
+      total: String(d["总计"] ?? "?"),
+      dc: String(d["DC"] ?? "?"),
+      success: Boolean(d["成功"]),
+      attr: String(d["属性"] ?? ""),
     };
   }
-  return { label: '掷骰', roll: '?', total: '?', dc: '?', success: false, attr: '' };
+  const raw = d["攻击掷骰"]?.match(/D20=(\d+)/)?.[1] || "?";
+  return {
+    dieLabel: "D20",
+    roll: raw,
+    total: String(d["总计"] ?? "?"),
+    dc: "AC" + String(d["目标AC"] ?? "?"),
+    success: Boolean(d["命中"]),
+    attr: String(d["武器"] ?? ""),
+  };
 }
 
-// ── 生成 1-20 的数字纹理 (canvas-based sprite) ──
-function createNumberTexture(num: number, size: number): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#1a1206';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = `bold ${size * 0.55}px serif`;
-  ctx.fillText(String(num), size / 2, size / 2);
-  return new THREE.CanvasTexture(canvas);
+function createDieGeometry(dieType: DieType, radius: number) {
+  switch (dieType) {
+    case "d4":
+      return new THREE.TetrahedronGeometry(radius, 0);
+    case "d8":
+      return new THREE.OctahedronGeometry(radius, 0);
+    case "d12":
+      return new THREE.DodecahedronGeometry(radius, 0);
+    case "d20":
+    default:
+      return new THREE.IcosahedronGeometry(radius, 0);
+  }
 }
 
-// ── 计算二十面体 20 个面的中心与法线 ──
-function icosaFaceData(radius: number) {
-  const geo = new THREE.IcosahedronGeometry(radius, 0);
+function polyFaceData(geo: THREE.BufferGeometry) {
   const pos = geo.attributes.position.array as Float32Array;
-  const faces: { center: THREE.Vector3; normal: THREE.Vector3 }[] = [];
-  for (let i = 0; i < 20; i++) {
-    const i9 = i * 9;
-    const a = new THREE.Vector3(pos[i9], pos[i9 + 1], pos[i9 + 2]);
-    const b = new THREE.Vector3(pos[i9 + 3], pos[i9 + 4], pos[i9 + 5]);
-    const c = new THREE.Vector3(pos[i9 + 6], pos[i9 + 7], pos[i9 + 8]);
-    const center = a.clone().add(b).add(c).multiplyScalar(1 / 3);
-    const normal = new THREE.Vector3().crossVectors(b.clone().sub(a), c.clone().sub(a)).normalize();
+  const groups: { center: THREE.Vector3; normal: THREE.Vector3; count: number }[] = [];
+
+  for (let i = 0; i < pos.length; i += 9) {
+    const a = new THREE.Vector3(pos[i], pos[i + 1], pos[i + 2]);
+    const b = new THREE.Vector3(pos[i + 3], pos[i + 4], pos[i + 5]);
+    const c = new THREE.Vector3(pos[i + 6], pos[i + 7], pos[i + 8]);
+    const center = a
+      .clone()
+      .add(b)
+      .add(c)
+      .multiplyScalar(1 / 3);
+    const normal = new THREE.Vector3()
+      .crossVectors(b.clone().sub(a), c.clone().sub(a))
+      .normalize();
     if (normal.dot(center) < 0) normal.negate();
-    faces.push({ center, normal });
+
+    const group = groups.find((item) => item.normal.dot(normal) > 0.98);
+    if (group) {
+      group.center.add(center);
+      group.normal.add(normal);
+      group.count += 1;
+    } else {
+      groups.push({ center, normal, count: 1 });
+    }
   }
-  return faces;
+
+  return groups.map((group) => {
+    const center = group.center.multiplyScalar(1 / group.count);
+    const normal = group.normal.normalize();
+    if (normal.dot(center) < 0) normal.negate();
+    return { center, normal };
+  });
 }
 
-// ── 3D 骰子画布 (纯 Three.js, 无 fiber) ──
-function useDiceCanvas(spinning: boolean) {
-  const containerRef = useRef<HTMLDivElement>(null);
+function makeNumTex(num: number): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#d4a843";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "bold 35px Georgia, serif";
+  ctx.fillText(String(num), 32, 32);
+  return new THREE.CanvasTexture(c);
+}
 
+export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOverlayProps) {
+  const [show, setShow] = useState(false);
+  const [rolling, setRolling] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<{
+    diceGroup: THREE.Group;
+    renderer: THREE.WebGLRenderer;
+    animId: number;
+  } | null>(null);
+  const spinningRef = useRef(false);
+  const timerRef = useRef<number[]>([]);
+
+  // 初始化 Three.js：容器始终存在，只建一次
   useEffect(() => {
-    const container = containerRef.current;
+    const container = canvasRef.current;
     if (!container) return;
 
-    // --- 初始化 ---
-    const w = 220, h = 220;
     const scene = new THREE.Scene();
-
-    const camera = new THREE.PerspectiveCamera(38, w / h, 0.5, 20);
+    const camera = new THREE.OrthographicCamera(-2.5, 2.5, 2.5, -2.5, 0.1, 20);
     camera.position.set(0, 0.3, 4.8);
+    camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(w, h);
+    renderer.setSize(220, 220);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
-    // 光照
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const p1 = new THREE.PointLight(0xfff8e7, 1.2);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const p1 = new THREE.PointLight(0xfff8e7, 1.6);
     p1.position.set(4, 3, 5);
     scene.add(p1);
-    const p2 = new THREE.PointLight(0x8b7d6b, 0.5);
+    const p2 = new THREE.PointLight(0x8b7d6b, 0.6);
     p2.position.set(-3, -2, -4);
     scene.add(p2);
-    const d1 = new THREE.DirectionalLight(0xffe0a0, 0.6);
+    const d1 = new THREE.DirectionalLight(0xffe8b0, 0.8);
     d1.position.set(0, 5, 2);
     scene.add(d1);
 
-    // 骰子组
     const diceGroup = new THREE.Group();
+    const dieSides = DIE_SIDES[dieType];
+    const bodyGeo = createDieGeometry(dieType, 1.5);
+    diceGroup.add(
+      new THREE.Mesh(
+        bodyGeo,
+        new THREE.MeshStandardMaterial({
+          color: 0x4a2080,
+          metalness: 0.45,
+          roughness: 0.25,
+        }),
+      ),
+    );
+    const eg = new LineSegmentsGeometry().fromEdgesGeometry(
+      new THREE.EdgesGeometry(bodyGeo, 12),
+    );
+    diceGroup.add(
+      new LineSegments2(
+        eg,
+        new LineMaterial({
+          color: 0xd4a843,
+          linewidth: 0.03,
+          worldUnits: true,
+        }),
+      ),
+    );
 
-    // 主体: 金色二十面体
-    const bodyGeo = new THREE.IcosahedronGeometry(1.5, 0);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc9a050, metalness: 0.55, roughness: 0.35 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    diceGroup.add(body);
-
-    // 棱线
-    const edgeGeo = new THREE.EdgesGeometry(bodyGeo, 12);
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0x5a3d1a, transparent: true, opacity: 0.7 });
-    diceGroup.add(new THREE.LineSegments(edgeGeo, edgeMat));
-
-    // 面数精灵
-    const faceData = icosaFaceData(1.5);
+    const faceData = polyFaceData(bodyGeo).slice(0, dieSides);
     faceData.forEach(({ center, normal }, i) => {
-      const tex = createNumberTexture(i + 1, 64);
-      const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-      const sprite = new THREE.Sprite(spriteMat);
-      sprite.scale.set(0.5, 0.5, 1);
-      const pos = center.clone().add(normal.clone().multiplyScalar(0.07));
-      sprite.position.copy(pos);
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeNumTex(i + 1),
+          transparent: true,
+          depthTest: false,
+        }),
+      );
+      sprite.scale.set(0.45, 0.45, 1);
+      sprite.position.copy(center).add(normal.clone().multiplyScalar(0.01));
       diceGroup.add(sprite);
     });
 
     scene.add(diceGroup);
 
-    // --- 动画循环 ---
+    // 减速状态
+    let decelerating = false;
+    let decelStart = 0;
+    let speedX = 0,
+      speedY = 0,
+      speedZ = 0;
+
     let animId = 0;
     const clock = new THREE.Clock();
-    const floatBase = diceGroup.position.clone();
-
     function animate() {
       animId = requestAnimationFrame(animate);
       const dt = Math.min(clock.getDelta(), 0.1);
 
-      if (spinning) {
+      if (decelerating) {
+        // 300ms ease-out 减速到零
+        const elapsed = Date.now() - decelStart;
+        const t = Math.min(elapsed / 300, 1.0);
+        const factor = 1 - t; // 线性衰减
+        diceGroup.rotation.x += dt * speedX * factor;
+        diceGroup.rotation.y += dt * speedY * factor;
+        diceGroup.rotation.z += dt * speedZ * factor;
+        if (t >= 1.0) {
+          decelerating = false;
+        }
+      } else if (spinningRef.current) {
         diceGroup.rotation.x += dt * 9;
         diceGroup.rotation.y += dt * 7;
         diceGroup.rotation.z += dt * 5;
-        diceGroup.position.copy(floatBase);
-      } else {
-        diceGroup.rotation.y += dt * 0.3;
-        diceGroup.position.y = floatBase.y + Math.sin(Date.now() * 0.001) * 0.08;
       }
 
       renderer.render(scene, camera);
     }
     animate();
 
+    // 暴露减速方法
+    (diceGroup.userData as any).startDecel = () => {
+      speedX = 9;
+      speedY = 7;
+      speedZ = 5;
+      decelerating = true;
+      decelStart = Date.now();
+    };
+
+    sceneRef.current = { diceGroup, renderer, animId };
     return () => {
       cancelAnimationFrame(animId);
       renderer.dispose();
-      if (container.contains(renderer.domElement)) {
+      if (container.contains(renderer.domElement))
         container.removeChild(renderer.domElement);
-      }
+      sceneRef.current = null;
     };
-  }, [spinning]);
+  }, [dieType]);
 
-  return containerRef;
-}
-
-// ── 主组件 ──
-export function DiceRollOverlay({ dice, onClose }: DiceRollOverlayProps) {
-  const [phase, setPhase] = useState<'rolling' | 'reveal' | 'idle'>('idle');
-  const containerRef = useDiceCanvas(phase === 'rolling');
-
+  // dice 变化 → 滚动→揭示
   useEffect(() => {
     if (!dice) {
-      setPhase('idle');
+      setShow(false);
       return;
     }
 
-    setPhase('rolling');
-    const revealTimer = window.setTimeout(() => {
-      setPhase('reveal');
-      const closeTimer = window.setTimeout(() => onClose(), 2800);
-      return () => window.clearTimeout(closeTimer);
+    timerRef.current.forEach(clearTimeout);
+    timerRef.current = [];
+
+    spinningRef.current = true;
+    setShow(true);
+    setRolling(true);
+    setRevealed(false);
+
+    const t1 = window.setTimeout(() => {
+      spinningRef.current = false;
+
+      // 触发自然减速
+      const ud = sceneRef.current?.diceGroup.userData as any;
+      if (ud?.startDecel) ud.startDecel();
+
+      // 300ms 减速完成后显示结果
+      setRolling(false);
+      window.setTimeout(() => setRevealed(true), 300);
     }, 1800);
 
-    return () => window.clearTimeout(revealTimer);
-  }, [dice, onClose]);
+    const t2 = window.setTimeout(() => onClose(), 4600);
+    timerRef.current = [t1, t2];
 
-  if (!dice || phase === 'idle') return null;
+    return () => timerRef.current.forEach(clearTimeout);
+  }, [dice]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const result = formatResult(dice);
-  const bonus = Number(dice.data['加值'] ?? 0);
-  const isNat20 = result.roll === '20';
-  const isNat1 = result.roll === '1';
+  // 始终渲染 Canvas 容器（即使隐藏），确保 ref 始终有效
+  const result = dice ? formatResult(dice, dieType) : null;
+  const bonus = dice ? Number(dice.data["加值"] ?? 0) : 0;
+  const resultDieType = dice ? dieTypeFromDice(dice, dieType) : dieType;
+  const resultSides = DIE_SIDES[resultDieType];
+  const isNatMax = Number(result?.roll) === resultSides;
+  const isNat1 = result?.roll === "1";
 
   return (
-    <AnimatePresence>
+    <div
+      className="dice-overlay"
+      style={{ display: show ? "flex" : "none" }}
+      onClick={revealed ? onClose : undefined}
+    >
       <motion.div
-        className="dice-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.25 }}
-        onClick={phase === 'reveal' ? onClose : undefined}
+        className="dice-modal dice-modal-3d"
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: show ? 1 : 0.6, opacity: show ? 1 : 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 22 }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <motion.div
-          className="dice-modal dice-modal-3d"
-          initial={{ scale: 0.7, y: 40 }}
-          animate={{ scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-          onClick={(e) => e.stopPropagation()}
+        {/* Canvas 容器：始终存在，仅 CSS display 控制 */}
+        <div
+          className="dice-canvas-wrap"
+          ref={canvasRef}
+          style={{ display: show ? "" : "none" }}
         >
-          {/* ── 3D 骰子画布 ── */}
-          <div className="dice-canvas-wrap" ref={containerRef}>
-            {/* 揭示时叠加结果数字 */}
-            <AnimatePresence>
-              {phase === 'reveal' && (
-                <motion.div
-                  className={`dice-result-badge ${isNat20 ? 'badge-crit' : ''} ${isNat1 ? 'badge-fumble' : ''}`}
-                  initial={{ scale: 0, rotateZ: -30 }}
-                  animate={{ scale: 1, rotateZ: 0 }}
-                  transition={{ type: 'spring', stiffness: 360, damping: 16, delay: 0.15 }}
-                >
-                  <span className="badge-num">{result.roll}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {revealed && result && (
+            <motion.div
+              className={`dice-result-badge ${isNatMax ? "badge-crit" : ""} ${isNat1 ? "badge-fumble" : ""}`}
+              initial={{ scale: 0, rotateZ: -30 }}
+              animate={{ scale: 1, rotateZ: 0 }}
+              transition={{ type: "spring", stiffness: 360, damping: 16 }}
+            >
+              <span className="badge-num">{result.roll}</span>
+            </motion.div>
+          )}
+        </div>
 
-          {/* ── 检定信息 ── */}
+        {revealed && result && (
           <motion.div
             className="dice-info"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: phase === 'reveal' ? 1 : 0, y: phase === 'reveal' ? 0 : 12 }}
-            transition={{ delay: 0.2, duration: 0.35 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
           >
             {result.attr && <div className="dice-attr">{result.attr}</div>}
-
             <div className="dice-calc">
-              <span>D20</span>
-              <span className={`dice-roll-val ${isNat20 ? 'text-teal' : ''} ${isNat1 ? 'text-danger' : ''}`}>
+              <span>{result.dieLabel}</span>
+              <span
+                className={`dice-roll-val ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}
+              >
                 {result.roll}
               </span>
               {bonus !== 0 && (
                 <>
-                  <span>{bonus > 0 ? '+' : ''}</span>
+                  <span>{bonus > 0 ? "+" : ""}</span>
                   <span>{bonus}</span>
                 </>
               )}
-              <span>=</span>
-              <span className="dice-total">{result.total}</span>
+              {(bonus !== 0 || result.total !== result.roll) && (
+                <>
+                  <span>=</span>
+                  <span className="dice-total">{result.total}</span>
+                </>
+              )}
             </div>
-
-            <div className="dice-dc">
-              <span>/</span>
-              <span>DC {result.dc.replace('AC', '').trim()}</span>
-            </div>
-
-            <motion.div
-              className={`dice-verdict ${result.success ? 'verdict-success' : 'verdict-fail'}`}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: 'spring', stiffness: 400 }}
-            >
-              {isNat20 ? '🎉 大成功!' : isNat1 ? '💀 大失败!' : result.success ? '通过 ✓' : '失败 ✗'}
-            </motion.div>
+            {result.dc && (
+              <div className="dice-dc">
+                <span>/</span>
+                <span>DC {result.dc.replace("AC", "").trim()}</span>
+              </div>
+            )}
+            {(result.verdict || typeof result.success === "boolean") && (
+              <motion.div
+                className={`dice-verdict ${
+                  typeof result.success === "boolean"
+                    ? result.success
+                      ? "verdict-success"
+                      : "verdict-fail"
+                    : "verdict-neutral"
+                }`}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.1, type: "spring", stiffness: 400 }}
+              >
+                {result.verdict ||
+                  (isNatMax
+                    ? "🎉 大成功!"
+                    : isNat1
+                      ? "💀 大失败!"
+                      : result.success
+                        ? "通过 ✓"
+                        : "失败 ✗")}
+              </motion.div>
+            )}
           </motion.div>
-        </motion.div>
+        )}
       </motion.div>
-    </AnimatePresence>
+    </div>
   );
 }

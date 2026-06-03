@@ -1,7 +1,7 @@
 import type { ActionSuggestion } from '../types/game';
 
 const HINT_RE = /\[HINTS:([\s\S]*?)\]/g;
-const SENTENCE_END_CHARS = new Set(['，', ',', '。', '！', '？', '!', '?', '；', ';', '\n']);
+const SENTENCE_END_CHARS = new Set(['。', '！', '？', '!', '?', '\n']);
 const MIN_SEGMENT_TEXT_LENGTH = 10;
 
 export interface NarrativeSegment {

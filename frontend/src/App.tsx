@@ -4,9 +4,12 @@ import { ActionPanel } from './components/ActionPanel';
 import { CharacterPanel } from './components/CharacterPanel';
 import { DiceRollOverlay } from './components/DiceRollOverlay';
 import type { EventFeedItem } from './components/EventFeed';
+import { LoadGameScreen } from './components/LoadGameScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { SaveLoadPanel } from './components/SaveLoadPanel';
 import { StartDND } from './components/StartDND';
+import { TestScreen } from './components/TestScreen';
+import { TitleMenu } from './components/TitleMenu';
 import { VisualNovelStage } from './components/VisualNovelStage';
 import { resolveDndScene } from './data/dndScenes';
 import { listSaves, loadGame, saveGame } from './services/api';
@@ -22,7 +25,7 @@ import type {
 } from './types/game';
 import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrativeSegments, splitNarrative } from './utils/narrative';
 
-type Screen = 'start' | 'loading' | 'game';
+type Screen = 'main-menu' | 'new-game' | 'load-game' | 'test' | 'loading' | 'game';
 type GamePhase = 'narrating' | 'action';
 
 const DEFAULT_OPENING = '王冠城的钟声穿过雾气。你的冒险从这一刻开始。';
@@ -58,7 +61,7 @@ function normalizeStoryLines(lines: StoryLine[]): StoryLine[] {
 
 export default function App() {
   const runtime = dndRuntime;
-  const [screen, setScreen] = useState<Screen>('start');
+  const [screen, setScreen] = useState<Screen>('main-menu');
   const [loadError, setLoadError] = useState('');
   const [gameId, setGameId] = useState('');
   const [gameState, setGameState] = useState<GameState>({});
@@ -82,6 +85,7 @@ export default function App() {
   const stateRef = useRef<GameState>({});
   const kpSpeakerRef = useRef('');
   const eventTimersRef = useRef<number[]>([]);
+  const diceFiredRef = useRef(false); // 防重复投骰
 
   useEffect(() => {
     stateRef.current = gameState;
@@ -295,6 +299,7 @@ export default function App() {
 
       abortRef.current?.abort();
       parserRef.current = createNarrativeStreamParser();
+      diceFiredRef.current = false; // 重置骰子锁
       setPhase('narrating');
       setStreaming(true);
       setSuggestions([]);
@@ -310,8 +315,9 @@ export default function App() {
           const parsed = runtime.parseSystemEvent(rawEvent);
           if (!parsed) return;
           addEvent(runtime.formatSystemEvent(parsed), parsed.type === 'error' ? 'error' : 'dice');
-          // 骰子检定类事件触发动画覆盖层
-          if (parsed.type === 'skill_check' || parsed.type === 'attack_roll') {
+          // 骰子动画：每轮最多触发一次
+          if (!diceFiredRef.current && (parsed.type === 'skill_check' || parsed.type === 'attack_roll')) {
+            diceFiredRef.current = true;
             setDiceRoll(parsed);
           }
         },
@@ -351,20 +357,45 @@ export default function App() {
     if (!streaming) setPhase('action');
   }, [activeIndex, story.length, streaming]);
 
-  if (screen === 'start') {
+  const openLoadGame = useCallback(() => {
+    setSaveMessage('');
+    setSaveMessageTone('neutral');
+    void refreshSaves();
+    setScreen('load-game');
+  }, [refreshSaves]);
+
+  if (screen === 'main-menu') {
+    return <TitleMenu onNewGame={() => setScreen('new-game')} onLoadGame={openLoadGame} onTest={() => setScreen('test')} />;
+  }
+
+  if (screen === 'new-game') {
     return (
       <StartDND
         onStart={startGame}
+        onBack={() => setScreen('main-menu')}
+      />
+    );
+  }
+
+  if (screen === 'load-game') {
+    return (
+      <LoadGameScreen
         saves={saves}
         saveBusySlot={saveBusySlot}
         saveMessage={saveMessage}
         saveMessageTone={saveMessageTone}
+        onBack={() => setScreen('main-menu')}
         onRefreshSaves={refreshSaves}
         onLoadSave={loadSavedGame}
       />
     );
   }
-  if (screen === 'loading') return <LoadingScreen error={loadError} onRetry={() => setScreen('start')} />;
+
+  if (screen === 'test') {
+    return <TestScreen onBack={() => setScreen('main-menu')} />;
+  }
+
+  if (screen === 'loading') return <LoadingScreen error={loadError} onRetry={() => setScreen('new-game')} />;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="vn-app">
@@ -385,7 +416,7 @@ export default function App() {
       />
 
       {/* 骰子检定动画覆盖层 */}
-      <DiceRollOverlay dice={diceRoll} onClose={() => setDiceRoll(null)} />
+      <DiceRollOverlay dice={diceRoll} dieType="d20" onClose={() => setDiceRoll(null)} />
 
       {/* 游戏内右上角存档按钮 */}
       <button
