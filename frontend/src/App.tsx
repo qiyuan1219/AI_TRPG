@@ -75,6 +75,8 @@ export default function App() {
   const [saves, setSaves] = useState<SaveSlotSummary[]>([]);
   const [saveBusySlot, setSaveBusySlot] = useState<SaveSlotKey | ''>('');
   const [showGameSaves, setShowGameSaves] = useState(false);
+  const [showCharacterInfo, setShowCharacterInfo] = useState(false);
+  const [showReturnTitleConfirm, setShowReturnTitleConfirm] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveMessageTone, setSaveMessageTone] = useState<'neutral' | 'success' | 'error'>('neutral');
 
@@ -332,10 +334,13 @@ export default function App() {
           setStreaming(false);
         },
         onError: (error) => {
-          const message = error || '连接中断';
+          const rawMessage = String(error || '').trim();
+          const message = /connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|timeout|timed\s*out|econn|socket/i.test(rawMessage)
+            ? 'KP暂时没有回应，已为本轮处理启用兜底。'
+            : rawMessage || 'KP暂时没有回应，已为本轮处理启用兜底。';
           setStreaming(false);
-          addEvent(message, 'error');
-          appendStoryLines([`KP 的声音暂时被杂讯打断：${message}`], 'system', '系统');
+          addEvent(message, 'state');
+          appendStoryLines([message], 'system', '系统');
           setSuggestions(fallbackSuggestions(stateRef.current));
         },
       });
@@ -363,6 +368,22 @@ export default function App() {
     void refreshSaves();
     setScreen('load-game');
   }, [refreshSaves]);
+
+  const returnToTitleMenu = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    parserRef.current = createNarrativeStreamParser();
+    clearEventTimers();
+    setStreaming(false);
+    setShowGameSaves(false);
+    setShowCharacterInfo(false);
+    setShowReturnTitleConfirm(false);
+    setDiceRoll(null);
+    setEvents([]);
+    setSaveMessage('');
+    setSaveMessageTone('neutral');
+    setScreen('main-menu');
+  }, [clearEventTimers]);
 
   if (screen === 'main-menu') {
     return <TitleMenu onNewGame={() => setScreen('new-game')} onLoadGame={openLoadGame} onTest={() => setScreen('test')} />;
@@ -399,7 +420,6 @@ export default function App() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="vn-app">
-      <CharacterPanel state={gameState} />
       <VisualNovelStage
         scene={scene}
         line={currentLine}
@@ -418,14 +438,100 @@ export default function App() {
       {/* 骰子检定动画覆盖层 */}
       <DiceRollOverlay dice={diceRoll} dieType="d20" onClose={() => setDiceRoll(null)} />
 
-      {/* 游戏内右上角存档按钮 */}
       <button
         type="button"
-        className="game-save-btn"
-        onClick={() => setShowGameSaves(true)}
+        className="game-character-btn"
+        aria-haspopup="dialog"
+        aria-expanded={showCharacterInfo}
+        onClick={() => setShowCharacterInfo(true)}
       >
-        📂 冒险存档
+        角色信息
       </button>
+
+      <div className="game-top-actions">
+        <button type="button" className="game-title-btn" onClick={() => setShowReturnTitleConfirm(true)}>
+          回到标题界面
+        </button>
+        <button
+          type="button"
+          className="game-save-btn"
+          onClick={() => setShowGameSaves(true)}
+        >
+          📂 冒险存档
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showReturnTitleConfirm && (
+          <motion.div
+            className="return-title-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowReturnTitleConfirm(false)}
+          >
+            <motion.section
+              className="return-title-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="返回标题界面确认"
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="return-title-copy">
+                <span>返回标题界面</span>
+                <p>请先确认当前冒险进度已经存档。未保存的剧情和状态不会自动保存。</p>
+              </div>
+              <div className="return-title-actions">
+                <button type="button" className="return-title-cancel" onClick={() => setShowReturnTitleConfirm(false)}>
+                  取消
+                </button>
+                <button type="button" className="return-title-confirm" onClick={returnToTitleMenu}>
+                  确定
+                </button>
+              </div>
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showCharacterInfo && (
+          <motion.div
+            className="character-modal-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowCharacterInfo(false)}
+          >
+            <motion.section
+              className="character-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="角色信息"
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="character-modal-header">
+                <div>
+                  <span>角色信息</span>
+                  <small>
+                    {gameState.player_name || '冒险者'} · {gameState.char_class || '战士'}
+                  </small>
+                </div>
+                <button type="button" aria-label="关闭角色信息" onClick={() => setShowCharacterInfo(false)}>
+                  ×
+                </button>
+              </div>
+              <CharacterPanel state={gameState} />
+            </motion.section>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 游戏内存档弹窗 */}
       <AnimatePresence>

@@ -1,16 +1,19 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { BattleTestScreen } from "./BattleTestScreen";
 import { DiceRollOverlay, type DieType } from "./DiceRollOverlay";
+import { YachtDiceTestScreen } from "./YachtDiceTestScreen";
 import type { DiceResult } from "../types/game";
 
 interface TestScreenProps {
   onBack: () => void;
 }
 
-type TestMode = "menu" | "dice-select" | "dice-roll";
+type TestMode = "menu" | "dice-select" | "dice-roll" | "battle" | "yacht";
 
 const DICE_OPTIONS: Array<{ type: DieType; label: string; sides: number }> = [
   { type: "d4", label: "四面骰", sides: 4 },
+  { type: "d6", label: "六面骰", sides: 6 },
   { type: "d8", label: "八面骰", sides: 8 },
   { type: "d12", label: "十二面骰", sides: 12 },
   { type: "d20", label: "二十面骰", sides: 20 },
@@ -23,7 +26,7 @@ export function TestScreen({ onBack }: TestScreenProps) {
   const [history, setHistory] = useState<Array<{ id: number; die: DieType; value: number }>>([]);
 
   const currentDie = useMemo(
-    () => DICE_OPTIONS.find((item) => item.type === selectedDie) ?? DICE_OPTIONS[3],
+    () => DICE_OPTIONS.find((item) => item.type === selectedDie) ?? DICE_OPTIONS[4],
     [selectedDie],
   );
 
@@ -33,6 +36,14 @@ export function TestScreen({ onBack }: TestScreenProps) {
       return;
     }
     if (mode === "dice-select") {
+      setMode("menu");
+      return;
+    }
+    if (mode === "battle") {
+      setMode("menu");
+      return;
+    }
+    if (mode === "yacht") {
       setMode("menu");
       return;
     }
@@ -63,6 +74,14 @@ export function TestScreen({ onBack }: TestScreenProps) {
     });
   }
 
+  if (mode === "battle") {
+    return <BattleTestScreen onBack={() => setMode("menu")} />;
+  }
+
+  if (mode === "yacht") {
+    return <YachtDiceTestScreen onBack={() => setMode("menu")} />;
+  }
+
   return (
     <main className="test-screen">
       <motion.section
@@ -85,11 +104,15 @@ export function TestScreen({ onBack }: TestScreenProps) {
           <section className="test-menu-grid" aria-label="测试类型">
             <button type="button" className="test-mode-button" onClick={() => setMode("dice-select")}>
               <span>测试骰子</span>
-              <small>验证 D4、D8、D12、D20 是否能正常投出结果</small>
+              <small>验证 D4、D6、D8、D12、D20 是否能正常投出结果</small>
             </button>
-            <button type="button" className="test-mode-button" disabled>
+            <button type="button" className="test-mode-button" onClick={() => setMode("battle")}>
               <span>测试战斗</span>
-              <small>战斗流程测试暂未开放</small>
+              <small>B1 层先攻、行动顺序、角色详情与技能界面</small>
+            </button>
+            <button type="button" className="test-mode-button" onClick={() => setMode("yacht")}>
+              <span>快艇骰子</span>
+              <small>5 颗 D6、锁骰、计分表与完整规则说明</small>
             </button>
           </section>
         )}

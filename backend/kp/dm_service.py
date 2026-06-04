@@ -1,4 +1,5 @@
 """D&D DM 服务"""
+import asyncio
 import json
 from typing import AsyncGenerator
 from openai import AsyncOpenAI
@@ -10,6 +11,21 @@ from engine.rules_dnd import (
 from kp.prompt_builder_dnd import build_system_prompt
 
 client = AsyncOpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
+LLM_MAX_ATTEMPTS = 3
+LLM_RETRY_DELAY = 0.8
+
+
+async def _create_chat_completion(**kwargs):
+    last_error = None
+    for attempt in range(LLM_MAX_ATTEMPTS):
+        try:
+            return await client.chat.completions.create(**kwargs)
+        except Exception as error:
+            last_error = error
+            if attempt >= LLM_MAX_ATTEMPTS - 1:
+                break
+            await asyncio.sleep(LLM_RETRY_DELAY * (attempt + 1))
+    raise last_error
 
 TOOLS = [
     {
@@ -280,7 +296,7 @@ async def dm_chat_stream(
         acc_content = ""
         acc_tools = []
 
-        stream = await client.chat.completions.create(
+        stream = await _create_chat_completion(
             model=LLM_MODEL, messages=messages, tools=TOOLS,
             tool_choice="auto", temperature=0.7, max_tokens=1024, stream=True,
         )
@@ -327,7 +343,7 @@ async def dm_chat_stream(
             continue
         return
 
-    final = await client.chat.completions.create(
+    final = await _create_chat_completion(
         model=LLM_MODEL,
         messages=messages + [{"role":"user","content":"继续叙事，不要调用函数。"}],
         temperature=0.7, max_tokens=768, stream=True,
@@ -339,7 +355,7 @@ async def dm_chat_stream(
 
 async def dm_narrate_stream(prompt: str, state: dict) -> AsyncGenerator[str, None]:
     sp = build_system_prompt(state)
-    stream = await client.chat.completions.create(
+    stream = await _create_chat_completion(
         model=LLM_MODEL,
         messages=[{"role":"system","content":sp},{"role":"user","content":prompt}],
         temperature=0.7, max_tokens=1024, stream=True,

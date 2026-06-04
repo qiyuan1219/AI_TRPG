@@ -78,6 +78,7 @@ function normalizeModelText(text: string) {
     .replace(/「/g, '“')
     .replace(/」/g, '”')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\[SCENE:[^\]]*\]\n?/g, '') // 剥离场景元数据，不展示给玩家
     .replace(/\r/g, '');
 }
 

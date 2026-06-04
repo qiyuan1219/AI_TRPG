@@ -1,6 +1,14 @@
 """
 主入口 —— D&D 碎冠之影 FastAPI 服务
 """
+import sys
+import io
+
+# 修复 Windows 终端中文乱码
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
