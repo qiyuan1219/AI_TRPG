@@ -15,34 +15,56 @@ export interface NarrativeParseResult {
 }
 
 const SPEAKER_ALIASES: Record<string, string> = {
-  '铁砧玛格丽特': '玛格丽特',
-  '玛格丽特': '玛格丽特',
-  '格鲁姆·铁锤': '格鲁姆',
-  '格鲁姆': '格鲁姆',
-  '铁锤': '格鲁姆',
-  '影刃丽莎': '丽莎',
-  '丽莎': '丽莎',
-  '影刃': '丽莎',
-  '塔莉亚': "塔莉亚",
-  '法师学徒': '塔莉亚',
-  '学徒': '塔莉亚',
-  '伊瑟拉·星语': '伊瑟拉',
-  '伊瑟拉': '伊瑟拉',
-  '星语': '伊瑟拉',
-  '莫德雷德主教': '莫德雷德',
-  '莫德雷德': '莫德雷德',
-  '主教': '莫德雷德',
-  '塞琳娜公主': '塞琳娜',
-  '塞琳娜': '塞琳娜',
-  '公主': '塞琳娜',
-  '雷恩·灰鬃': '雷恩',
-  '雷恩': '雷恩',
-  '灰鬃': '雷恩',
-  '艾拉': '艾拉',
-  '巴托克': '巴托克',
-  '塞德里克': '塞德里克',
-  '奥图斯': '奥图斯',
-  '典狱长': '典狱长',
+  // 核心同伴 - 瑟琳
+  '瑟琳·逆钟': '瑟琳',
+  '瑟琳': '瑟琳',
+  '逆钟': '瑟琳',
+  // 可选同伴
+  '森洛·铁锅': '森洛',
+  '森洛': '森洛',
+  '铁锅': '森洛',
+  '莉亚瑟·青弦': '莉亚瑟',
+  '莉亚瑟': '莉亚瑟',
+  '青弦': '莉亚瑟',
+  '卡西亚·断羽': '卡西亚',
+  '卡西亚': '卡西亚',
+  '断羽': '卡西亚',
+  '克莱娅·软爪': '克莱娅',
+  '克莱娅': '克莱娅',
+  '软爪': '克莱娅',
+  '雷铎·炉心': '雷铎',
+  '雷铎': '雷铎',
+  '炉心': '雷铎',
+  // 剧情NPC
+  '米蕾娜·白契': '米蕾娜',
+  '米蕾娜': '米蕾娜',
+  '白契': '米蕾娜',
+  '赫尔曼·断缆': '赫尔曼',
+  '赫尔曼': '赫尔曼',
+  '断缆': '赫尔曼',
+  '温妮娅·铜铃': '温妮娅',
+  '温妮娅': '温妮娅',
+  '铜铃': '温妮娅',
+  '莱因·铁脊': '莱因',
+  '莱因': '莱因',
+  '铁脊': '莱因',
+  // 纯粹NPC
+  '萨洛·杯底': '萨洛',
+  '萨洛': '萨洛',
+  '海伦特·灰杯': '海伦特',
+  '海伦特': '海伦特',
+  '奥布兰·晨爵': '奥布兰',
+  '奥布兰': '奥布兰',
+  '赛因·镜页': '赛因',
+  '赛因': '赛因',
+  '铁砧玛尔加': '玛尔加',
+  '玛尔加': '玛尔加',
+  '蓝伞尼布': '尼布',
+  '尼布': '尼布',
+  '烛账帕维': '帕维',
+  '帕维': '帕维',
+  '静默修女埃拉': '埃拉',
+  '埃拉': '埃拉',
 };
 
 const SPEAKER_ALIASES_SORTED = Object.keys(SPEAKER_ALIASES).sort((a, b) => b.length - a.length);
@@ -162,13 +184,47 @@ function findSpeaker(text: string, reverse = false): string {
 }
 
 function findSpeakerNearQuote(before: string, after: string) {
-  const beforeSpeaker = findSpeaker(before.slice(-36), true);
+  // 优先搜索引号前整个文本（从后往前），不限36字符
+  const beforeSpeaker = findSpeaker(before, true);
   if (beforeSpeaker) return beforeSpeaker;
 
-  const afterSpeaker = findSpeaker(after.slice(0, 36));
+  // 模式匹配：检查引号前是否紧跟「名字说」或「名字：」格式
+  const beforePatternSpeaker = findSpeakerBySpeechPattern(before);
+  if (beforePatternSpeaker) return beforePatternSpeaker;
+
+  // 搜索引号后的短文本
+  const afterSpeaker = findSpeaker(after.slice(0, 80));
   if (afterSpeaker) return afterSpeaker;
 
   return '';
+}
+
+// 引号前模式匹配：检测「名字说」「名字：」「【名字】」等常见发言人标记
+function findSpeakerBySpeechPattern(before: string): string {
+  const trimmed = before.trimEnd();
+  // 检查文本末尾是否正好是「名字」或「名字说」等
+  for (const alias of SPEAKER_ALIASES_SORTED) {
+    const speaker = SPEAKER_ALIASES[alias];
+    if (!speaker) continue;
+    // 检查末尾是否为 alias + 说/道/问/喊 等
+    for (const verb of ['说', '说道', '道', '问', '问道', '喊', '喊道', '插嘴', '低语', '叫', '回答', '宣布']) {
+      if (trimmed.endsWith(`${alias}${verb}`) || trimmed.endsWith(`${speaker}${verb}`)) {
+        return speaker;
+      }
+    }
+    // 检查末尾是否为 alias：
+    if (trimmed.endsWith(`${alias}：`) || trimmed.endsWith(`${speaker}：`) ||
+        trimmed.endsWith(`${alias}:`) || trimmed.endsWith(`${speaker}:`)) {
+      return speaker;
+    }
+  }
+  return '';
+}
+
+// 在整个块中查找最近出现过的说话人（用于处理引号和名字不在同一行的情况）
+function findLastSpeakerInBlock(block: string, upTo: number): string {
+  const text = block.slice(0, upTo);
+  return findSpeaker(text, true);
 }
 
 function isPureSpeechAttribution(text: string) {
@@ -328,7 +384,11 @@ export function parseNarrativeSegments(
       if (actor) lastSpeaker = actor;
       pushNarration(segments, before, defaultSpeaker);
 
-      const speaker = findSpeakerNearQuote(before, after) || lastSpeaker || defaultSpeaker;
+      // 三层回退搜索说话人
+      let speaker = findSpeakerNearQuote(before, after);
+      if (!speaker) speaker = findLastSpeakerInBlock(block, match.index);
+      if (!speaker) speaker = lastSpeaker;
+      if (!speaker) speaker = defaultSpeaker;
       pushDialogue(segments, match[1], speaker);
       if (speaker !== defaultSpeaker) lastSpeaker = speaker;
 

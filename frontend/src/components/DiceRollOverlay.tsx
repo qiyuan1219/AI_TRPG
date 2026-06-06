@@ -21,6 +21,8 @@ export interface Dice3DViewProps {
   revealed?: boolean;
   size?: number;
   className?: string;
+  faceStyle?: "numbers" | "pips";
+  showResultBadge?: boolean;
 }
 
 const DIE_SIDES: Record<DieType, number> = {
@@ -183,6 +185,39 @@ function makeNumTex(num: number): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
+function makePipTex(num: number): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext("2d")!;
+
+  ctx.fillStyle = "#f8f3df";
+  ctx.beginPath();
+  ctx.roundRect(10, 10, 108, 108, 18);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(40, 45, 52, 0.22)";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  const positions: Record<number, Array<[number, number]>> = {
+    1: [[64, 64]],
+    2: [[40, 40], [88, 88]],
+    3: [[40, 40], [64, 64], [88, 88]],
+    4: [[40, 40], [88, 40], [40, 88], [88, 88]],
+    5: [[40, 40], [88, 40], [64, 64], [40, 88], [88, 88]],
+    6: [[40, 36], [88, 36], [40, 64], [88, 64], [40, 92], [88, 92]],
+  };
+
+  ctx.fillStyle = "#1f2830";
+  positions[num]?.forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 10, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  return new THREE.CanvasTexture(c);
+}
+
 export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOverlayProps) {
   const [show, setShow] = useState(false);
   const [rolling, setRolling] = useState(false);
@@ -313,6 +348,8 @@ export function Dice3DView({
   revealed = false,
   size = 220,
   className = "",
+  faceStyle = "numbers",
+  showResultBadge = true,
 }: Dice3DViewProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
@@ -386,11 +423,12 @@ export function Dice3DView({
           ? d10FaceData(1.5)
         : polyFaceData(bodyGeo, dieSides);
     const planeSize = dieType === "d6" ? 1.2 : dieType === "d10" ? 0.72 : 0.55;
+    const usePips = dieType === "d6" && faceStyle === "pips";
     faceData.forEach(({ center, normal }, i) => {
       const plane = new THREE.Mesh(
         new THREE.PlaneGeometry(planeSize, planeSize),
         new THREE.MeshBasicMaterial({
-          map: makeNumTex(i + 1),
+          map: usePips ? makePipTex(i + 1) : makeNumTex(i + 1),
           transparent: true,
           side: THREE.DoubleSide,
         }),
@@ -455,7 +493,7 @@ export function Dice3DView({
       }
       sceneRef.current = null;
     };
-  }, [dieType, size]);
+  }, [dieType, faceStyle, size]);
 
   useEffect(() => {
     const rollNumber = Number(roll);
@@ -477,7 +515,7 @@ export function Dice3DView({
       ref={canvasRef}
       style={{ width: size, height: size }}
     >
-      {revealed && Number.isFinite(rollNumber) && (
+      {showResultBadge && revealed && Number.isFinite(rollNumber) && (
         <motion.div
           className={`dice-result-badge ${isNatMax ? "badge-crit" : ""} ${isNat1 ? "badge-fumble" : ""}`}
           initial={{ scale: 0, rotateZ: -30 }}

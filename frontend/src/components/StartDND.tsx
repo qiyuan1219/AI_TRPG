@@ -59,10 +59,10 @@ export function StartDND({
         <header className="start-header">
           <div>
             <p className="eyebrow">D&D AI-TRPG</p>
-            <h1>碎冠之影</h1>
+            <h1>地心之门</h1>
           </div>
           <div className="start-header-copy">
-            <p>王冠城的雾正在升起，地下裂隙等待回应。</p>
+            <p>逆穹城倒挂在穹顶之下，无光孢海的荧光在深渊中明灭。</p>
             {onBack && (
               <button type="button" className="ghost-button" onClick={onBack}>
                 返回

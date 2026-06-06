@@ -1,5 +1,5 @@
 """
-游戏配置文件 —— D&D 碎冠之影
+游戏配置文件 —— D&D 地心之门
 """
 import os
 from pathlib import Path

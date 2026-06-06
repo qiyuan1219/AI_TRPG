@@ -1,5 +1,5 @@
 """
-主入口 —— D&D 碎冠之影 FastAPI 服务
+主入口 —— D&D 地心之门 FastAPI 服务
 """
 import sys
 import io
@@ -13,11 +13,12 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes_dnd import router_dnd
+from api.routes_dice_poker import router_poker
 from config import HOST, PORT, CORS_ORIGINS
 
 app = FastAPI(
-    title="碎冠之影 D&D TRPG",
-    description="碎冠之影 - AI Dungeon Master (DM) 服务",
+    title="地心之门 D&D TRPG",
+    description="地心之门 - AI Dungeon Master (DM) 服务",
     version="1.0.0",
 )
 
@@ -30,17 +31,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册 D&D 路由
+# 注册路由
 app.include_router(router_dnd)
+app.include_router(router_poker)
 
 
 @app.get("/")
 async def root():
     return {
-        "game": "碎冠之影",
+        "game": "地心之门",
         "service": "AI-DM (地下城主)",
         "docs": "/docs",
         "api": "/api/dnd",
+        "dice_poker": "/api/dice-poker",
     }
 
 

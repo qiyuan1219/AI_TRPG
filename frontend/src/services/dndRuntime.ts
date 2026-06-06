@@ -2,16 +2,21 @@ import { chatStream, createGame } from './api';
 import type { DiceResult, GameRuntimeService, GameState } from '../types/game';
 
 const NPC_TRUST_KEYS: Record<string, string> = {
-  格鲁姆: 'gm_trust',
-  丽莎: 'ls_trust',
-  塔莉亚: 'tl_trust',
-  伊瑟拉: 'ys_trust',
+  瑟琳: 'se_trust',
+  森洛: 'sl_trust',
+  莉亚瑟: 'ly_trust',
+  卡西亚: 'kx_trust',
+  克莱娅: 'kl_trust',
+  雷铎: 'ld_trust',
 };
 
 const NPC_HP_KEYS: Record<string, string> = {
-  格鲁姆: 'gm_hp',
-  丽莎: 'ls_hp',
-  塔莉亚: 'tl_hp',
+  瑟琳: 'se_hp',
+  森洛: 'sl_hp',
+  莉亚瑟: 'ly_hp',
+  卡西亚: 'kx_hp',
+  克莱娅: 'kl_hp',
+  雷铎: 'ld_hp',
 };
 
 export function parseDiceEvent(event: string): DiceResult | null {
@@ -102,7 +107,7 @@ function applyStateChange(state: GameState, change: Record<string, any>): GameSt
 
 export const dndRuntime: GameRuntimeService = {
   id: 'dnd',
-  name: '碎冠之影',
+  name: '地心之门',
   createGame,
   streamAction(gameId, message, callbacks) {
     return chatStream(

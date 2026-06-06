@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 >nul
-title 碎冠之影 - DND TRPG
+title 地心之门 - DND TRPG
 
 echo ========================================
-echo   碎冠之影  DND TRPG
+echo   地心之门  DND TRPG
 echo ========================================
 echo.
 echo 正在启动后端 (端口 8000)...

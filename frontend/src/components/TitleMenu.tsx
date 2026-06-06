@@ -26,7 +26,7 @@ export function TitleMenu({ onNewGame, onLoadGame, onTest }: TitleMenuProps) {
       >
         <div className="title-brand">
           <p className="eyebrow">D&D AI-TRPG</p>
-          <h1>碎冠之影</h1>
+          <h1>地心之门</h1>
           <div className="title-rule" />
         </div>
 

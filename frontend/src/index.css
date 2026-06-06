@@ -579,6 +579,12 @@ button:disabled {
   background: rgba(212, 168, 67, 0.12);
 }
 
+.yacht-die.is-reroll {
+  border-color: rgba(95, 183, 167, 0.78);
+  background: rgba(95, 183, 167, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(95, 183, 167, 0.28);
+}
+
 .yacht-die span {
   color: var(--gold-soft);
   font-size: 0.86rem;
@@ -766,6 +772,446 @@ button:disabled {
 
 .yacht-grand-total b {
   font-size: 1.4rem;
+}
+
+.yacht-screen {
+  background:
+    linear-gradient(180deg, rgba(8, 12, 18, 0.42), rgba(8, 12, 18, 0.94)),
+    url("/assets/battle/b1-sanctum-placeholder.png") center / cover fixed,
+    #131821;
+}
+
+.yacht-layout {
+  width: min(1500px, 100%);
+  padding: 24px 20px;
+}
+
+.yacht-header small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.yacht-game-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 370px);
+  gap: 18px;
+}
+
+.yacht-play-panel {
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.yacht-status-row,
+.yacht-bank-panel,
+.yacht-serlyn-panel,
+.yacht-hand-panel,
+.yacht-perception-panel,
+.yacht-advisor-panel,
+.yacht-result-panel,
+.yacht-side-panel {
+  border: 1px solid rgba(231, 211, 161, 0.2);
+  border-radius: 8px;
+  background: rgba(13, 17, 24, 0.86);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(10px);
+}
+
+.yacht-status-row {
+  padding: 14px 16px;
+}
+
+.yacht-status-row strong {
+  max-width: 56%;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.yacht-bank-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 180px;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.yacht-bank-panel article {
+  display: grid;
+  gap: 4px;
+  min-height: 62px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.yacht-bank-panel span,
+.yacht-serlyn-panel span,
+.yacht-advisor-panel span {
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.yacht-bank-panel b {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 1.18rem;
+}
+
+.yacht-serlyn-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px minmax(260px, 330px);
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.yacht-serlyn-panel > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.yacht-serlyn-panel b,
+.yacht-advisor-panel b {
+  color: var(--text);
+}
+
+.yacht-serlyn-panel small,
+.yacht-advisor-panel small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.yacht-serlyn-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.yacht-serlyn-actions .ghost-button {
+  min-width: 0;
+  padding-inline: 10px;
+}
+
+.yacht-serlyn-panel p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.yacht-duel-table {
+  display: grid;
+  gap: 12px;
+}
+
+.yacht-hand-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.yacht-hand-panel > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.yacht-hand-panel > header div {
+  min-width: 0;
+}
+
+.yacht-hand-panel > header span {
+  display: block;
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.yacht-hand-panel h2 {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 1.18rem;
+}
+
+.yacht-hand-panel > header strong {
+  color: var(--gold-soft);
+  font-size: 1rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.yacht-hand-panel.is-enemy {
+  border-color: rgba(214, 76, 124, 0.35);
+  background: linear-gradient(135deg, rgba(45, 18, 35, 0.9), rgba(13, 17, 24, 0.88));
+}
+
+.yacht-hand-panel.is-player {
+  border-color: rgba(95, 183, 167, 0.3);
+  background: linear-gradient(135deg, rgba(13, 17, 24, 0.9), rgba(17, 38, 45, 0.86));
+}
+
+.yacht-hand-panel.is-hidden > header strong {
+  color: rgba(231, 211, 161, 0.64);
+}
+
+.yacht-dice-row {
+  grid-template-columns: repeat(5, minmax(104px, 1fr));
+  gap: 12px;
+}
+
+.yacht-die {
+  position: relative;
+  min-height: 164px;
+  padding: 10px 8px;
+  overflow: hidden;
+}
+
+.yacht-die:disabled {
+  cursor: default;
+}
+
+.yacht-die.is-hidden {
+  border-color: rgba(214, 76, 124, 0.28);
+  background: rgba(60, 15, 36, 0.28);
+}
+
+.yacht-die.is-locked {
+  border-color: rgba(239, 213, 140, 0.82);
+  background: rgba(212, 168, 67, 0.16);
+}
+
+.yacht-die.is-reroll {
+  border-color: rgba(95, 183, 167, 0.82);
+  background: rgba(95, 183, 167, 0.16);
+}
+
+.yacht-hidden-mark {
+  position: absolute;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(8, 10, 15, 0.48);
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 3rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.yacht-dice-canvas {
+  width: 118px;
+  height: 118px;
+}
+
+.yacht-dice-canvas .dice-result-badge {
+  width: 42px;
+  height: 42px;
+}
+
+.yacht-dice-canvas .badge-num {
+  font-size: 23px;
+}
+
+.yacht-control-row {
+  grid-template-columns: 190px 132px minmax(0, 1fr);
+  padding: 14px 16px;
+  border: 1px solid rgba(231, 211, 161, 0.2);
+  border-radius: 8px;
+  background: rgba(13, 17, 24, 0.84);
+}
+
+.yacht-perception-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px 132px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.yacht-perception-panel div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.yacht-perception-panel span {
+  color: var(--teal);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.yacht-perception-panel b {
+  color: var(--text);
+}
+
+.yacht-perception-panel small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.yacht-perception-die {
+  width: 92px;
+  height: 92px;
+  justify-self: center;
+}
+
+.yacht-perception-die .dice-result-badge {
+  width: 36px;
+  height: 36px;
+}
+
+.yacht-perception-die .badge-num {
+  font-size: 20px;
+}
+
+.yacht-advisor-panel {
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px;
+}
+
+.yacht-advisor-panel header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(231, 211, 161, 0.16);
+}
+
+.yacht-advisor-panel p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.yacht-advisor-panel .ghost-button {
+  justify-self: start;
+}
+
+.yacht-atmosphere-line {
+  display: block;
+  padding-top: 8px;
+  border-top: 1px solid rgba(231, 211, 161, 0.14);
+  color: rgba(245, 236, 216, 0.78);
+}
+
+.yacht-result-panel {
+  display: grid;
+  gap: 8px;
+  padding: 15px 16px;
+}
+
+.yacht-result-panel h2 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-size: 1.12rem;
+}
+
+.yacht-result-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.yacht-result-panel.is-player {
+  border-color: rgba(95, 183, 167, 0.5);
+}
+
+.yacht-result-panel.is-enemy {
+  border-color: rgba(214, 76, 124, 0.5);
+}
+
+.yacht-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.yacht-result-actions small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.yacht-side-panel {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.yacht-rank-ladder {
+  display: grid;
+  gap: 8px;
+}
+
+.yacht-rank-ladder header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(231, 211, 161, 0.16);
+}
+
+.yacht-rank-ladder header span {
+  color: var(--gold-soft);
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.yacht-rank-ladder header small {
+  color: var(--muted);
+}
+
+.yacht-rank-row {
+  display: grid;
+  grid-template-columns: 68px 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.yacht-rank-row b {
+  color: var(--text);
+}
+
+.yacht-rank-row strong {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 0.95rem;
+}
+
+.yacht-rank-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.yacht-side-panel .yacht-rules-panel {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.yacht-side-panel .yacht-rules-panel ol {
+  gap: 7px;
 }
 
 .start-screen {
@@ -2017,6 +2463,20 @@ button:disabled {
   animation: battle-avatar-pulse 780ms ease-in-out infinite alternate;
 }
 
+.initiative-token.is-defeated {
+  opacity: 0.48;
+}
+
+.initiative-token.is-defeated::before {
+  content: "倒下";
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  color: #f0a0a0;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
 .initiative-token-copy {
   display: grid;
   min-width: 0;
@@ -2148,6 +2608,11 @@ button:disabled {
   box-shadow: 0 0 24px rgba(239, 213, 140, 0.18), 0 14px 36px rgba(0, 0, 0, 0.24);
 }
 
+.battle-roster-unit.is-defeated {
+  opacity: 0.52;
+  border-color: rgba(211, 99, 99, 0.28);
+}
+
 .battle-roster-unit .battle-avatar-mark {
   width: 52px;
   height: 52px;
@@ -2273,6 +2738,21 @@ button:disabled {
 
 .battle-combatant.is-active .sprite-aura {
   opacity: 1;
+}
+
+.battle-combatant.is-defeated {
+  opacity: 0.48;
+}
+
+.battle-combatant.is-defeated .battle-sprite {
+  animation: none;
+  filter: grayscale(0.85) drop-shadow(0 14px 14px rgba(0, 0, 0, 0.38));
+  transform: rotate(-6deg) translateY(12px);
+}
+
+.battle-combatant.is-defeated .battle-combatant-name {
+  border-color: rgba(211, 99, 99, 0.34);
+  color: #f0a0a0;
 }
 
 .battle-sprite {
@@ -2841,6 +3321,42 @@ button:disabled {
   color: var(--muted);
 }
 
+.battle-end-banner {
+  position: absolute;
+  top: 182px;
+  left: 50%;
+  z-index: 26;
+  display: grid;
+  width: min(560px, calc(100% - 520px));
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid rgba(239, 213, 140, 0.44);
+  border-radius: 8px;
+  background: rgba(13, 16, 22, 0.84);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.38);
+  text-align: center;
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+}
+
+.battle-end-banner b {
+  color: var(--gold-soft);
+  font-size: 1.14rem;
+}
+
+.battle-end-banner span {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.battle-end-banner.is-win {
+  border-color: rgba(115, 198, 157, 0.5);
+}
+
+.battle-end-banner.is-lose {
+  border-color: rgba(211, 99, 99, 0.5);
+}
+
 .battle-log-panel {
   position: absolute;
   right: 286px;
@@ -2883,10 +3399,20 @@ button:disabled {
 }
 
 .battle-effect-panel p,
-.battle-effect-panel small {
+.battle-effect-panel small,
+.battle-effect-panel blockquote {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.battle-effect-panel blockquote {
+  padding: 10px 12px;
+  border-left: 3px solid rgba(239, 213, 140, 0.58);
+  border-radius: 6px;
+  background: rgba(212, 168, 67, 0.08);
+  color: #fff3cf;
+  font-size: 0.94rem;
 }
 
 .battle-effect-panel p b {
@@ -3514,8 +4040,60 @@ button:disabled {
     min-height: 168px;
   }
 
+  .yacht-status-row {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .yacht-bank-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .yacht-bank-panel .start-button {
+    grid-column: 1 / -1;
+  }
+
+  .yacht-serlyn-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .yacht-serlyn-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .yacht-advisor-panel header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .yacht-status-row strong {
+    max-width: none;
+    text-align: left;
+  }
+
+  .yacht-hand-panel > header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .yacht-hand-panel > header strong {
+    text-align: left;
+  }
+
   .yacht-control-row {
     grid-template-columns: 1fr;
+  }
+
+  .yacht-perception-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .yacht-perception-die {
+    justify-self: start;
+  }
+
+  .yacht-rank-row {
+    grid-template-columns: 60px 52px minmax(0, 1fr);
   }
 
   .yacht-score-row {
@@ -3643,6 +4221,7 @@ button:disabled {
   }
 
   .battle-enemy-turn-lock,
+  .battle-end-banner,
   .battle-effect-panel {
     width: calc(100% - 480px);
   }
@@ -3706,6 +4285,7 @@ button:disabled {
   .initiative-track,
   .battle-rules-dock,
   .battle-enemy-turn-lock,
+  .battle-end-banner,
   .battle-log-panel,
   .battle-effect-panel,
   .battle-roster,
@@ -3728,6 +4308,7 @@ button:disabled {
   }
 
   .battle-enemy-turn-lock,
+  .battle-end-banner,
   .battle-log-panel,
   .battle-effect-panel {
     display: grid;
@@ -3992,4 +4573,588 @@ button:disabled {
   border: 1px solid rgba(95, 183, 167, 0.36);
   color: #5fb7a7;
   text-shadow: 0 0 14px rgba(95, 183, 167, 0.28);
+}
+
+/* ============================================================
+   快艇骰子游戏 (Dice Poker)
+   ============================================================ */
+.dice-poker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.dice-poker-modal {
+  width: min(760px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(22, 18, 38, 0.97), rgba(10, 8, 18, 0.97));
+  box-shadow: 0 0 80px rgba(72, 30, 120, 0.25), 0 40px 100px rgba(0, 0, 0, 0.6);
+}
+
+.dice-poker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(231, 211, 161, 0.2);
+}
+
+.dice-poker-header span {
+  color: var(--gold-soft);
+  font-size: 1.18rem;
+  font-weight: 900;
+}
+
+.dice-poker-header button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid rgba(231,211,161,0.22);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.045);
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.dice-poker-header button:hover {
+  color: var(--text);
+  border-color: rgba(239,213,140,0.5);
+}
+
+/* 骰子展示区 */
+.dice-poker-dice-area {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 0;
+}
+
+.dice-poker-die {
+  position: relative;
+  width: 98px;
+  height: 98px;
+  border: 2px solid rgba(231,211,161,0.24);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1c182e, #121022);
+  cursor: pointer;
+  transition: all 180ms ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.dice-poker-die:hover {
+  border-color: rgba(239,213,140,0.6);
+  transform: translateY(-6px);
+}
+
+.dice-poker-die.selected {
+  border-color: var(--teal) !important;
+  border-width: 3px;
+  background: linear-gradient(135deg, #1a2e2e, #0f2222);
+  box-shadow: 0 0 28px rgba(95,183,167,0.4);
+}
+
+.dice-poker-die.locked {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.dice-kept-mark {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #101217;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+/* 骰子面 */
+.dice-face {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  gap: 4px;
+}
+
+.dice-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.dice-dot {
+  border-radius: 50%;
+}
+
+.dice-dot.filled {
+  background: radial-gradient(circle at 40% 40%, #efd58c, #d4a843);
+  box-shadow: 0 0 6px rgba(239,213,140,0.4);
+}
+
+/* 操作按钮 */
+.dice-poker-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0 16px;
+  flex-wrap: wrap;
+}
+
+.poker-btn {
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 1px solid rgba(231,211,161,0.22);
+  border-radius: 8px;
+  font-size: 0.93rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.poker-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.poker-btn-primary {
+  background: rgba(212,168,67,0.16);
+  border-color: rgba(239,213,140,0.42);
+  color: var(--gold-soft);
+}
+
+.poker-btn-primary:hover:not(:disabled) {
+  background: rgba(212,168,67,0.26);
+}
+
+.poker-btn-secondary {
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+
+.poker-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(231,211,161,0.5);
+  color: var(--text);
+}
+
+.poker-btn-accent {
+  background: rgba(95,183,167,0.12);
+  border-color: rgba(95,183,167,0.36);
+  color: var(--teal);
+}
+
+.poker-btn-accent:hover:not(:disabled) {
+  background: rgba(95,183,167,0.22);
+}
+
+/* AI策略提示 */
+.dice-poker-hint {
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid rgba(95,183,167,0.36);
+  border-radius: 8px;
+  background: rgba(95,183,167,0.08);
+}
+
+.hint-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.dice-poker-hint pre {
+  margin: 0;
+  color: #c8e8e2;
+  font-family: "Crimson Text", Georgia, "Noto Serif SC", serif;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* 计分面板 */
+.dice-poker-score-panel {
+  margin-bottom: 14px;
+}
+
+.dice-poker-score-panel h3 {
+  margin: 0 0 10px;
+  color: var(--gold-soft);
+  font-size: 1rem;
+}
+
+.score-categories {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.score-category-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid rgba(231,211,161,0.16);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.score-category-btn:hover:not(:disabled) {
+  border-color: rgba(239,213,140,0.5);
+}
+
+.score-category-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.score-category-btn.high {
+  border-left: 3px solid var(--success);
+}
+.score-category-btn.mid {
+  border-left: 3px solid var(--teal);
+}
+.score-category-btn.low {
+  border-left: 3px solid var(--muted);
+}
+
+.cat-name { font-weight: 700; }
+.cat-score {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-weight: 900;
+}
+
+/* 叙事区 */
+.dice-poker-narrative {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid rgba(231,211,161,0.14);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.24);
+}
+
+.dice-poker-narrative p {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* 结果面板 */
+.dice-poker-result {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(231,211,161,0.18);
+}
+
+.result-banner {
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.result-win {
+  background: rgba(115,198,157,0.12);
+  border: 1px solid rgba(115,198,157,0.4);
+  color: var(--success);
+}
+
+.result-tie {
+  background: rgba(95,183,167,0.1);
+  border: 1px solid rgba(95,183,167,0.3);
+  color: var(--teal);
+}
+
+.result-lose {
+  background: rgba(211,99,99,0.1);
+  border: 1px solid rgba(211,99,99,0.3);
+  color: var(--danger);
+}
+
+.result-scores {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  color: var(--muted);
+  font-family: Consolas, monospace;
+}
+
+.result-trust {
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.result-trust.positive { color: var(--success); }
+.result-trust.negative { color: var(--danger); }
+
+@media (max-width: 640px) {
+  .dice-poker-dice-area {
+    gap: 6px;
+    padding: 12px 0;
+  }
+  .dice-poker-die {
+    width: 60px;
+    height: 60px;
+  }
+  .score-categories {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 快艇骰子入口按钮（酒馆场景下显示在游戏画面上） */
+.game-dice-poker-btn {
+  position: absolute;
+  top: 64px;
+  left: 140px;
+  z-index: 8;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 2px solid rgba(95,183,167,0.48);
+  border-radius: 8px;
+  background: rgba(13,22,26,0.72);
+  color: var(--teal);
+  font-weight: 900;
+  font-size: 0.92rem;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  animation: dice-btn-pulse 2.4s ease-in-out infinite;
+}
+.game-dice-poker-btn:hover {
+  border-color: rgba(95,183,167,0.85);
+  background: rgba(95,183,167,0.15);
+  animation: none;
+}
+@keyframes dice-btn-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(95,183,167,0.15); }
+  50% { box-shadow: 0 0 22px rgba(95,183,167,0.4); }
+}
+
+/* ============================================================
+   对话日志 (Dialogue Log)
+   ============================================================ */
+.dialogue-log-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+}
+
+.dialogue-log-modal {
+  width: min(560px, 100%);
+  max-height: 86vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(18,15,30,0.97), rgba(8,6,16,0.97));
+  box-shadow: 0 0 60px rgba(72,30,120,0.2), 0 30px 80px rgba(0,0,0,0.5);
+}
+
+.dialogue-log-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(231,211,161,0.18);
+}
+
+.dialogue-log-header span {
+  color: var(--gold-soft);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.dialogue-log-header small {
+  flex: 1;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.dialogue-log-header button {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid rgba(231,211,161,0.22);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.dialogue-log-header button:hover {
+  border-color: rgba(239,213,140,0.5);
+  color: var(--text);
+}
+
+.dialogue-log-list {
+  overflow-y: auto;
+  padding: 10px 14px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.log-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 0;
+}
+
+.log-entry {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.log-entry:hover {
+  border-color: rgba(231,211,161,0.18);
+  background: rgba(255,255,255,0.04);
+}
+
+.log-entry-active {
+  border-color: rgba(239,213,140,0.26) !important;
+  background: rgba(212,168,67,0.07);
+}
+
+.log-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.log-role-player {
+  color: #73c69d;
+  font-weight: 800;
+}
+
+.log-role-system {
+  color: #d36363;
+  font-weight: 800;
+}
+
+.log-role-speaker {
+  color: var(--gold-soft);
+  font-weight: 800;
+}
+
+.log-now-mark {
+  margin-left: auto;
+  padding: 1px 7px;
+  border: 1px solid rgba(239,213,140,0.4);
+  border-radius: 999px;
+  color: var(--gold-soft);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.log-entry-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.93rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.log-line-player .log-entry-text {
+  color: #b8e6d2;
+}
+
+.log-line-system .log-entry-text {
+  color: #f0a0a0;
+  font-size: 0.84rem;
+}
+
+.dialogue-log-footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(231,211,161,0.14);
+}
+
+.dialogue-log-footer button {
+  flex: 1;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(231,211,161,0.18);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.dialogue-log-footer button:hover {
+  border-color: rgba(239,213,140,0.4);
+  color: var(--text);
+}
+
+/* 对话日志按钮（顶栏） */
+.game-log-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(231,211,161,0.28);
+  border-radius: 6px;
+  background: rgba(14,17,23,0.62);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.game-log-btn:hover {
+  border-color: rgba(239,213,140,0.56);
+  color: var(--gold-soft);
+}
+
+@media (max-width: 640px) {
+  .dialogue-log-backdrop {
+    padding: 8px;
+  }
+  .dialogue-log-modal {
+    width: 100%;
+    max-height: 92vh;
+  }
 }

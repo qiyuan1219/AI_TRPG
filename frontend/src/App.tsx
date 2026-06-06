@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ActionPanel } from './components/ActionPanel';
 import { CharacterPanel } from './components/CharacterPanel';
+import { DicePokerGame } from './components/DicePokerGame';
 import { DiceRollOverlay } from './components/DiceRollOverlay';
 import type { EventFeedItem } from './components/EventFeed';
 import { LoadGameScreen } from './components/LoadGameScreen';
@@ -11,6 +12,7 @@ import { StartDND } from './components/StartDND';
 import { TestScreen } from './components/TestScreen';
 import { TitleMenu } from './components/TitleMenu';
 import { VisualNovelStage } from './components/VisualNovelStage';
+import { DialogueLog } from './components/DialogueLog';
 import { resolveDndScene } from './data/dndScenes';
 import { listSaves, loadGame, saveGame } from './services/api';
 import { dndRuntime } from './services/dndRuntime';
@@ -28,17 +30,20 @@ import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrat
 type Screen = 'main-menu' | 'new-game' | 'load-game' | 'test' | 'loading' | 'game';
 type GamePhase = 'narrating' | 'action';
 
-const DEFAULT_OPENING = '王冠城的钟声穿过雾气。你的冒险从这一刻开始。';
+const DEFAULT_OPENING = '逆穹城倒挂在巨大洞穴的穹顶之上，蓝绿色荧光在远方深渊中明灭。你的冒险从这一刻开始。';
 
 function fallbackSuggestions(state: GameState): ActionSuggestion[] {
   const area = String(state.current_area || '');
   if (area.includes('公会') || area.includes('酒馆')) {
-    return makeSuggestions(['调查登记簿【智力DC12】', '观察伊瑟拉是否隐瞒【洞悉DC14】', '让格鲁姆打听传闻【人脉DC13】']);
+    return makeSuggestions(['查看远征档案【调查DC12】', '打听地底堡垒传闻【感知DC12】', '让瑟琳分析时间异常【奥秘DC13】']);
   }
-  if (area.includes('B')) {
-    return makeSuggestions(['谨慎搜索暗门【察觉DC14】', '让丽莎检查陷阱【巧手DC15】', '让塔莉亚解读符文【奥秘DC14】']);
+  if (area.includes('孢海') || area.includes('菌林') || area.includes('湿地')) {
+    return makeSuggestions(['谨慎探查周围【感知DC14】', '让克莱娅检查陷阱【巧手DC15】', '让森洛辨识真菌生态【自然DC13】']);
   }
-  return makeSuggestions(['接过招募令', '调查公会登记簿【智力DC12】', '询问伊瑟拉真相【洞悉DC14】']);
+  if (area.includes('黑石') || area.includes('黑暗之门')) {
+    return makeSuggestions(['分析黑石结构【奥秘DC15】', '辨识三圈纹路【历史DC14】', '让瑟琳感知时间异常']);
+  }
+  return makeSuggestions(['前往冒险者公会接取委托', '在逆穹城探索打听情报', '与瑟琳讨论远征计划']);
 }
 
 function normalizeStoryLines(lines: StoryLine[]): StoryLine[] {
@@ -77,6 +82,9 @@ export default function App() {
   const [showGameSaves, setShowGameSaves] = useState(false);
   const [showCharacterInfo, setShowCharacterInfo] = useState(false);
   const [showReturnTitleConfirm, setShowReturnTitleConfirm] = useState(false);
+  const [showDicePoker, setShowDicePoker] = useState(false);
+  const [dicePokerNpc, setDicePokerNpc] = useState('莱因');
+  const [showDialogueLog, setShowDialogueLog] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveMessageTone, setSaveMessageTone] = useState<'neutral' | 'success' | 'error'>('neutral');
 
@@ -438,6 +446,17 @@ export default function App() {
       {/* 骰子检定动画覆盖层 */}
       <DiceRollOverlay dice={diceRoll} dieType="d20" onClose={() => setDiceRoll(null)} />
 
+      {/* 快艇骰子入口：进入酒馆场景时显示 */}
+      {String(gameState.current_area || '').includes('酒馆') && (
+        <button
+          type="button"
+          className="game-dice-poker-btn"
+          onClick={() => { setDicePokerNpc('莱因'); setShowDicePoker(true); }}
+        >
+          🎲 快艇骰子
+        </button>
+      )}
+
       <button
         type="button"
         className="game-character-btn"
@@ -449,6 +468,9 @@ export default function App() {
       </button>
 
       <div className="game-top-actions">
+        <button type="button" className="game-log-btn" onClick={() => setShowDialogueLog(true)}>
+          📜 对话日志
+        </button>
         <button type="button" className="game-title-btn" onClick={() => setShowReturnTitleConfirm(true)}>
           回到标题界面
         </button>
@@ -530,6 +552,40 @@ export default function App() {
               <CharacterPanel state={gameState} />
             </motion.section>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 对话日志弹窗 */}
+      <AnimatePresence>
+        {showDialogueLog && (
+          <DialogueLog
+            story={story}
+            activeIndex={activeIndex}
+            isStreaming={streaming}
+            onClose={() => setShowDialogueLog(false)}
+            onJumpTo={(index) => {
+              setActiveIndex(index);
+              setPhase('narrating');
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 快艇骰子游戏弹窗 */}
+      <AnimatePresence>
+        {showDicePoker && (
+          <DicePokerGame
+            gameId={gameId}
+            npcName={dicePokerNpc}
+            npcTrustKey="ly"
+            onClose={() => setShowDicePoker(false)}
+            onTrustChange={(npc, key, change) => {
+              addEvent(`${npc}信任 ${change > 0 ? '+' : ''}${change}`, 'state');
+            }}
+            onGetClue={(info) => {
+              addEvent(`获得情报：${info}`, 'dice');
+            }}
+          />
         )}
       </AnimatePresence>
 

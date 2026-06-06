@@ -108,11 +108,11 @@ export function TestScreen({ onBack }: TestScreenProps) {
             </button>
             <button type="button" className="test-mode-button" onClick={() => setMode("battle")}>
               <span>测试战斗</span>
-              <small>B1 层先攻、行动顺序、角色详情与技能界面</small>
+              <small>B1 层先攻、指定目标、骰子判定与 AI KP 战斗描写</small>
             </button>
             <button type="button" className="test-mode-button" onClick={() => setMode("yacht")}>
               <span>快艇骰子</span>
-              <small>5 颗 D6、锁骰、计分表与完整规则说明</small>
+              <small>三轮赌局、瑟琳协助、AI建议、氛围旁白与点面 D6</small>
             </button>
           </section>
         )}
