@@ -5,7 +5,7 @@ const NPC_TRUST_KEYS: Record<string, string> = {
   瑟琳: 'se_trust',
   森洛: 'sl_trust',
   莉亚瑟: 'ly_trust',
-  卡西亚: 'kx_trust',
+  艾琳: 'al_trust',
   克莱娅: 'kl_trust',
   雷铎: 'ld_trust',
 };
@@ -14,7 +14,7 @@ const NPC_HP_KEYS: Record<string, string> = {
   瑟琳: 'se_hp',
   森洛: 'sl_hp',
   莉亚瑟: 'ly_hp',
-  卡西亚: 'kx_hp',
+  艾琳: 'al_hp',
   克莱娅: 'kl_hp',
   雷铎: 'ld_hp',
 };

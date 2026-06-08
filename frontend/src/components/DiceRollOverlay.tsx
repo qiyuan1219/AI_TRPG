@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import * as THREE from "three";
+import { sfx } from "../utils/audio";
+import { SkillEffectOverlay, inferSkillEffect } from "./SkillEffectOverlay";
+import type { SkillEffectConfig } from "./SkillEffectOverlay";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
@@ -222,9 +225,14 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
   const [show, setShow] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [effectRevealed, setEffectRevealed] = useState(false);
+  const [skillFx, setSkillFx] = useState<SkillEffectConfig | null>(null);
+  const [closed, setClosed] = useState(false);
   const timerRef = useRef<number[]>([]);
+  const closeTimerRef = useRef<number | null>(null);
+  const skillEffectRef = useRef<SkillEffectConfig | null>(null);
 
-  // dice 变化 → 滚动→揭示
+  // dice 变化 → 滚动→揭示→特效延迟→等待点击
   useEffect(() => {
     if (!dice) {
       setShow(false);
@@ -237,13 +245,24 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
     setShow(true);
     setRolling(true);
     setRevealed(false);
+    setEffectRevealed(false);
+    setSkillFx(null);
+    setClosed(false);
+    if (closeTimerRef.current) { window.clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
 
+    // 音效：开始滚动
+    sfx.diceRoll();
+
+    // 阶段1：滚动结束 → 显示骰面
     const t1 = window.setTimeout(() => {
       setRolling(false);
-      window.setTimeout(() => setRevealed(true), 950);
-    }, 1200);
+      sfx.diceStop();
+      window.setTimeout(() => setRevealed(true), 400);
+    }, 800);
 
-    const t2 = window.setTimeout(() => onClose(), 4600);
+    // 阶段2：骰面显示后，弹出技能特效
+    const t2 = window.setTimeout(() => setEffectRevealed(true), 1800);
+
     timerRef.current = [t1, t2];
 
     return () => timerRef.current.forEach(clearTimeout);
@@ -257,20 +276,49 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
   const isNatMax = Number(result?.roll) === resultSides;
   const isNat1 = result?.roll === "1";
 
+  // 推断技能特效类型
+  const skillEffect = useMemo(() => (dice ? inferSkillEffect(dice.data) : null), [dice]);
+  // 保存到 ref，避免关闭后 dice 变 null 导致特效丢失
+  useEffect(() => { skillEffectRef.current = skillEffect; }, [skillEffect]);
+
+  // 特效弹出时播放判定音效（不触发技能特效，留到关闭后触发）
+  useEffect(() => {
+    if (effectRevealed && result) {
+      const isCrit = isNatMax && !isNat1;
+      sfx.verdict(Boolean(result.success), isCrit);
+    }
+  }, [effectRevealed]); // eslint-disable-line
+
+  // 用户关闭骰子界面后1秒，触发技能特效
+  useEffect(() => {
+    if (!closed) return;
+    closeTimerRef.current = window.setTimeout(() => {
+      if (skillEffectRef.current) setSkillFx({ ...skillEffectRef.current });
+    }, 1000);
+    return () => {
+      if (closeTimerRef.current) { window.clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+    };
+  }, [closed]); // eslint-disable-line
+
   return (
+    <>
     <div
       className="dice-overlay"
       style={{ display: show ? "flex" : "none" }}
-      onClick={revealed ? onClose : undefined}
+      onClick={() => {
+        if (!effectRevealed || closed) return;
+        setClosed(true);
+        onClose?.();
+      }}
     >
       <motion.div
         className="dice-modal dice-modal-3d"
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: show ? 1 : 0.6, opacity: show ? 1 : 0 }}
         transition={{ type: "spring", stiffness: 260, damping: 22 }}
-        onClick={(e) => e.stopPropagation()}
       >
         <Dice3DView
+          key={dice ? (dice.data["id"] ?? "roll") : "idle"}
           dieType={resultDieType}
           roll={Number(result?.roll)}
           rolling={rolling}
@@ -311,7 +359,7 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
                 <span>DC {result.dc.replace("AC", "").trim()}</span>
               </div>
             )}
-            {(result.verdict || typeof result.success === "boolean") && (
+            {effectRevealed && (result.verdict || typeof result.success === "boolean") && (
               <motion.div
                 className={`dice-verdict ${
                   typeof result.success === "boolean"
@@ -322,7 +370,7 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
                 }`}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ delay: 0.1, type: "spring", stiffness: 400 }}
+                transition={{ delay: 0.05, type: "spring", stiffness: 360, damping: 14 }}
               >
                 {result.verdict ||
                   (isNatMax
@@ -337,7 +385,22 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
           </motion.div>
         )}
       </motion.div>
+
+      {/* 点击继续提示 */}
+      {effectRevealed && (
+        <motion.div
+          className="dice-continue-hint"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+        >
+          <span>点击任意处继续</span>
+        </motion.div>
+      )}
     </div>
+
+    <SkillEffectOverlay config={skillFx} onDone={() => setSkillFx(null)} />
+    </>
   );
 }
 

@@ -12,6 +12,28 @@ const SAFE_SERVICE_MESSAGE = 'KP暂时没有回应，已为本轮处理启用兜
 const CONNECTION_ERROR_PATTERN =
   /(connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|load\s*failed|timeout|timed\s*out|econn|socket|fetch|body\s*stream|terminated|aborted)/i;
 
+export interface BargainJudgePayload {
+  item_name: string;
+  base_price: number;
+  current_price: number;
+  attempt: number;
+  max_attempts: number;
+  roll: number;
+  bonus: number;
+  total: number;
+  player_words: string;
+  history: Array<Record<string, unknown>>;
+}
+
+export interface BargainJudgeResult {
+  agreed: boolean;
+  discount: number;
+  new_price: number;
+  mood: string;
+  reason: string;
+  boss_reply: string;
+}
+
 function toSafeMessage(value: unknown, fallback: string) {
   const message = String(value || '').trim();
   if (!message) return fallback;
@@ -77,6 +99,20 @@ export async function loadGame(slotKey: SaveSlotKey): Promise<LoadGameResult> {
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, '读取存档失败'));
+  }
+
+  return response.json();
+}
+
+export async function judgeBargain(payload: BargainJudgePayload): Promise<BargainJudgeResult> {
+  const response = await apiFetch(`${BASE}/bargain/judge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }, '讲价判定失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '讲价判定失败'));
   }
 
   return response.json();

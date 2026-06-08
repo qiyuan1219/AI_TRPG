@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { BargainTestScreen } from "./BargainTestScreen";
 import { BattleTestScreen } from "./BattleTestScreen";
 import { DiceRollOverlay, type DieType } from "./DiceRollOverlay";
+import { PortraitTestScreen } from "./PortraitTestScreen";
 import { YachtDiceTestScreen } from "./YachtDiceTestScreen";
 import type { DiceResult } from "../types/game";
 
@@ -9,7 +11,7 @@ interface TestScreenProps {
   onBack: () => void;
 }
 
-type TestMode = "menu" | "dice-select" | "dice-roll" | "battle" | "yacht";
+type TestMode = "menu" | "dice-select" | "dice-roll" | "battle" | "yacht" | "bargain" | "portrait";
 
 const DICE_OPTIONS: Array<{ type: DieType; label: string; sides: number }> = [
   { type: "d4", label: "四面骰", sides: 4 },
@@ -44,6 +46,14 @@ export function TestScreen({ onBack }: TestScreenProps) {
       return;
     }
     if (mode === "yacht") {
+      setMode("menu");
+      return;
+    }
+    if (mode === "bargain") {
+      setMode("menu");
+      return;
+    }
+    if (mode === "portrait") {
       setMode("menu");
       return;
     }
@@ -82,6 +92,14 @@ export function TestScreen({ onBack }: TestScreenProps) {
     return <YachtDiceTestScreen onBack={() => setMode("menu")} />;
   }
 
+  if (mode === "bargain") {
+    return <BargainTestScreen onBack={() => setMode("menu")} />;
+  }
+
+  if (mode === "portrait") {
+    return <PortraitTestScreen onBack={() => setMode("menu")} />;
+  }
+
   return (
     <main className="test-screen">
       <motion.section
@@ -113,6 +131,14 @@ export function TestScreen({ onBack }: TestScreenProps) {
             <button type="button" className="test-mode-button" onClick={() => setMode("yacht")}>
               <span>快艇骰子</span>
               <small>三轮赌局、瑟琳协助、AI建议、氛围旁白与点面 D6</small>
+            </button>
+            <button type="button" className="test-mode-button" onClick={() => setMode("bargain")}>
+              <span>讲价游戏</span>
+              <small>黑市购买时触发：D20 判定、玩家话术、AI 老板视角回复与最多 5 次砍价</small>
+            </button>
+            <button type="button" className="test-mode-button" onClick={() => setMode("portrait")}>
+              <span>🧑 角色立绘</span>
+              <small>加载全部7位角色的正比立绘，模拟视觉小说对话，验证立绘资源完整性</small>
             </button>
           </section>
         )}

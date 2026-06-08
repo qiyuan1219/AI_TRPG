@@ -86,7 +86,7 @@ button:disabled {
   margin: 0;
   color: var(--gold-soft);
   font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
-  font-size: 2.5rem;
+  font-size: 3.2rem;
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -154,9 +154,11 @@ button:disabled {
   min-height: 100vh;
   overflow: hidden;
   background:
-    var(--title-bg-image, linear-gradient(135deg, rgba(25, 36, 48, 0.85), rgba(11, 12, 16, 0.96))),
-    linear-gradient(180deg, rgba(13, 16, 22, 0.24), rgba(7, 8, 11, 0.9)),
+    var(--title-bg-image, url('/assets/title-bg.webp')),
     #0d1016;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
   isolation: isolate;
 }
 
@@ -165,19 +167,18 @@ button:disabled {
   position: absolute;
   inset: 0;
   z-index: -3;
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.18) 52%, rgba(0, 0, 0, 0.84)),
-    repeating-linear-gradient(90deg, rgba(239, 213, 140, 0.055) 0 1px, transparent 1px 92px),
-    repeating-linear-gradient(0deg, rgba(95, 183, 167, 0.045) 0 1px, transparent 1px 84px);
+  /* 非常轻的氛围遮罩，不遮挡美术本身 */
+  background: radial-gradient(ellipse at 30% 50%, rgba(0,0,0,0.1) 0%, transparent 70%);
 }
 
 .title-menu-shade {
   position: absolute;
   inset: 0;
   z-index: -2;
+  /* 左侧深色渐变确保文字可读，右侧透明展示美术 */
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.78)),
-    linear-gradient(105deg, rgba(12, 14, 20, 0.95) 0 34%, rgba(12, 14, 20, 0.42) 57%, rgba(12, 14, 20, 0.9) 100%);
+    linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.55)),
+    linear-gradient(105deg, rgba(5, 6, 12, 0.85) 0 28%, rgba(8, 10, 16, 0.35) 48%, rgba(5, 6, 12, 0.0) 65%);
 }
 
 .title-menu-layout {
@@ -185,28 +186,41 @@ button:disabled {
   align-content: center;
   width: min(1120px, 100%);
   min-height: 100vh;
-  padding: 48px 72px;
+  padding: 48px 64px;
+  gap: 20px;
 }
 
 .title-brand {
-  max-width: 560px;
+  max-width: 540px;
+}
+
+.title-brand .eyebrow {
+  margin: 0 0 10px;
+  color: rgba(231, 211, 161, 0.75);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .title-brand h1 {
   margin: 0;
   color: var(--gold-soft);
   font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
-  font-size: 4.6rem;
+  font-size: 5rem;
   font-weight: 800;
   line-height: 1.06;
   letter-spacing: 0;
-  text-shadow: 0 12px 34px rgba(0, 0, 0, 0.52);
+  text-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.65),
+    0 0 60px rgba(95, 183, 167, 0.18);
 }
 
 .title-rule {
-  width: 150px;
+  width: 160px;
   height: 1px;
-  margin: 24px 0 28px;
+  margin: 22px 0 32px;
   background: linear-gradient(90deg, var(--gold-soft), rgba(95, 183, 167, 0));
 }
 
@@ -221,18 +235,20 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  min-height: 54px;
-  padding: 0 20px;
+  min-height: 58px;
+  padding: 0 26px;
   overflow: hidden;
-  border: 1px solid rgba(231, 211, 161, 0.22);
+  font-size: 1.2rem;
+  border: 1px solid rgba(231, 211, 161, 0.28);
   border-radius: 6px;
-  background: rgba(13, 16, 22, 0.58);
+  background: rgba(10, 12, 18, 0.55);
   color: var(--text);
-  font-size: 1.12rem;
+  font-size: 1.08rem;
   font-weight: 800;
   text-align: left;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition: border-color 180ms ease, color 180ms ease, transform 180ms ease, background 180ms ease;
 }
 
@@ -240,19 +256,22 @@ button:disabled {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(212, 168, 67, 0.18), rgba(95, 183, 167, 0.04));
+  background: linear-gradient(90deg, rgba(212, 168, 67, 0.14), rgba(95, 183, 167, 0.04));
   opacity: 0;
   transition: opacity 180ms ease;
 }
 
 .title-menu-button span {
   position: relative;
+  letter-spacing: 0.04em;
 }
 
 .title-menu-button:hover:not(:disabled) {
-  border-color: rgba(239, 213, 140, 0.58);
+  border-color: rgba(239, 213, 140, 0.65);
   color: var(--gold-soft);
-  transform: translateX(4px);
+  background: rgba(18, 16, 28, 0.72);
+  transform: translateX(6px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 30px rgba(95, 183, 167, 0.12);
 }
 
 .title-menu-button:hover:not(:disabled)::before {
@@ -260,10 +279,11 @@ button:disabled {
 }
 
 .title-menu-button:disabled {
-  color: rgba(185, 179, 165, 0.68);
-  border-color: rgba(231, 211, 161, 0.12);
-  background: rgba(13, 16, 22, 0.36);
+  color: rgba(185, 179, 165, 0.55);
+  border-color: rgba(231, 211, 161, 0.10);
+  background: rgba(8, 10, 14, 0.35);
   box-shadow: none;
+  backdrop-filter: blur(6px);
 }
 
 .load-game-screen {
@@ -779,6 +799,577 @@ button:disabled {
     linear-gradient(180deg, rgba(8, 12, 18, 0.42), rgba(8, 12, 18, 0.94)),
     url("/assets/battle/b1-sanctum-placeholder.png") center / cover fixed,
     #131821;
+}
+
+/* ============================================================
+   讲价游戏 — 视觉小说风格  V2
+   ============================================================ */
+.bargain-vn-screen {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  position: relative;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+.bargain-vn-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(9, 12, 15, 0.65), rgba(6, 8, 11, 0.94)),
+    repeating-linear-gradient(0deg, rgba(95, 183, 167, 0.04) 0 3px, transparent 3px 64px),
+    repeating-linear-gradient(90deg, rgba(212, 168, 67, 0.05) 0 1px, transparent 1px 88px),
+    #12151b;
+}
+
+.bargain-vn-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 35%, transparent 40%, rgba(0,0,0,0.55));
+}
+
+.bargain-vn-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: rgba(8, 10, 14, 0.72);
+  border-bottom: 1px solid rgba(231, 211, 161, 0.12);
+  color: var(--teal);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.bargain-vn-currency {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 1.05rem;
+}
+
+/* 舞台：老板区域 */
+.bargain-vn-stage {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 20px;
+}
+
+.bargain-vn-items {
+  display: flex;
+  gap: 8px;
+}
+
+.bargain-vn-items button {
+  padding: 6px 16px;
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bargain-vn-items button.is-active {
+  border-color: rgba(95, 183, 167, 0.7);
+  background: rgba(95, 183, 167, 0.12);
+  color: var(--teal);
+}
+
+.bargain-vn-items button em {
+  margin-left: 6px;
+  color: var(--gold-soft);
+  font-style: normal;
+}
+
+/* 老板立绘 + 气泡 */
+.bargain-vn-boss-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 720px;
+  width: 100%;
+  position: relative;
+}
+
+.bargain-vn-dice-spin {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 14px;
+  border-radius: 12px;
+  background: rgba(212, 168, 67, 0.2);
+  color: var(--gold-soft);
+  font-size: 0.88rem;
+  animation: bargainPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes bargainPulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+.bargain-vn-boss-portrait {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bargain-vn-boss-face {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(212, 168, 67, 0.35);
+  border-radius: 50%;
+  background: rgba(16, 19, 26, 0.82);
+  box-shadow: 0 0 28px rgba(212, 168, 67, 0.1);
+}
+
+.bargain-vn-boss-face span {
+  font-size: 2rem;
+}
+
+.bargain-vn-boss-face small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.bargain-vn-boss-bubble {
+  flex: 1;
+  min-height: 54px;
+  padding: 14px 18px;
+  border-radius: 12px 12px 12px 2px;
+  background: rgba(20, 24, 33, 0.88);
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  color: var(--text);
+  line-height: 1.6;
+  position: relative;
+}
+
+.bargain-vn-boss-bubble p {
+  margin: 0;
+}
+
+.bargain-vn-boss-bubble .muted {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.bargain-vn-tag {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.bargain-vn-tag.agree {
+  background: rgba(95, 183, 167, 0.16);
+  color: #5fb7a7;
+}
+
+.bargain-vn-tag.reject {
+  background: rgba(239, 130, 130, 0.14);
+  color: #ef8282;
+}
+
+/* 讲价时间线 */
+.bargain-vn-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 720px;
+  width: 100%;
+  justify-content: center;
+}
+
+.bargain-vn-timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.76rem;
+  border-left: 3px solid transparent;
+}
+
+.bargain-vn-timeline-item.agree { border-left-color: #5fb7a7; }
+.bargain-vn-timeline-item.reject { border-left-color: #ef8282; }
+
+.bargain-vn-timeline-num { color: var(--muted); font-weight: 900; }
+.bargain-vn-timeline-dice { color: var(--teal); }
+.bargain-vn-timeline-words { color: var(--text); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bargain-vn-timeline-price { color: var(--gold-soft); font-family: Consolas, monospace; margin-left: auto; }
+
+/* 底部：话术选择 */
+.bargain-vn-actions {
+  position: relative;
+  z-index: 10;
+  padding: 12px 20px 18px;
+  background: rgba(8, 10, 14, 0.78);
+  border-top: 1px solid rgba(231, 211, 161, 0.12);
+}
+
+.bargain-vn-prompt {
+  text-align: center;
+  margin: 0 0 10px;
+  color: var(--gold-soft);
+  font-weight: 900;
+  font-size: 0.92rem;
+}
+
+.bargain-vn-prompt small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.bargain-vn-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.bargain-vn-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(231, 211, 161, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  text-align: left;
+  line-height: 1.55;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.88rem;
+}
+
+.bargain-vn-choice:hover:not(:disabled) {
+  border-color: rgba(95, 183, 167, 0.5);
+  background: rgba(95, 183, 167, 0.08);
+}
+
+.bargain-vn-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bargain-vn-choice-tag {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: rgba(212, 168, 67, 0.18);
+  color: var(--gold-soft);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+/* 等待 / 结束状态 */
+.bargain-vn-waiting,
+.bargain-vn-gameover {
+  text-align: center;
+  color: var(--text);
+}
+
+.bargain-vn-waiting p,
+.bargain-vn-gameover p {
+  margin: 0 0 6px;
+}
+
+.bargain-vn-gameover .muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+/* ============================================================
+   技能特效覆盖层
+   ============================================================ */
+.skill-fx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 62;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.skill-fx-flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.skill-fx-glyph {
+  position: relative;
+  z-index: 2;
+  font-size: 4rem;
+  filter: drop-shadow(0 0 18px rgba(255,255,255,0.8));
+}
+
+.skill-fx-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin-left: -5px;
+  margin-top: -5px;
+}
+
+.skill-fx-impact-lines {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  z-index: 1;
+}
+
+.skill-fx-line {
+  position: absolute;
+  top: -1.5px;
+  left: 0;
+  width: 80px;
+  height: 3px;
+  transform-origin: left center;
+  border-radius: 2px;
+}
+
+.skill-fx-ring {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 4px solid transparent;
+}
+
+.skill-fx-heal-rise {
+  position: absolute;
+  bottom: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ============================================================
+   快艇骰子 — 视觉小说风格 V2
+   ============================================================ */
+.yacht-vn-screen {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  position: relative;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+.yacht-vn-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 12, 20, 0.65), rgba(5, 7, 11, 0.94)),
+    repeating-linear-gradient(0deg, rgba(212, 168, 67, 0.04) 0 3px, transparent 3px 64px),
+    #12151b;
+}
+
+.yacht-vn-vignette {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(ellipse at 50% 35%, transparent 40%, rgba(0,0,0,0.55));
+}
+
+.yacht-vn-header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px;
+  background: rgba(8, 10, 14, 0.72);
+  border-bottom: 1px solid rgba(231, 211, 161, 0.12);
+  color: var(--teal); font-size: 0.88rem; font-weight: 900;
+}
+
+.yacht-vn-gold {
+  color: var(--gold-soft); font-family: Consolas, monospace; font-size: 1.05rem;
+}
+
+.yacht-vn-stage {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14px; padding: 14px 18px; overflow-y: auto;
+}
+
+/* NPC 行 */
+.yacht-vn-npc-row {
+  display: flex; align-items: flex-start; gap: 16px;
+  max-width: 800px; width: 100%;
+}
+
+.yacht-vn-npc-portrait {
+  flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; align-items: center;
+}
+
+.yacht-vn-npc-face {
+  width: 60px; height: 60px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 2px solid rgba(212, 168, 67, 0.3); border-radius: 50%;
+  background: rgba(16, 19, 26, 0.82);
+}
+
+.yacht-vn-npc-face span { font-size: 1.5rem; }
+.yacht-vn-npc-face small { margin-top: 1px; color: var(--muted); font-size: 0.62rem; }
+
+.yacht-vn-bubble {
+  flex: 1; min-height: 50px;
+  padding: 12px 16px; border-radius: 12px 12px 12px 2px;
+  background: rgba(20, 24, 33, 0.88);
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  color: var(--text); line-height: 1.6; font-size: 0.9rem;
+}
+
+.yacht-vn-bubble p { margin: 0; }
+.yacht-vn-bubble-tag {
+  display: block; margin-top: 6px;
+  color: var(--teal); font-size: 0.78rem; font-weight: 900;
+}
+
+/* 入场 */
+.yacht-vn-idle {
+  text-align: center; color: var(--muted); display: grid; gap: 12px; justify-items: center;
+}
+
+/* 瑟琳行动 */
+.yacht-vn-serlyn {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 20px;
+  border: 1px solid rgba(231, 211, 161, 0.14); border-radius: 10px;
+  background: rgba(255,255,255,0.03);
+}
+
+.yacht-vn-serlyn small { color: var(--muted); font-size: 0.8rem; }
+
+.yacht-vn-serlyn-btns { display: flex; gap: 8px; }
+
+.yacht-vn-choice-btn {
+  padding: 6px 16px; border: 1px solid rgba(95,183,167,0.4); border-radius: 10px;
+  background: rgba(95,183,167,0.08); color: var(--teal); cursor: pointer; font-weight: 900;
+  transition: all 0.2s;
+}
+
+.yacht-vn-choice-btn:hover { border-color: rgba(95,183,167,0.8); background: rgba(95,183,167,0.16); }
+
+.yacht-vn-rolling { color: var(--gold-soft); font-size: 0.9rem; animation: bargainPulse 0.8s ease-in-out infinite alternate; }
+
+/* 骰子区域 */
+.yacht-vn-dice-area {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  width: 100%; max-width: 900px;
+}
+
+.yacht-vn-hand {
+  padding: 10px; border: 1px solid rgba(231,211,161,0.1); border-radius: 10px;
+  background: rgba(0,0,0,0.18);
+}
+
+.yacht-vn-hand header {
+  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;
+}
+
+.yacht-vn-hand header span { color: var(--teal); font-weight: 900; font-size: 0.82rem; }
+.yacht-vn-hand header small { color: var(--muted); font-size: 0.76rem; }
+
+.yacht-vn-dice-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+
+.yacht-vn-die {
+  position: relative; width: 108px; height: 108px;
+  border: 1px solid rgba(231,211,161,0.14); border-radius: 10px;
+  background: rgba(0,0,0,0.2); cursor: pointer;
+}
+
+.yacht-vn-die.is-reroll { border-color: rgba(239,130,130,0.5); box-shadow: 0 0 12px rgba(239,130,130,0.2); }
+
+.yacht-vn-die-3d { width: 100%; height: 100%; }
+
+.yacht-vn-die-hidden {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.2); font-size: 2rem; font-style: normal; pointer-events: none;
+}
+
+/* AI参谋 */
+.yacht-vn-advisor {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px; border-radius: 8px;
+  background: rgba(95,183,167,0.06); border: 1px solid rgba(95,183,167,0.15);
+  color: var(--teal); font-size: 0.84rem; max-width: 800px; width: 100%;
+}
+
+.yacht-vn-advisor span { font-weight: 900; }
+.yacht-vn-advisor p { margin: 0; flex: 1; color: var(--text); }
+
+/* 操作按钮 */
+.yacht-vn-actions-row {
+  display: flex; gap: 10px; align-items: center; justify-content: center;
+  flex-wrap: wrap; padding: 8px 0;
+}
+
+.yacht-vn-dice-sm {
+  width: 72px; height: 72px;
+  border: 1px solid rgba(212,168,67,0.24); border-radius: 8px;
+}
+
+/* 规则展开 */
+.yacht-vn-rules-toggle {
+  color: var(--muted); background: none; border: none; cursor: pointer; font-size: 0.82rem;
+}
+
+.yacht-vn-rules {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  max-width: 720px; padding: 8px;
+}
+
+.yacht-vn-rules span {
+  padding: 3px 10px; border-radius: 6px; background: rgba(255,255,255,0.04);
+  font-size: 0.76rem; color: var(--text);
+}
+
+.yacht-vn-rules b { color: var(--gold-soft); margin-right: 4px; }
+.yacht-vn-rules i { color: var(--muted); margin-left: 4px; }
+
+@media (max-width: 700px) {
+  .yacht-vn-dice-area { grid-template-columns: 1fr; }
+  .yacht-vn-npc-row { flex-direction: column; align-items: center; }
+  .yacht-vn-serlyn { flex-wrap: wrap; justify-content: center; }
+}
+
+@media (max-width: 700px) {
+  .bargain-vn-choices {
+    grid-template-columns: 1fr;
+  }
+  .bargain-vn-boss-row {
+    flex-direction: column;
+    align-items: center;
+  }
+  .bargain-vn-boss-bubble {
+    border-radius: 12px 12px 2px 12px;
+  }
 }
 
 .yacht-layout {
@@ -1366,6 +1957,35 @@ button:disabled {
 
 .sheet-title small {
   color: var(--gold-soft);
+}
+
+/* HP/AC 醒目徽章 */
+.sheet-stats-badge {
+  display: flex;
+  gap: 8px;
+}
+
+.sheet-stats-badge span {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.badge-hp {
+  background: rgba(211,99,99,0.16);
+  border: 1px solid rgba(211,99,99,0.4);
+  color: #f08b8b;
+  text-shadow: 0 0 8px rgba(211,99,99,0.3);
+}
+
+.badge-ac {
+  background: rgba(155,178,209,0.16);
+  border: 1px solid rgba(155,178,209,0.4);
+  color: #b6ceed;
+  text-shadow: 0 0 8px rgba(155,178,209,0.3);
 }
 
 .stat-list {
@@ -2093,6 +2713,17 @@ button:disabled {
     linear-gradient(90deg, rgba(0, 0, 0, 0.3), transparent 32%, transparent 68%, rgba(0, 0, 0, 0.35));
 }
 
+/* 场景背景图 — 渐进式浮现层，位于渐变背景与暗角之间 */
+.scene-background-image {
+  position: absolute;
+  inset: 0;
+  z-index: -2.5;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
 .scene-crown-city .scene-layer {
   background:
     linear-gradient(180deg, rgba(27, 42, 60, 0.25), rgba(18, 21, 28, 0.82)),
@@ -2211,7 +2842,7 @@ button:disabled {
   right: 28px;
   bottom: 24px;
   left: 28px;
-  z-index: 3;
+  z-index: 10;  /* 高于角色立绘(z-index:3) */
   display: grid;
   grid-template-columns: minmax(0, 1fr) 120px;
   gap: 12px 18px;
@@ -2523,6 +3154,14 @@ button:disabled {
   box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.32), 0 8px 22px rgba(0, 0, 0, 0.32);
 }
 
+/* 图片头像 */
+.battle-avatar-img {
+  background-size: cover;
+  background-position: center 18%;
+  background-repeat: no-repeat;
+  color: transparent; /* 隐藏文字内容 */
+}
+
 .battle-avatar-adventurer {
   background: linear-gradient(135deg, #7b4f32, #b28b52 48%, #35556c);
 }
@@ -2545,6 +3184,14 @@ button:disabled {
 
 .battle-avatar-shade {
   background: linear-gradient(135deg, #12151d, #384354 52%, #5fb7a7);
+}
+
+.battle-avatar-selin {
+  background: linear-gradient(135deg, #2c3b52, #6c7fa8 48%, #d8c17b);
+}
+
+.battle-avatar-crawler {
+  background: linear-gradient(135deg, #192027, #3d5a52 52%, #9ac77d);
 }
 
 .battle-roster {
@@ -2740,6 +3387,15 @@ button:disabled {
   opacity: 1;
 }
 
+.battle-combatant.is-casting .battle-sprite {
+  animation: battle-cast-lunge 820ms ease-out 1, battle-model-flicker 420ms ease-in-out infinite alternate;
+}
+
+.battle-combatant.is-impacted .battle-sprite {
+  animation: battle-impact-shake 460ms ease-out 1;
+  filter: drop-shadow(0 0 24px rgba(239, 213, 140, 0.64)) drop-shadow(0 20px 18px rgba(0, 0, 0, 0.42));
+}
+
 .battle-combatant.is-defeated {
   opacity: 0.48;
 }
@@ -2812,6 +3468,129 @@ button:disabled {
   background: linear-gradient(180deg, #f1d986, #80602e);
   transform: rotate(-23deg);
   transform-origin: top center;
+}
+
+/* ============================================================
+   Q版序列帧精灵 (PNG sprite sheet 动画)
+   ============================================================ */
+.sprite-sheet {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-size: auto 100%;      /* 高度填满，宽度自动按帧数缩放 */
+  background-repeat: no-repeat;
+  image-rendering: auto;           /* 二次元平滑 */
+}
+
+/* 冒险者待机动画 - 9帧循环 */
+.battle-sprite-adventurer .sprite-sheet {
+  animation: chibi-idle 1.5s steps(9) infinite;
+}
+
+/* 活跃状态增加呼吸浮动 */
+.battle-combatant.is-active .sprite-sheet {
+  animation: chibi-idle 1.5s steps(9) infinite, chibi-float 1.8s ease-in-out infinite;
+}
+
+@keyframes chibi-idle {
+  from { background-position: 0 0; }
+}
+
+@keyframes chibi-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* 战败状态 */
+@keyframes lisa-idle-frames {
+  from { background-position: 0 0; }
+  to { background-position: -900px 0; }
+}
+
+@keyframes lisa-cast-frames {
+  from { background-position: 0 0; }
+  to { background-position: -1500px 0; }
+}
+
+@keyframes lisa-impact-frames {
+  0% {
+    opacity: 0;
+    background-position: 0 0;
+    transform: translateX(-50%) scale(0.84);
+  }
+  8% {
+    opacity: 1;
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    background-position: -2100px 0;
+    transform: translateX(-50%) scale(1.06);
+  }
+}
+
+.battle-combatant.is-defeated .sprite-sheet {
+  animation: none;
+  filter: grayscale(0.85) brightness(0.6);
+  transform: rotate(-6deg) translateY(12px);
+}
+
+.battle-sprite-lisa,
+.battle-sprite-selin {
+  width: 150px;
+  height: 130px;
+  overflow: visible;
+}
+
+.lisa-sprite-sheet {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-size: auto 100%;
+  image-rendering: auto;
+  filter: drop-shadow(0 18px 16px rgba(0, 0, 0, 0.42));
+}
+
+.lisa-sprite-sheet.is-idle {
+  background-image: url("/assets/battle/lisa/lisa-idle-sheet.png");
+  animation: lisa-idle-frames 1.2s steps(6) infinite;
+}
+
+.lisa-sprite-sheet.is-cast {
+  background-image: url("/assets/battle/lisa/lisa-cast-sheet.png");
+  animation: lisa-cast-frames 980ms steps(10) 1 both;
+}
+
+.battle-combatant.is-casting .lisa-sprite-sheet.is-idle {
+  opacity: 0;
+}
+
+.battle-combatant.is-defeated .lisa-sprite-sheet {
+  animation: none;
+  filter: grayscale(0.85) brightness(0.62) drop-shadow(0 14px 14px rgba(0, 0, 0, 0.38));
+  transform: rotate(-6deg) translateY(12px);
+}
+
+.battle-impact-effect {
+  position: absolute;
+  z-index: 8;
+  top: 10px;
+  left: 50%;
+  width: 210px;
+  height: 150px;
+  pointer-events: none;
+  background-image: url("/assets/battle/lisa/lisa-impact-sheet.png");
+  background-repeat: no-repeat;
+  background-size: auto 100%;
+  filter: drop-shadow(0 0 18px rgba(165, 205, 255, 0.9));
+  mix-blend-mode: screen;
+  transform: translateX(-50%);
+  animation: lisa-impact-frames 920ms steps(10) 1 both;
 }
 
 .battle-sprite-adventurer .sprite-body {
@@ -2896,6 +3675,67 @@ button:disabled {
   top: 48px;
   height: 62px;
   background: linear-gradient(180deg, #5fb7a7, #263746);
+}
+
+.battle-sprite-crawler {
+  width: 116px;
+  height: 92px;
+  margin-top: 32px;
+}
+
+.battle-sprite-crawler .sprite-aura {
+  inset: 8px -8px 0;
+  border-color: rgba(154, 199, 125, 0.34);
+  box-shadow: 0 0 22px rgba(154, 199, 125, 0.18), inset 0 0 18px rgba(95, 183, 167, 0.16);
+}
+
+.battle-sprite-crawler .sprite-head {
+  top: 22px;
+  left: 76px;
+  width: 34px;
+  height: 30px;
+  border-color: rgba(195, 235, 184, 0.2);
+  background: linear-gradient(135deg, #40584f, #182127);
+}
+
+.battle-sprite-crawler .sprite-body {
+  top: 38px;
+  width: 96px;
+  height: 42px;
+  border-color: rgba(154, 199, 125, 0.22);
+  border-radius: 48px 38px 24px 30px;
+  background: linear-gradient(180deg, #405f55, #1b272c 64%, #283b34);
+}
+
+.battle-sprite-crawler .sprite-body::before,
+.battle-sprite-crawler .sprite-body::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  width: 28px;
+  height: 10px;
+  border-radius: 999px;
+  background: #25382f;
+}
+
+.battle-sprite-crawler .sprite-body::before {
+  left: 12px;
+  transform: rotate(12deg);
+}
+
+.battle-sprite-crawler .sprite-body::after {
+  right: 16px;
+  transform: rotate(-10deg);
+}
+
+.battle-sprite-crawler .sprite-weapon {
+  top: 30px;
+  right: 12px;
+  width: 22px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #c6e7a7, #537c68);
+  transform: rotate(12deg);
 }
 
 .battle-combatant-name {
@@ -3259,22 +4099,55 @@ button:disabled {
   line-height: 1.35;
 }
 
+/* ===== 右上角规则速查按钮 ===== */
+.battle-rules-toggle {
+  position: absolute;
+  top: 120px;
+  right: 24px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(231, 211, 161, 0.28);
+  border-radius: 8px;
+  background: rgba(13, 16, 22, 0.72);
+  color: var(--gold-soft);
+  font-size: 0.88rem;
+  font-weight: 700;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+.battle-rules-toggle:hover {
+  border-color: rgba(95, 183, 167, 0.6);
+  background: rgba(95, 183, 167, 0.14);
+}
+.battle-rules-toggle[aria-expanded="true"] {
+  border-color: rgba(239, 213, 140, 0.6);
+}
+
+/* ===== 规则速查面板（可折叠） ===== */
 .battle-rules-dock {
   position: absolute;
-  top: 112px;
-  left: 50%;
-  z-index: 7;
+  top: 164px;
+  right: 24px;
+  z-index: 11;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  width: min(920px, calc(100vw - 720px));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(520px, calc(100vw - 360px));
   gap: 8px;
-  transform: translateX(-50%);
+  padding: 10px;
+  border: 1px solid rgba(231, 211, 161, 0.22);
+  border-radius: 10px;
+  background: rgba(13, 16, 22, 0.78);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(12px);
 }
 
 .battle-rules-dock article,
 .battle-enemy-turn-lock,
-.battle-log-panel,
-.battle-effect-panel {
+.battle-log-panel {
   border: 1px solid rgba(231, 211, 161, 0.18);
   border-radius: 8px;
   background: rgba(13, 16, 22, 0.66);
@@ -3291,7 +4164,6 @@ button:disabled {
 
 .battle-rules-dock b,
 .battle-log-panel span,
-.battle-effect-panel span,
 .battle-enemy-turn-lock b {
   color: var(--teal);
   font-size: 0.78rem;
@@ -3357,13 +4229,168 @@ button:disabled {
   border-color: rgba(211, 99, 99, 0.5);
 }
 
+.battle-end-banner .start-button {
+  justify-self: center;
+  min-width: 132px;
+  min-height: 38px;
+  margin-top: 6px;
+}
+
+.battle-tutorial-intro-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(3, 5, 8, 0.68);
+  backdrop-filter: blur(6px);
+}
+
+.battle-tutorial-intro {
+  display: grid;
+  width: min(1040px, 100%);
+  max-height: min(88vh, 820px);
+  gap: 16px;
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid rgba(231, 211, 161, 0.32);
+  border-radius: 8px;
+  background: rgba(18, 21, 28, 0.97);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.56);
+}
+
+.battle-tutorial-intro header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(231, 211, 161, 0.16);
+}
+
+.battle-tutorial-intro header > div {
+  min-width: 0;
+}
+
+.battle-tutorial-intro header .ghost-button {
+  min-width: 92px;
+  min-height: 36px;
+  flex: 0 0 auto;
+}
+
+.battle-tutorial-intro h2 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
+  font-size: 2rem;
+  letter-spacing: 0;
+}
+
+.battle-tutorial-intro header small,
+.battle-tutorial-intro footer span {
+  color: rgba(245, 236, 216, 0.72);
+  line-height: 1.5;
+}
+
+.battle-tutorial-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: 14px;
+  min-height: 0;
+  overflow: visible;
+  padding-right: 4px;
+}
+
+.battle-tutorial-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.battle-tutorial-steps article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid rgba(231, 211, 161, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.battle-tutorial-steps article > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(95, 183, 167, 0.48);
+  border-radius: 50%;
+  color: var(--teal);
+  font-family: Consolas, monospace;
+  font-weight: 900;
+}
+
+.battle-tutorial-steps b,
+.battle-tutorial-enemies > b,
+.battle-tutorial-enemies span {
+  color: var(--gold-soft);
+}
+
+.battle-tutorial-steps p,
+.battle-tutorial-enemies p {
+  margin: 4px 0 0;
+  color: rgba(245, 236, 216, 0.72);
+  line-height: 1.48;
+}
+
+.battle-tutorial-enemies {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(95, 183, 167, 0.24);
+  border-radius: 8px;
+  background: rgba(95, 183, 167, 0.07);
+}
+
+.battle-tutorial-enemies section {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(231, 211, 161, 0.14);
+}
+
+.battle-tutorial-enemies section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.battle-tutorial-enemies span {
+  font-weight: 900;
+}
+
+.battle-tutorial-intro footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(231, 211, 161, 0.16);
+}
+
+.battle-tutorial-intro footer .start-button {
+  min-width: 132px;
+  min-height: 40px;
+}
+
 .battle-log-panel {
   position: absolute;
-  right: 286px;
+  left: 24px;
   bottom: 24px;
-  z-index: 7;
+  z-index: 8;
   display: grid;
-  width: 300px;
+  width: 248px;
+  max-height: 38vh;
+  overflow-y: auto;
   gap: 7px;
   padding: 12px;
 }
@@ -3375,71 +4402,86 @@ button:disabled {
   line-height: 1.35;
 }
 
+/* ===== 底部 AI KP 视觉小说对话框 ===== */
 .battle-effect-panel {
   position: absolute;
-  bottom: 116px;
-  left: 50%;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 18;
-  display: grid;
-  width: min(540px, calc(100% - 560px));
-  gap: 7px;
-  padding: 14px;
-  border-color: rgba(95, 183, 167, 0.42);
-  transform: translateX(-50%);
+  padding: 0 24px 16px;
 }
-
 .battle-effect-panel.is-fail {
-  border-color: rgba(211, 99, 99, 0.42);
+  --vn-accent: rgba(211, 99, 99, 0.5);
 }
-
-.battle-effect-panel h2 {
-  margin: 0;
-  color: var(--gold-soft);
-  font-size: 1.18rem;
+.battle-effect-panel.is-win {
+  --vn-accent: rgba(95, 183, 167, 0.5);
 }
-
-.battle-effect-panel p,
-.battle-effect-panel small,
-.battle-effect-panel blockquote {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.45;
+.vn-dialogue-box {
+  position: relative;
+  margin: 0 auto;
+  width: min(720px, calc(100vw - 320px));
+  padding: 16px 20px 14px;
+  border: 1px solid var(--vn-accent, rgba(239, 213, 140, 0.38));
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(13, 16, 24, 0.94) 0%, rgba(18, 22, 32, 0.92) 100%);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4), 0 0 60px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
 }
-
-.battle-effect-panel blockquote {
-  padding: 10px 12px;
-  border-left: 3px solid rgba(239, 213, 140, 0.58);
-  border-radius: 6px;
-  background: rgba(212, 168, 67, 0.08);
-  color: #fff3cf;
-  font-size: 0.94rem;
-}
-
-.battle-effect-panel p b {
-  color: var(--text);
-}
-
-.battle-effect-panel strong {
-  color: var(--text);
-  font-family: Consolas, monospace;
-}
-
-.battle-effect-panel em {
+.vn-speaker-tag {
+  display: inline-block;
   position: absolute;
-  top: 14px;
-  right: 14px;
-  display: grid;
-  width: 54px;
-  height: 54px;
-  place-items: center;
-  border: 1px solid rgba(239, 213, 140, 0.54);
-  border-radius: 50%;
-  background: rgba(212, 168, 67, 0.12);
+  top: -14px;
+  left: 18px;
+  padding: 3px 16px;
+  border: 1px solid var(--vn-accent, rgba(239, 213, 140, 0.44));
+  border-radius: 20px;
+  background: rgba(20, 24, 36, 0.9);
   color: var(--gold-soft);
-  font-family: Consolas, monospace;
-  font-size: 1.35rem;
-  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.vn-result-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 8px;
+  color: var(--text);
+  font-size: 1rem;
+}
+.vn-result-line b {
+  color: var(--gold-accent, #efd58c);
+}
+.vn-amount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  background: rgba(239, 213, 140, 0.15);
+  color: var(--gold-soft);
+  font-size: 1.16rem;
   font-weight: 900;
+  font-style: normal;
+}
+.vn-narration {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--vn-accent, rgba(239, 213, 140, 0.58));
+  border-radius: 6px;
+  background: rgba(212, 168, 67, 0.06);
+  color: #fff3cf;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.vn-formula {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: right;
 }
 
 .battle-combatant.is-targetable .battle-sprite {
@@ -3919,6 +4961,33 @@ button:disabled {
   }
 }
 
+@keyframes battle-cast-lunge {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-8px) scale(1.06);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes battle-impact-shake {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+  28% {
+    transform: translateX(-7px) translateY(2px);
+  }
+  56% {
+    transform: translateX(8px) translateY(-2px);
+  }
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+}
+
 @keyframes battle-avatar-pulse {
   from {
     box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.32), 0 0 10px rgba(239, 213, 140, 0.28);
@@ -3995,7 +5064,7 @@ button:disabled {
   }
 
   .title-brand h1 {
-    font-size: 3.1rem;
+    font-size: 3.6rem;
   }
 
   .title-menu-actions {
@@ -4082,6 +5151,19 @@ button:disabled {
 
   .yacht-control-row {
     grid-template-columns: 1fr;
+  }
+
+  .bargain-item-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bargain-input-panel > div {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .bargain-input-panel .start-button {
+    width: 100%;
   }
 
   .yacht-perception-panel {
@@ -4214,16 +5296,25 @@ button:disabled {
     width: 210px;
   }
 
-  .battle-rules-dock {
+  .battle-rules-toggle {
     top: 122px;
-    width: calc(100vw - 480px);
+    right: 12px;
+  }
+
+  .battle-rules-dock {
+    top: 164px;
+    right: 12px;
+    width: min(420px, calc(100vw - 260px));
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .battle-enemy-turn-lock,
-  .battle-end-banner,
-  .battle-effect-panel {
+  .battle-end-banner {
     width: calc(100% - 480px);
+  }
+
+  .vn-dialogue-box {
+    width: calc(100vw - 280px);
   }
 
   .battle-log-panel {
@@ -4283,6 +5374,7 @@ button:disabled {
   }
 
   .initiative-track,
+  .battle-rules-toggle,
   .battle-rules-dock,
   .battle-enemy-turn-lock,
   .battle-end-banner,
@@ -4301,6 +5393,10 @@ button:disabled {
     translate: none;
   }
 
+  .battle-rules-toggle {
+    margin: 12px 12px 0 auto;
+  }
+
   .battle-rules-dock {
     width: calc(100% - 24px);
     grid-template-columns: 1fr;
@@ -4309,17 +5405,20 @@ button:disabled {
 
   .battle-enemy-turn-lock,
   .battle-end-banner,
-  .battle-log-panel,
-  .battle-effect-panel {
+  .battle-log-panel {
     display: grid;
     width: calc(100% - 24px);
     margin: 0 12px 12px;
   }
 
-  .battle-effect-panel em {
-    position: static;
-    width: 46px;
-    height: 46px;
+  .battle-effect-panel {
+    display: grid;
+    width: 100%;
+    padding: 0 12px 12px;
+    margin: 0;
+  }
+  .vn-dialogue-box {
+    width: 100%;
   }
 
   .initiative-track {
@@ -4408,15 +5507,41 @@ button:disabled {
 /* ============================================================
    骰子检定覆盖层 (深紫鎏金 3D)
    ============================================================ */
+.dice-continue-hint {
+  z-index: 63;
+  pointer-events: none;
+  text-align: center;
+}
+
+.dice-continue-hint span {
+  display: inline-block;
+  padding: 10px 28px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(231, 211, 161, 0.35);
+  color: rgba(231, 211, 161, 0.9);
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  animation: diceHintPulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes diceHintPulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
 .dice-overlay {
   position: fixed;
   inset: 0;
   z-index: 60;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.88);
-  backdrop-filter: blur(8px);
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
 }
 
 .dice-modal-3d {
@@ -5156,5 +6281,278 @@ button:disabled {
   .dialogue-log-modal {
     width: 100%;
     max-height: 92vh;
+  }
+}
+
+/* ============================================================
+   六维雷达图 (创角界面属性展示)
+   ============================================================ */
+.radar-chart {
+  display: block;
+  width: 100%;
+  max-width: 310px;
+  margin: 0 auto 4px;
+}
+
+.radar-chart text {
+  font-family: "Crimson Text", Georgia, "Noto Serif SC", serif;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============================================================
+   角色立绘 (视觉小说居中，仅上半身)
+   ============================================================ */
+.character-portrait {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  z-index: 3;
+  width: auto;
+  height: 105vh;
+  max-height: 1050px;
+  object-fit: cover;
+  object-position: center 100%;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 8px 28px rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+  user-select: none;
+}
+
+.character-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 37%;
+}
+
+@media (max-width: 900px) {
+  .character-portrait {
+    bottom: 50px;
+    height: 81vh;
+    max-height: 720px;
+  }
+}
+
+/* ============================================================
+   角色立绘测试界面
+   ============================================================ */
+.portrait-test {
+  cursor: pointer;
+}
+
+/* 顶部信息栏 */
+.portrait-test-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: linear-gradient(180deg, rgba(10, 12, 20, 0.9) 0%, rgba(10, 12, 20, 0) 100%);
+  pointer-events: none;
+}
+.portrait-test-header > * {
+  pointer-events: auto;
+}
+.portrait-test-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.portrait-test-eyebrow {
+  color: var(--teal);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+.portrait-test-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  color: var(--gold-soft);
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+.portrait-test-title small {
+  color: rgba(245, 236, 216, 0.58);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+.portrait-test-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.portrait-test-status {
+  color: rgba(245, 236, 216, 0.45);
+  font-size: 0.76rem;
+}
+.portrait-test-auto-btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(239, 213, 140, 0.32);
+  border-radius: 8px;
+  background: rgba(20, 24, 36, 0.7);
+  color: var(--gold-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+.portrait-test-auto-btn:hover {
+  border-color: var(--gold-soft);
+  background: rgba(212, 168, 67, 0.12);
+}
+.portrait-test-auto-btn.is-active {
+  border-color: var(--teal);
+  background: rgba(95, 183, 167, 0.15);
+  color: var(--teal);
+}
+
+/* 底部缩略图指示器 */
+.portrait-test-thumbnails {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  z-index: 11;
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  border-radius: 24px;
+  background: rgba(13, 16, 22, 0.72);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+}
+.portrait-thumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
+  color: rgba(245, 236, 216, 0.5);
+  font-size: 0.72rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+.portrait-thumb:hover {
+  color: var(--text);
+  border-color: rgba(95, 183, 167, 0.4);
+}
+.portrait-thumb.is-current {
+  color: var(--gold-soft);
+  border-color: rgba(239, 213, 140, 0.5);
+  background: rgba(212, 168, 67, 0.08);
+}
+.portrait-thumb.is-error .portrait-thumb-icon {
+  color: #d36363;
+}
+.portrait-thumb-dot {
+  font-size: 0.68rem;
+}
+.portrait-thumb-label {
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.portrait-thumb-icon {
+  font-size: 0.58rem;
+  opacity: 0.8;
+}
+
+/* 立绘加载失败占位 */
+.portrait-test-fallback {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 36px;
+  border: 1px dashed rgba(211, 99, 99, 0.4);
+  border-radius: 12px;
+  background: rgba(211, 99, 99, 0.06);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.portrait-test-fallback span {
+  font-size: 2rem;
+}
+.portrait-test-fallback p {
+  margin: 0;
+  color: #d36363;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.portrait-test-fallback small {
+  color: rgba(211, 99, 99, 0.6);
+  font-size: 0.72rem;
+  max-width: 300px;
+  word-break: break-all;
+}
+
+/* 对话框内导航按钮 */
+.portrait-test-nav {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(231, 211, 161, 0.12);
+}
+.portrait-test-nav span {
+  color: rgba(245, 236, 216, 0.45);
+  font-size: 0.8rem;
+  min-width: 48px;
+  text-align: center;
+}
+.portrait-test-nav button {
+  padding: 5px 14px;
+  border: 1px solid rgba(231, 211, 161, 0.24);
+  border-radius: 6px;
+  background: rgba(20, 24, 36, 0.6);
+  color: var(--gold-soft);
+  font-size: 0.82rem;
+  transition: all 0.15s ease;
+}
+.portrait-test-nav button:hover:not(:disabled) {
+  border-color: var(--gold-soft);
+  background: rgba(212, 168, 67, 0.1);
+}
+.portrait-test-nav button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .portrait-test-header {
+    padding: 10px 14px;
+  }
+  .portrait-test-title {
+    font-size: 1rem;
+  }
+  .portrait-test-title small {
+    display: none;
+  }
+  .portrait-test-thumbnails {
+    bottom: 60px;
+    gap: 4px;
+    padding: 6px 10px;
+  }
+  .portrait-thumb {
+    padding: 4px 8px;
+  }
+  .portrait-thumb-label {
+    display: none;
   }
 }

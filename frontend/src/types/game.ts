@@ -22,6 +22,7 @@ export interface SceneVisual {
   subtitle: string;
   aliases: string[];
   themeClass: string;
+  backgroundImage?: string;  // 场景背景图，渐进式浮现
 }
 
 export interface GameState {

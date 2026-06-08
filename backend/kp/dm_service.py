@@ -363,3 +363,154 @@ async def dm_narrate_stream(prompt: str, state: dict) -> AsyncGenerator[str, Non
     async for chunk in stream:
         d = chunk.choices[0].delta if chunk.choices else None
         if d and d.content: yield d.content
+
+
+def _fallback_bargain_judgement(
+    item_name: str,
+    base_price: int,
+    current_price: int,
+    attempt: int,
+    max_attempts: int,
+    total: int,
+    player_words: str,
+) -> dict:
+    patience_lost = attempt >= max_attempts
+    word_score = min(4, max(0, len(player_words.strip()) // 18))
+    effective_total = total + word_score
+    floor_price = max(1, round(base_price * 0.55))
+
+    if patience_lost:
+        agreed = False
+        discount = 0
+        mood = "不耐烦"
+    elif effective_total >= 22:
+        agreed = True
+        discount = max(1, round(current_price * 0.16))
+        mood = "被打动"
+    elif effective_total >= 17:
+        agreed = True
+        discount = max(1, round(current_price * 0.1))
+        mood = "松口"
+    elif effective_total >= 13 and "老主顾" in player_words:
+        agreed = True
+        discount = max(1, round(current_price * 0.06))
+        mood = "试探"
+    else:
+        agreed = False
+        discount = 0
+        mood = "戒备"
+
+    discount = min(discount, max(0, current_price - floor_price))
+    new_price = current_price - discount
+    if discount <= 0:
+        agreed = False
+        new_price = current_price
+
+    boss_reply = (
+        f"老板：「{item_name}不是地摊上的破铜烂铁。你这话我听着还算顺耳，"
+        f"骰点也没让我觉得你在浪费时间。"
+        f"{'我给你抹掉 ' + str(discount) + ' 金，' if agreed else '但这个价我不点头，'}"
+        f"现在就是 {new_price} 金。再磨下去，我的耐心可比这盏黑油灯烧得快。」"
+    )
+
+    return {
+        "agreed": agreed,
+        "discount": discount,
+        "new_price": new_price,
+        "mood": mood,
+        "reason": "根据骰点、话术长度和老板耐心进行兜底判定。",
+        "boss_reply": boss_reply,
+    }
+
+
+async def judge_black_market_bargain(
+    item_name: str,
+    base_price: int,
+    current_price: int,
+    attempt: int,
+    max_attempts: int,
+    roll: int,
+    bonus: int,
+    total: int,
+    player_words: str,
+    history: list[dict] | None = None,
+) -> dict:
+    floor_price = max(1, round(base_price * 0.55))
+    max_single_discount = max(1, round(current_price * 0.18))
+    remaining_discount = max(0, current_price - floor_price)
+
+    prompt = f"""
+你是逆穹城黑市老板“萨洛·杯底”的地下同行，一名谨慎、会算账、嘴硬但懂人情的老板。
+玩家正在购买：{item_name}
+原价：{base_price} 金
+当前报价：{current_price} 金
+最低心理价：{floor_price} 金
+这是第 {attempt}/{max_attempts} 次讲价。
+玩家说的话：{player_words}
+讲价判定：D20={roll}，加值={bonus}，总计={total}
+历史：{json.dumps(history or [], ensure_ascii=False)}
+
+请判断老板是否同意本轮降价。主要影响因素是：
+1. 判定总计越高越容易降价。
+2. 玩家话语越具体、越能打动老板、越符合黑市处境，越容易降价。
+3. 空泛、威胁、白嫖、侮辱老板会失败。
+4. 第 {max_attempts} 次后老板耐心耗尽，不再同意降价。
+5. 本轮降价不能超过 {max_single_discount} 金，最终价格不能低于 {floor_price} 金。
+
+必须只输出 JSON，不要输出解释文本。JSON 字段：
+agreed: boolean
+discount: integer
+new_price: integer
+mood: string
+reason: string
+boss_reply: string
+
+boss_reply 必须是老板第一人称台词，60-140个中文字符，无论成功或失败都必须有老板视角回复。
+"""
+    fallback = _fallback_bargain_judgement(
+        item_name, base_price, current_price, attempt, max_attempts, total, player_words,
+    )
+
+    try:
+        completion = await _create_chat_completion(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": "你只输出严格 JSON。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.75,
+            max_tokens=420,
+            stream=False,
+        )
+        raw = completion.choices[0].message.content if completion.choices else ""
+        data = json.loads((raw or "").strip())
+    except Exception:
+        data = fallback
+
+    agreed = bool(data.get("agreed"))
+    discount = int(data.get("discount") or 0)
+    if attempt >= max_attempts:
+        agreed = False
+        discount = 0
+
+    discount = max(0, min(discount, max_single_discount, remaining_discount))
+    if discount <= 0:
+        agreed = False
+
+    new_price = current_price - discount if agreed else current_price
+    if new_price < floor_price:
+        new_price = floor_price
+        discount = current_price - new_price
+
+    boss_reply = str(data.get("boss_reply") or fallback["boss_reply"]).strip()
+    if not boss_reply:
+        boss_reply = fallback["boss_reply"]
+
+    return {
+        "agreed": agreed,
+        "discount": discount,
+        "new_price": new_price,
+        "mood": str(data.get("mood") or fallback["mood"]),
+        "reason": str(data.get("reason") or fallback["reason"]),
+        "boss_reply": boss_reply,
+    }
