@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ActionPanel } from './components/ActionPanel';
+import { BattleTestScreen } from './components/BattleTestScreen';
 import { CharacterPanel } from './components/CharacterPanel';
 import { DicePokerGame } from './components/DicePokerGame';
 import { DiceRollOverlay } from './components/DiceRollOverlay';
@@ -27,10 +28,122 @@ import type {
 } from './types/game';
 import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrativeSegments, splitNarrative } from './utils/narrative';
 
-type Screen = 'main-menu' | 'new-game' | 'load-game' | 'test' | 'loading' | 'game';
+type Screen = 'main-menu' | 'new-game' | 'load-game' | 'test' | 'loading' | 'game' | 'tutorial-battle';
 type GamePhase = 'narrating' | 'action';
 
 const DEFAULT_OPENING = '逆穹城倒挂在巨大洞穴的穹顶之上，蓝绿色荧光在远方深渊中明灭。你的冒险从这一刻开始。';
+const RETREAT_ACTION_RE = /逃跑|撤退|脱战|逃离|后撤|拉开距离|跑路|避战|不战斗/;
+const DC_CHECK_RE = /(?:DC|ＤＣ)\s*\d{1,2}/i;
+
+interface TutorialBattleSetup {
+  openingEffects: Array<{
+    unitId: string;
+    hpDelta?: number;
+    acDelta?: number;
+    statuses?: string[];
+    traits?: string[];
+    log: string;
+  }>;
+}
+
+function isFirstPlayerChoice(story: StoryLine[], state: GameState) {
+  if (state.first_choice_resolved || state.tutorial_battle_done) return false;
+  return !story.some((line) => line.role === 'player');
+}
+
+function ensureFirstBattleCheck(action: string) {
+  if (DC_CHECK_RE.test(action)) return action;
+  if (/瑟琳|法术|辅助|光/.test(action)) return `${action}【瑟琳奥秘DC10】`;
+  if (/观察|弱点|破绽|侧腹|寻找/.test(action)) return `${action}【感知DC10】`;
+  if (/闪避|掩护|躲|绕/.test(action)) return `${action}【敏捷DC10】`;
+  return `${action}【力量DC10】`;
+}
+
+function diceSucceeded(dice: DiceResult | null) {
+  if (!dice) return false;
+  if (dice.type === 'attack_roll') return Boolean(dice.data.命中);
+  if (dice.type === 'skill_check') return Boolean(dice.data.成功);
+  return Number(dice.data.总计 ?? dice.data.结果 ?? 0) >= 10;
+}
+
+function getDiceMargin(dice: DiceResult | null) {
+  if (!dice) return 0;
+  const total = Number(dice.data.总计 ?? dice.data.结果 ?? 0);
+  const target = Number(dice.data.DC ?? dice.data.目标AC ?? 10);
+  if (!Number.isFinite(total) || !Number.isFinite(target)) return 0;
+  return total - target;
+}
+
+function buildTutorialBattleSetup(dice: DiceResult | null): TutorialBattleSetup {
+  const success = diceSucceeded(dice);
+  const margin = getDiceMargin(dice);
+  const rollText = dice
+    ? `D20判定总计 ${dice.data.总计 ?? dice.data.结果 ?? '?'}`
+    : '未取得明确骰点';
+
+  // 🔴 铁律：判定无论成功失败，都必须进入完整战斗。只给战术优势/劣势，绝不秒杀。
+  if (success && margin >= 5) {
+    return {
+      openingEffects: [
+        {
+          unitId: 'tutorial-crawler-a',
+          hpDelta: -3,
+          acDelta: -1,
+          statuses: ['侧腹暴露'],
+          traits: ['开局先制成功：HP-3，AC-1'],
+          log: `开局先制成功：${rollText}。你抢在爬兽扑到之前切入侧腹——它嘶叫着踉跄后退，甲壳边缘裂开一道口子。`,
+        },
+        {
+          unitId: 'tutorial-crawler-b',
+          hpDelta: -2,
+          acDelta: -1,
+          statuses: ['畏光迟滞'],
+          traits: ['开局先制成功：HP-2，AC-1'],
+          log: '瑟琳趁势扬起一团银光。第二只爬兽被灼得偏头闪躲，动作明显慢了半拍。',
+        },
+      ],
+    };
+  }
+
+  if (success) {
+    return {
+      openingEffects: [
+        {
+          unitId: 'tutorial-crawler-a',
+          hpDelta: -2,
+          statuses: ['重心偏移'],
+          traits: ['开局判定成功：HP-2'],
+          log: `开局判定成功：${rollText}。你压低重心迎上爬兽的冲势——它被顶得偏了方向，背脊撞上吊箱边缘。`,
+        },
+        {
+          unitId: 'tutorial-crawler-b',
+          acDelta: -1,
+          statuses: ['阵脚散乱'],
+          traits: ['开局判定成功：AC-1'],
+          log: '另一只爬兽被同伴的撞击带乱了步伐，护甲下的软腹短暂暴露。',
+        },
+      ],
+    };
+  }
+
+  return {
+    openingEffects: [
+      {
+        unitId: 'tutorial-crawler-a',
+        acDelta: -1,
+        statuses: ['受惊'],
+        traits: ['开局判定未成功：AC-1'],
+        log: `开局判定未成功：${rollText}。爬兽比你预想的更敏捷——它从你手边擦过，但城市灯火让它不断眨眼，动作失了准头。`,
+      },
+      {
+        unitId: 'tutorial-crawler-b',
+        statuses: ['警觉'],
+        traits: ['开局判定未成功：保持满血'],
+        log: '第二只爬兽绕过吊箱从侧面逼近。它没有受伤，但狭小的补给平台让它的行动受到限制。',
+      },
+    ],
+  };
+}
 
 function fallbackSuggestions(state: GameState): ActionSuggestion[] {
   const area = String(state.current_area || '');
@@ -87,6 +200,8 @@ export default function App() {
   const [showDialogueLog, setShowDialogueLog] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveMessageTone, setSaveMessageTone] = useState<'neutral' | 'success' | 'error'>('neutral');
+  const [pendingTutorialBattleSetup, setPendingTutorialBattleSetup] = useState<TutorialBattleSetup | null>(null);
+  const [openingFastForward, setOpeningFastForward] = useState(false);
 
   const lineId = useRef(1);
   const eventId = useRef(1);
@@ -96,6 +211,8 @@ export default function App() {
   const kpSpeakerRef = useRef('');
   const eventTimersRef = useRef<number[]>([]);
   const diceFiredRef = useRef(false); // 防重复投骰
+  const tutorialBattleIntentRef = useRef(false);
+  const tutorialBattleDiceRef = useRef<DiceResult | null>(null);
 
   useEffect(() => {
     stateRef.current = gameState;
@@ -250,6 +367,10 @@ export default function App() {
         setPhase(result.phase === 'narrating' ? 'narrating' : 'action');
         setStreaming(false);
         setSuggestions(result.suggestions.length ? result.suggestions : fallbackSuggestions(result.state));
+        setPendingTutorialBattleSetup(null);
+        setOpeningFastForward(false);
+        tutorialBattleIntentRef.current = false;
+        tutorialBattleDiceRef.current = null;
         clearEventTimers();
         setEvents([]);
         setScreen('game');
@@ -281,6 +402,10 @@ export default function App() {
       setPhase('narrating');
       setSaveMessage('');
       setSaveMessageTone('neutral');
+      setPendingTutorialBattleSetup(null);
+      setOpeningFastForward(false);
+      tutorialBattleIntentRef.current = false;
+      tutorialBattleDiceRef.current = null;
       lineId.current = 1;
       eventId.current = 1;
       kpSpeakerRef.current = '';
@@ -294,6 +419,7 @@ export default function App() {
         setGameState(result.state);
         setSuggestions(parsedOpening.suggestions.length ? parsedOpening.suggestions : fallbackSuggestions(result.state));
         appendStoryLines(openingLines.length ? openingLines : [DEFAULT_OPENING], 'kp', 'KP', true);
+        setOpeningFastForward(true);
         setScreen('game');
       } catch (error: any) {
         setLoadError(error.message || '连接失败');
@@ -307,15 +433,31 @@ export default function App() {
       const action = text.trim();
       if (!action || !gameId || streaming) return;
 
+      const firstChoice = isFirstPlayerChoice(story, stateRef.current);
+      const retreatChoice = RETREAT_ACTION_RE.test(action);
+      const shouldPrepareTutorialBattle = firstChoice && !retreatChoice;
+      const resolvedAction = shouldPrepareTutorialBattle ? ensureFirstBattleCheck(action) : action;
+
       abortRef.current?.abort();
       parserRef.current = createNarrativeStreamParser();
       diceFiredRef.current = false; // 重置骰子锁
+      tutorialBattleIntentRef.current = shouldPrepareTutorialBattle;
+      tutorialBattleDiceRef.current = null;
       setPhase('narrating');
       setStreaming(true);
       setSuggestions([]);
-      appendStoryLines([action], 'player', gameState.player_name || '你', true);
+      setPendingTutorialBattleSetup(null);
+      appendStoryLines([resolvedAction], 'player', gameState.player_name || '你', true);
 
-      abortRef.current = runtime.streamAction(gameId, action, {
+      if (firstChoice && retreatChoice) {
+        setGameState((prev) => ({
+          ...prev,
+          first_choice_resolved: true,
+          last_event: '玩家选择撤退，避开第一次教学战斗',
+        }));
+      }
+
+      abortRef.current = runtime.streamAction(gameId, resolvedAction, {
         onNarrative: (chunk) => {
           const parsed = parserRef.current.push(chunk);
           if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', 'KP');
@@ -328,6 +470,7 @@ export default function App() {
           // 骰子动画：每轮最多触发一次
           if (!diceFiredRef.current && (parsed.type === 'skill_check' || parsed.type === 'attack_roll')) {
             diceFiredRef.current = true;
+            if (tutorialBattleIntentRef.current) tutorialBattleDiceRef.current = parsed;
             setDiceRoll(parsed);
           }
         },
@@ -338,7 +481,20 @@ export default function App() {
         onDone: () => {
           const parsed = parserRef.current.flush();
           if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', 'KP');
-          setSuggestions(parsed.suggestions.length ? parsed.suggestions : fallbackSuggestions(stateRef.current));
+          if (tutorialBattleIntentRef.current) {
+            const setup = buildTutorialBattleSetup(tutorialBattleDiceRef.current);
+            setPendingTutorialBattleSetup(setup);
+            setGameState((prev) => ({
+              ...prev,
+              first_choice_resolved: true,
+              current_area: '逆穹城·补给平台',
+              last_event: '开局判定完成，等待进入教学战斗',
+            }));
+            setSuggestions(makeSuggestions(['进入教学战斗']));
+            addEvent('开局判定将影响战斗', 'state');
+          } else {
+            setSuggestions(parsed.suggestions.length ? parsed.suggestions : fallbackSuggestions(stateRef.current));
+          }
           setStreaming(false);
         },
         onError: (error) => {
@@ -349,11 +505,22 @@ export default function App() {
           setStreaming(false);
           addEvent(message, 'state');
           appendStoryLines([message], 'system', '系统');
-          setSuggestions(fallbackSuggestions(stateRef.current));
+          if (tutorialBattleIntentRef.current) {
+            setPendingTutorialBattleSetup(buildTutorialBattleSetup(null));
+            setGameState((prev) => ({
+              ...prev,
+              first_choice_resolved: true,
+              current_area: '逆穹城·补给平台',
+              last_event: 'KP兜底后进入教学战斗',
+            }));
+            setSuggestions(makeSuggestions(['进入教学战斗']));
+          } else {
+            setSuggestions(fallbackSuggestions(stateRef.current));
+          }
         },
       });
     },
-    [addEvent, appendStoryLines, gameId, gameState.player_name, runtime, streaming],
+    [addEvent, appendStoryLines, gameId, gameState.player_name, runtime, story, streaming],
   );
 
   const scene = useMemo(() => resolveDndScene(gameState), [gameState]);
@@ -361,14 +528,29 @@ export default function App() {
   const canAdvance = Boolean(currentLine) && (activeIndex < story.length - 1 || !streaming);
   const visibleSuggestions = suggestions.length ? suggestions : fallbackSuggestions(gameState);
 
+  useEffect(() => {
+    if (!openingFastForward) return;
+    const hasPlayerLine = story.some((line) => line.role === 'player');
+    if (phase === 'action' || hasPlayerLine || screen !== 'game') {
+      setOpeningFastForward(false);
+    }
+  }, [openingFastForward, phase, screen, story]);
+
   const advanceLine = useCallback(() => {
     if (activeIndex < story.length - 1) {
       setActiveIndex((index) => Math.min(index + 1, story.length - 1));
       return;
     }
 
-    if (!streaming) setPhase('action');
-  }, [activeIndex, story.length, streaming]);
+    if (!streaming) {
+      if (pendingTutorialBattleSetup) {
+        setPhase('narrating');
+        setScreen('tutorial-battle');
+        return;
+      }
+      setPhase('action');
+    }
+  }, [activeIndex, pendingTutorialBattleSetup, story.length, streaming]);
 
   const openLoadGame = useCallback(() => {
     setSaveMessage('');
@@ -388,10 +570,47 @@ export default function App() {
     setShowReturnTitleConfirm(false);
     setDiceRoll(null);
     setEvents([]);
+    setPendingTutorialBattleSetup(null);
+    setOpeningFastForward(false);
+    tutorialBattleIntentRef.current = false;
+    tutorialBattleDiceRef.current = null;
     setSaveMessage('');
     setSaveMessageTone('neutral');
     setScreen('main-menu');
   }, [clearEventTimers]);
+
+  const completeTutorialBattle = useCallback(() => {
+    if (stateRef.current.tutorial_battle_done) {
+      setScreen('game');
+      return;
+    }
+
+    setGameState((prev) => ({
+      ...prev,
+      first_choice_resolved: true,
+      tutorial_battle_done: true,
+      current_area: '逆穹城·补给平台',
+      last_event: '击退补给吊箱中的裂隙爬兽',
+    }));
+    setPhase('narrating');
+    setSuggestions(makeSuggestions([
+      '查看吊箱封条【调查DC12】',
+      '询问瑟琳这些魔物为什么怕光【奥秘DC13】',
+      '前往冒险者公会接任务',
+    ]));
+    setPendingTutorialBattleSetup(null);
+    setOpeningFastForward(false);
+    tutorialBattleIntentRef.current = false;
+    tutorialBattleDiceRef.current = null;
+    appendStoryLines([
+      '最后一只裂隙爬兽被银白色光芒逼退，撞在吊箱边缘，蜷缩着失去了攻击性。瑟琳收起指尖的光，视线仍停在那些蓝绿色孢尘上。',
+      '瑟琳：「它们不是主动潜进来的。箱壁内侧有拖痕，像是被什么东西赶进去的。」',
+      '守卫翻看吊箱封条，脸色忽然变了。守卫：「这是从孢海据点回收的空箱。按理说，它不该带回活物。」',
+      '补给平台短暂安静下来，远处城市主缆发出低沉震响。你已经掌握了这场战斗的基本流程，而真正的问题刚刚露出第一道裂口。',
+    ], 'kp', 'KP', true);
+    addEvent('教学战斗完成', 'state');
+    setScreen('game');
+  }, [addEvent, appendStoryLines]);
 
   if (screen === 'main-menu') {
     return <TitleMenu onNewGame={() => setScreen('new-game')} onLoadGame={openLoadGame} onTest={() => setScreen('test')} />;
@@ -426,6 +645,20 @@ export default function App() {
 
   if (screen === 'loading') return <LoadingScreen error={loadError} onRetry={() => setScreen('new-game')} />;
 
+  if (screen === 'tutorial-battle') {
+    return (
+      <BattleTestScreen
+        mode="tutorial"
+        openingEffects={pendingTutorialBattleSetup?.openingEffects ?? []}
+        onBack={() => {
+          setPendingTutorialBattleSetup(null);
+          setScreen('game');
+        }}
+        onComplete={completeTutorialBattle}
+      />
+    );
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="vn-app">
       <VisualNovelStage
@@ -435,6 +668,8 @@ export default function App() {
         isStreaming={streaming}
         isActionPhase={phase === 'action'}
         canAdvance={phase !== 'action' && canAdvance}
+        autoAdvance={openingFastForward && phase === 'narrating' && !streaming && !story.some((line) => line.role === 'player')}
+        autoAdvanceDelay={90}
         onAdvance={advanceLine}
         actionPanel={
           phase === 'action' ? (

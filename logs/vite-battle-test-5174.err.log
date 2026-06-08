@@ -40,3 +40,21 @@ Error: connect ECONNREFUSED 127.0.0.1:8000
 [2m18:47:04[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/dnd/saves[39m
 Error: connect ECONNREFUSED 127.0.0.1:8000
     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+[2m18:13:09[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/dnd/saves[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m18:13:09[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/dnd/saves[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m18:13:09[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/dnd/saves[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m18:13:09[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/dnd/saves[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m18:13:09[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/dnd/saves[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+[2m18:13:09[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/dnd/saves[39m
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)

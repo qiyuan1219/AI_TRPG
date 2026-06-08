@@ -7,6 +7,7 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '倒挂在穹顶下的奇迹城邦',
     aliases: ['逆穹城', '倒挂城市', '城市', '城中'],
     themeClass: 'scene-crown-city',
+    backgroundImage: '/assets/scenes/inverse-city.jpg',
   },
   {
     id: 'guild',

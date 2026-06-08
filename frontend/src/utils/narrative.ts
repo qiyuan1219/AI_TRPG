@@ -1,7 +1,7 @@
 import type { ActionSuggestion } from '../types/game';
 
 const HINT_RE = /\[HINTS:([\s\S]*?)\]/g;
-const SENTENCE_END_CHARS = new Set(['。', '！', '？', '!', '?', '\n']);
+const SENTENCE_END_CHARS = new Set(['。', '！', '？', '!', '?']);
 const MIN_SEGMENT_TEXT_LENGTH = 10;
 
 export interface NarrativeSegment {
@@ -26,9 +26,9 @@ const SPEAKER_ALIASES: Record<string, string> = {
   '莉亚瑟·青弦': '莉亚瑟',
   '莉亚瑟': '莉亚瑟',
   '青弦': '莉亚瑟',
-  '卡西亚·断羽': '卡西亚',
-  '卡西亚': '卡西亚',
-  '断羽': '卡西亚',
+  '艾琳·白枝': '艾琳',
+  '艾琳': '艾琳',
+  '白枝': '艾琳',
   '克莱娅·软爪': '克莱娅',
   '克莱娅': '克莱娅',
   '软爪': '克莱娅',
@@ -97,15 +97,18 @@ const SPEECH_VERBS = [
 
 function normalizeModelText(text: string) {
   return text
-    .replace(/「/g, '“')
-    .replace(/」/g, '”')
+    .replace(/「/g, '"')
+    .replace(/」/g, '"')
+    .replace(/"/g, '"')   // 弯左引号 → 直引号
+    .replace(/"/g, '"')   // 弯右引号 → 直引号
     .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\[SCENE:[^\]]*\]\n?/g, '') // 剥离场景元数据，不展示给玩家
-    .replace(/\r/g, '');
+    .replace(/\[SCENE:[^\]]*\]\n?/g, '')
+    .replace(/[\r\n]+/g, '')   // 去掉所有换行，防止LLM分行导致逗号误断句
+    .replace(/[ \t]{2,}/g, '') // 多余空格压缩
 }
 
 function visibleTextLength(text: string) {
-  return text.replace(/[\s“”「」【】{}\[\]（）()，,。.!！?？；;：:、—\-…]/g, '').length;
+  return text.replace(/[\s""「」【】{}\[\]（）()，,。.!！?？；;：:、—\-…]/g, '').length;
 }
 
 function isShortText(text: string) {
@@ -118,8 +121,6 @@ function joinSegmentText(...parts: string[]) {
 
 function compactText(text: string) {
   return normalizeModelText(text)
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -228,6 +229,10 @@ function findLastSpeakerInBlock(block: string, upTo: number): string {
 }
 
 function isPureSpeechAttribution(text: string) {
+  const raw = text.trim();
+  // 如果包含【】舞台提示，这不是纯发言标记，不要丢弃
+  if (raw.includes('【') || raw.includes('】')) return false;
+
   const cleaned = normalizeNarrationPiece(stripOuterSquareBrackets(text)).replace(/[【】\s：:，,。.!！?？；;]+$/g, '');
   if (!cleaned) return true;
 
@@ -247,7 +252,11 @@ function isPureSpeechAttribution(text: string) {
 function pushNarration(segments: NarrativeSegment[], text: string, speaker: string) {
   if (isPureSpeechAttribution(text)) return;
 
-  const cleaned = normalizeNarrationPiece(stripOuterSquareBrackets(text));
+  const raw = text.trim();
+  // 舞台提示保留【】，只清洗普通叙述
+  const cleaned = raw.includes('【')
+    ? normalizeNarrationPiece(raw)
+    : normalizeNarrationPiece(stripOuterSquareBrackets(text));
   if (!cleaned) return;
 
   splitPlainSentences(cleaned).forEach((line) => {
@@ -258,7 +267,7 @@ function pushNarration(segments: NarrativeSegment[], text: string, speaker: stri
 function pushDialogue(segments: NarrativeSegment[], text: string, speaker: string) {
   const cleaned = text.trim();
   if (!cleaned) return;
-  segments.push({ speaker, text: `“${cleaned}”` });
+  segments.push({ speaker, text: `"${cleaned}"` });
 }
 
 function mergeShortSegments(segments: NarrativeSegment[]) {
@@ -370,7 +379,7 @@ export function parseNarrativeSegments(
   const blocks = text.split(/\n+/).map((block) => block.trim()).filter(Boolean);
 
   for (const block of blocks) {
-    const quoteRe = /“([^”]*)”/g;
+    const quoteRe = /"([^"]*)"/g;
     let cursor = 0;
     let hasQuote = false;
     let match: RegExpExecArray | null;
@@ -382,7 +391,9 @@ export function parseNarrativeSegments(
       const actor = findSpeaker(before);
 
       if (actor) lastSpeaker = actor;
-      pushNarration(segments, before, defaultSpeaker);
+      // 舞台提示用人物名作为speaker，而非KP
+      const narrationSpeaker = before.includes('【') && actor ? actor : defaultSpeaker;
+      pushNarration(segments, before, narrationSpeaker);
 
       // 三层回退搜索说话人
       let speaker = findSpeakerNearQuote(before, after);
@@ -397,7 +408,8 @@ export function parseNarrativeSegments(
 
     const tail = block.slice(cursor);
     const tailActor = findSpeaker(tail);
-    pushNarration(segments, tail, defaultSpeaker);
+    const tailSpeaker = tail.includes('【') && tailActor ? tailActor : defaultSpeaker;
+    pushNarration(segments, tail, tailSpeaker);
     if (tailActor) lastSpeaker = tailActor;
 
     if (!hasQuote) {
@@ -415,26 +427,28 @@ function lastCompleteBoundary(input: string) {
 
   for (let i = 0; i < input.length; i += 1) {
     const char = input[i];
-    if (char === '“') {
-      inQuote = true;
-      continue;
-    }
-    if (char === '”') {
-      inQuote = false;
+    if (char === '"' || char === '"' || char === '"' || char === '"') {
+      inQuote = !inQuote;
       continue;
     }
     if (!SENTENCE_END_CHARS.has(char)) continue;
 
     if (inQuote) {
+      // 中文标点在引号内，向前看是否紧接后引号
       let cursor = i + 1;
-      while (/\s/.test(input[cursor] || '')) cursor += 1;
-      if (input[cursor] === '”') lastEnd = cursor + 1;
+      while (cursor < input.length && (input[cursor] === ' ' || input[cursor] === '\t' || input[cursor] === '\u3000')) {
+        cursor += 1;
+      }
+      if (cursor < input.length && (input[cursor] === '"' || input[cursor] === '"' || input[cursor] === '"' || input[cursor] === '"')) {
+        lastEnd = cursor + 1;
+        inQuote = false;
+        i = cursor; // 跳过后引号
+      }
       continue;
     }
 
-    if (!inQuote) {
-      lastEnd = i + 1;
-    }
+    // 不在引号中
+    lastEnd = i + 1;
   }
 
   return lastEnd;
@@ -450,15 +464,35 @@ export function splitNarrative(input: string): string[] {
 
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
-    if (char === '“') {
-      inQuote = true;
+
+    // 追踪引号状态（用于判断句子边界是否需要包含后引号）
+    if (char === '"' || char === '"' || char === '"' || char === '"') {
+      inQuote = !inQuote;
       continue;
     }
-    if (char === '”') {
-      inQuote = false;
-      continue;
-    }
-    if (!inQuote && SENTENCE_END_CHARS.has(char)) {
+
+    // 句子结束字符 — 不跳过引号内的，而是检查引号是否即将闭合
+    if (SENTENCE_END_CHARS.has(char)) {
+      if (inQuote) {
+        // 中文标点规矩：句号/问号/叹号在引号内部
+        // 向前看：紧接在句末标点后的是否是后引号？
+        let cursor = i + 1;
+        while (cursor < text.length && (text[cursor] === ' ' || text[cursor] === '\t' || text[cursor] === '\u3000')) {
+          cursor += 1;
+        }
+        if (cursor < text.length && (text[cursor] === '"' || text[cursor] === '"' || text[cursor] === '"' || text[cursor] === '"')) {
+          // 句子结束 → 后引号紧随其后 → 整个 "..." 作为一句切出
+          const line = text.slice(start, cursor + 1).trim();
+          if (line) raw.push(line);
+          start = cursor + 1;
+          inQuote = false;
+          i = cursor;
+          continue;
+        }
+        // 引号内句号但后引号还没来（对话还没说完），继续累积
+        continue;
+      }
+      // 不在引号中，普通叙事句结束
       const line = text.slice(start, i + 1).trim();
       if (line) raw.push(line);
       start = i + 1;
@@ -477,7 +511,7 @@ export function splitNarrative(input: string): string[] {
       result.push(line);
     }
   }
-  return mergeShortLines(result);
+  return result;
 }
 
 function splitCompleteSentences(input: string): { complete: string[]; tail: string } {

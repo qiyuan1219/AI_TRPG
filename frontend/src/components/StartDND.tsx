@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { abilityModifier, DND_CLASSES, presetAc, presetHp } from '../data/dndClasses';
 import type { CharacterPreset, CreateGamePayload, SaveSlotKey, SaveSlotSummary } from '../types/game';
@@ -23,6 +23,128 @@ const ATTRS: Array<{ key: keyof CharacterPreset['stats']; name: string }> = [
   { key: 'wis', name: '感知' },
   { key: 'cha', name: '魅力' },
 ];
+
+// ============================================================
+// SVG 六维雷达图（增加边距防止标签被裁剪）
+// ============================================================
+const RADIUS = 80;          // 六角形半径
+const CENTER = 140;         // viewBox 280x280 中心
+const MAX_VAL = 20;         // 属性最大值（对应外圈）
+const LEVELS = 3;           // 网格层数
+const LABEL_R = RADIUS + 28; // 标签半径（外圈+边距，含数值行）
+
+function polar(angle: number, r: number): { x: number; y: number } {
+  return { x: CENTER + r * Math.cos(angle), y: CENTER + r * Math.sin(angle) };
+}
+
+function hexPath(r: number): string {
+  const pts = ATTRS.map((_, i) => {
+    const a = (Math.PI / 2) + (2 * Math.PI * i) / 6; // 从顶部开始
+    return polar(a, r);
+  });
+  return pts.map((p, i) => (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`).join(' ') + 'Z';
+}
+
+function RadarChart({ stats }: { stats: Record<string, number> }) {
+  const gradientId = useId();
+
+  // 数据多边形路径
+  const dataPath = ATTRS.map((attr, i) => {
+    const val = Math.min(stats[attr.key], MAX_VAL);
+    const r = (val / MAX_VAL) * RADIUS;
+    const a = (Math.PI / 2) + (2 * Math.PI * i) / 6;
+    const p = polar(a, r);
+    return (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`;
+  }).join(' ') + 'Z';
+
+  return (
+    <svg viewBox="0 0 280 280" className="radar-chart">
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#5fb7a7" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="#d4a843" stopOpacity="0.6" />
+        </linearGradient>
+      </defs>
+
+      {/* 网格层 */}
+      {Array.from({ length: LEVELS }).map((_, level) => {
+        const r = (RADIUS / LEVELS) * (level + 1);
+        return (
+          <path
+            key={`grid-${level}`}
+            d={hexPath(r)}
+            fill="none"
+            stroke="rgba(231,211,161,0.15)"
+            strokeWidth="1"
+          />
+        );
+      })}
+
+      {/* 轴线 */}
+      {ATTRS.map((_, i) => {
+        const a = (Math.PI / 2) + (2 * Math.PI * i) / 6;
+        const p = polar(a, RADIUS);
+        return (
+          <line
+            key={`axis-${i}`}
+            x1={CENTER} y1={CENTER} x2={p.x} y2={p.y}
+            stroke="rgba(231,211,161,0.12)"
+            strokeWidth="1"
+          />
+        );
+      })}
+
+      {/* 数据多边形（带动画） */}
+      <motion.path
+        d={dataPath}
+        fill={`url(#${gradientId})`}
+        stroke="#5fb7a7"
+        strokeWidth="2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      />
+
+      {/* 数据点 */}
+      {ATTRS.map((attr, i) => {
+        const val = Math.min(stats[attr.key], MAX_VAL);
+        const r = (val / MAX_VAL) * RADIUS;
+        const a = (Math.PI / 2) + (2 * Math.PI * i) / 6;
+        const p = polar(a, r);
+        return (
+          <circle key={`dot-${i}`} cx={p.x} cy={p.y} r="4" fill="#efd58c" />
+        );
+      })}
+
+      {/* 属性标签 + 数值（合并为单行，彻底消除重叠） */}
+      {ATTRS.map((attr, i) => {
+        const a = (Math.PI / 2) + (2 * Math.PI * i) / 6;
+        const mod = abilityModifier(stats[attr.key]);
+        const lbl = polar(a, LABEL_R);
+        // 顶部和底部的标签适当调整 y 偏移，避免被六角形遮挡
+        const isTop = i === 0;
+        const isBottom = i === 3;
+        const dy = isTop ? '-0.4em' : isBottom ? '0.4em' : '0em';
+        return (
+          <text
+            key={`label-${i}`}
+            x={lbl.x}
+            y={lbl.y}
+            dy={dy}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill="#f5ecd8"
+            fontSize="13"
+            fontWeight="800"
+          >
+            <tspan x={lbl.x} dy="0" fill="rgba(95,183,167,0.9)" fontSize="11" fontFamily="Consolas, monospace" fontWeight="900">{stats[attr.key]} {mod}</tspan>
+            <tspan x={lbl.x} dy="15" fill="#f5ecd8" fontSize="13" fontWeight="800">{attr.name}</tspan>
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
 
 export function StartDND({
   onStart,
@@ -106,27 +228,21 @@ export function StartDND({
           <motion.div key={currentClass.id} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="class-sheet">
             <div className="sheet-title">
               <span>{currentClass.name}</span>
-              <small>
-                HP {presetHp(currentClass.stats.con)} / AC {presetAc(currentClass.id)}
-              </small>
+              <div className="sheet-stats-badge">
+                <span className="badge-hp">❤️ HP {presetHp(currentClass.stats.con)}</span>
+                <span className="badge-ac">🛡️ AC {presetAc(currentClass.id)}</span>
+              </div>
             </div>
 
-            <div className="stat-list">
-              {ATTRS.map((attr) => {
-                const value = currentClass.stats[attr.key];
-                return (
-                  <div key={attr.key} className="stat-row">
-                    <span>{attr.name}</span>
-                    <div className="stat-track">
-                      <i style={{ width: `${(value / 18) * 100}%` }} />
-                    </div>
-                    <b>
-                      {value} ({abilityModifier(value)})
-                    </b>
-                  </div>
-                );
-              })}
-            </div>
+            {/* 🔴 六维雷达图替换原 stat-list */}
+            <RadarChart stats={{
+              str: currentClass.stats.str,
+              dex: currentClass.stats.dex,
+              con: currentClass.stats.con,
+              int: currentClass.stats.int,
+              wis: currentClass.stats.wis,
+              cha: currentClass.stats.cha,
+            }} />
 
             <div className="trait-grid">
               <div>

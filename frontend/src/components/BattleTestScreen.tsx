@@ -3,8 +3,23 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Dice3DView, DiceRollOverlay, type DieType } from "./DiceRollOverlay";
 import type { DiceResult } from "../types/game";
 
+/* ===== 战斗头像映射（Q版截取，52×52） ===== */
+const AVATAR_MAP: Record<string, string> = {
+  adventurer: '/assets/chibi/adventurer/avatar.png',
+  selin: '/assets/chibi/selin/avatar.png',
+  senluo: '/assets/chibi/senluo/avatar.png',
+  liyase: '/assets/chibi/liyase/avatar.png',
+  ailin: '/assets/chibi/ailin/avatar.png',
+  kelaiya: '/assets/chibi/kelaiya/avatar.png',
+  leiduo: '/assets/chibi/leiduo/avatar.png',
+  crawler: '/assets/chibi/crawler/avatar.png',
+};
+
 interface BattleTestScreenProps {
   onBack: () => void;
+  mode?: "test" | "tutorial";
+  onComplete?: () => void;
+  openingEffects?: BattleOpeningEffect[];
 }
 
 type Faction = "ally" | "enemy";
@@ -46,13 +61,15 @@ interface NonCombatSkill {
   effect: string;
 }
 
+type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler";
+
 interface BattleUnit {
   id: string;
   name: string;
   faction: Faction;
   role: string;
   portrait: string;
-  model: "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade";
+  model: BattleModelKey;
   hp: number;
   maxHp: number;
   ac: number;
@@ -81,6 +98,13 @@ interface TargetSelection {
   skillId: string;
 }
 
+interface BattleAnimationCue {
+  id: number;
+  actorId: string;
+  targetId: string;
+  skillId: string;
+}
+
 interface BattleEffect {
   id: number;
   actorName: string;
@@ -95,6 +119,61 @@ interface BattleEffect {
   success?: boolean;
 }
 
+interface PendingSettlement {
+  unit: BattleUnit;
+  target: BattleUnit;
+  skill: BattleSkill;
+  effect: BattleEffect;
+  isEnemy?: boolean;
+}
+
+interface BattleOpeningEffect {
+  unitId: string;
+  hpDelta?: number;
+  acDelta?: number;
+  statuses?: string[];
+  traits?: string[];
+  log: string;
+}
+
+interface QuickRule {
+  title: string;
+  text: string;
+}
+
+interface TutorialIntroStep {
+  title: string;
+  text: string;
+}
+
+interface TutorialEnemySkillBrief {
+  name: string;
+  skills: string[];
+}
+
+interface BattleConfig {
+  units: BattleUnit[];
+  quickRules: QuickRule[];
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  backLabel: string;
+  rerollLog: string;
+  initialLog: string;
+  initiativeNote: string;
+  winTitle: string;
+  loseTitle: string;
+  winText: string;
+  loseText: string;
+  completeLabel?: string;
+  tutorialIntro?: {
+    title: string;
+    subtitle: string;
+    steps: TutorialIntroStep[];
+    enemySkills: TutorialEnemySkillBrief[];
+  };
+}
+
 const ABILITY_LABELS: Array<[AbilityKey, string]> = [
   ["str", "力量"],
   ["dex", "敏捷"],
@@ -104,11 +183,18 @@ const ABILITY_LABELS: Array<[AbilityKey, string]> = [
   ["cha", "魅力"],
 ];
 
-const QUICK_RULES = [
+const QUICK_RULES: QuickRule[] = [
   { title: "流程", text: "每回合选择 1 个战斗技能，指定对象后立刻进入骰子判定。" },
   { title: "技能", text: "每个角色只展示 3 个战斗技能，暂不区分移动、附赠动作、反应和距离。" },
   { title: "判定", text: "攻击看 D20 + 加值 vs AC；治疗和范围技能按各自骰子结算。" },
   { title: "节奏", text: "我方有 +2 节奏加值，普通未命中会造成压制擦伤；敌方伤害降低。" },
+];
+
+const TUTORIAL_QUICK_RULES: QuickRule[] = [
+  { title: "1 先攻", text: "战斗开始先投 1D20 + 敏捷调整值，数值越高越早行动。" },
+  { title: "2 技能", text: "轮到我方时选择一个技能；本教学每名角色每回合只做一次主要行动。" },
+  { title: "3 目标", text: "选好技能后指定发光目标。攻击技能打敌人，治疗技能点我方。" },
+  { title: "4 结算", text: "右侧会展示骰点、AC 或 DC、伤害/治疗，以及 KP 对结果的解释。" },
 ];
 
 const BACKGROUND_URL = "/assets/battle/b1-sanctum-placeholder.png";
@@ -723,6 +809,370 @@ function buildSimpleBattleUnit(unit: BattleUnit): BattleUnit {
 
 const SIMPLE_BATTLE_UNITS = BATTLE_UNITS.map(buildSimpleBattleUnit);
 
+const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
+  {
+    id: "tutorial-adventurer",
+    name: "冒险者",
+    faction: "ally",
+    role: "战士 Lv.3 / 新手教学前排",
+    portrait: "冒",
+    model: "adventurer",
+    hp: 30,
+    maxHp: 30,
+    ac: 18,
+    speed: 30,
+    proficiency: 2,
+    abilities: { str: 16, dex: 13, con: 15, int: 10, wis: 12, cha: 8 },
+    weaponMastery: "本场教学只保留核心概念：攻击检定、技能检定、治疗。",
+    resourceProfile: ["攻击检定 vs AC", "力量检定 vs DC", "治疗恢复 HP"],
+    statuses: ["前排", "教学保护", "敌伤降低"],
+    traits: ["HP30 / AC18", "攻击加值会自动计算", "未命中也可能造成 4 点擦伤压制", "本场目标：把两只小怪打到 HP0"],
+    skills: [
+      {
+        id: "TA1",
+        name: "稳步斩击",
+        resource: "战斗技能",
+        source: "职业技能",
+        formula: "STR + 熟练 vs AC；1d8+3 挥砍",
+        effect: "教学重点：D20 + 力量调整值 + 熟练加值 >= 目标 AC 即命中。命中造成伤害，未命中也可能触发擦伤压制。",
+        cooldown: "每回合 1 次",
+        rule: "攻击检定",
+        roll: { kind: "attack", ability: "str", targetAc: 12, label: "稳步斩击命中判定" },
+        tags: ["攻击", "AC", "推荐起手"],
+      },
+      {
+        id: "TA2",
+        name: "盾牌压制",
+        resource: "战斗技能",
+        source: "职业技能",
+        formula: "STR 运动 DC12；1d4+3 钝击",
+        effect: "教学重点：技能检定看 D20 + 对应属性/熟练加值 vs 固定 DC。成功会造成伤害并压低小怪攻势。",
+        cooldown: "每回合 1 次",
+        rule: "技能检定",
+        roll: { kind: "ability", ability: "str", dc: 12, label: "盾牌压制运动检定" },
+        tags: ["检定", "控制", "低风险"],
+      },
+      {
+        id: "TA3",
+        name: "回气",
+        resource: "战斗技能",
+        source: "职业技能",
+        formula: "恢复 1d10+3 HP",
+        effect: "教学重点：治疗不攻击敌人，而是选择我方目标并恢复生命值。冒险者受伤后再用最划算。",
+        cooldown: "每战斗 1 次",
+        rule: "治疗骰",
+        roll: { kind: "healing", dieType: "d10", diceCount: 1, bonus: 3, label: "回气恢复量" },
+        tags: ["治疗", "HP", "保命"],
+      },
+    ],
+    nonCombatSkills: [],
+  },
+  {
+    id: "ally-selin",
+    name: "瑟琳",
+    faction: "ally",
+    role: "时间法师 / 教学支援",
+    portrait: "瑟",
+    model: "selin",
+    hp: 24,
+    maxHp: 24,
+    ac: 14,
+    speed: 30,
+    proficiency: 2,
+    initiativeBonus: 1,
+    abilities: { str: 8, dex: 14, con: 12, int: 16, wis: 14, cha: 11 },
+    weaponMastery: "固定同行；负责讲解法术攻击、豁免和治疗。",
+    resourceProfile: ["法术攻击 vs AC", "迫使目标豁免", "队友治疗"],
+    statuses: ["后排", "奥术支援", "时间感"],
+    traits: ["HP24 / AC14", "INT +3", "法术 DC13", "光亮会压制裂隙爬兽"],
+    skills: [
+      {
+        id: "SE1",
+        name: "银钟光束",
+        resource: "战斗技能",
+        source: "队友技能",
+        formula: "INT + 熟练 vs AC；1d8+3 光耀",
+        effect: "教学重点：法术攻击也使用 D20 + 施法属性 + 熟练加值。裂隙爬兽怕光，命中后很容易进入残血。",
+        cooldown: "每回合 1 次",
+        rule: "法术攻击",
+        roll: { kind: "attack", ability: "int", targetAc: 12, label: "银钟光束命中判定" },
+        tags: ["法术攻击", "光耀", "补刀"],
+      },
+      {
+        id: "SE2",
+        name: "时隙牵引",
+        resource: "战斗技能",
+        source: "队友技能",
+        formula: "目标 DEX 豁免 DC13；1d6+3 力场",
+        effect: "教学重点：有些技能不是你掷攻击，而是目标掷豁免。目标失败吃完整效果，成功通常只有半效。",
+        cooldown: "每回合 1 次",
+        rule: "豁免判定",
+        roll: { kind: "save", dc: 13, targetSaveBonus: 2, label: "目标 DEX 豁免" },
+        tags: ["豁免", "减速", "控制"],
+      },
+      {
+        id: "SE3",
+        name: "逆钟愈合",
+        resource: "战斗技能",
+        source: "队友技能",
+        formula: "恢复 1d8+3 HP",
+        effect: "教学重点：治疗可以点冒险者或瑟琳。新手战斗里敌方伤害较低，治疗主要用于理解 HP 变化。",
+        cooldown: "每战斗 2 次",
+        rule: "治疗骰",
+        roll: { kind: "healing", dieType: "d8", diceCount: 1, bonus: 3, label: "逆钟愈合恢复量" },
+        tags: ["治疗", "支援", "安全网"],
+      },
+    ],
+    nonCombatSkills: [],
+  },
+  {
+    id: "tutorial-crawler-a",
+    name: "裂隙爬兽A",
+    faction: "enemy",
+    role: "小怪 / 爪击教学",
+    portrait: "爬A",
+    model: "crawler",
+    hp: 28,
+    maxHp: 28,
+    ac: 12,
+    speed: 25,
+    proficiency: 2,
+    abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
+    resourceProfile: ["低伤害攻击", "怕光", "被击败即退出战斗"],
+    statuses: ["惊慌", "怕光", "教学敌人"],
+    traits: ["HP28 / AC12", "DEX +2", "伤害已降低", "优先攻击当前生命较低的我方"],
+    skills: [
+      {
+        id: "CR1A",
+        name: "畏光爪击",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "DEX + 熟练 vs AC；1d4+2 挥砍",
+        effect: "小怪最基础的攻击：投 D20 加敏捷和熟练，对比目标 AC。命中也只造成少量伤害。",
+        cooldown: "每回合 1 次",
+        rule: "敌方攻击检定",
+        roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击命中判定" },
+        tags: ["攻击", "低伤害", "教学"],
+      },
+      {
+        id: "CR2A",
+        name: "孢尘喷吐",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "目标 CON 豁免 DC11；1d4 毒素",
+        effect: "小怪吐出浅绿色孢尘，目标用体质豁免抵抗。成功半效，失败会受到完整影响。",
+        cooldown: "每回合 1 次",
+        rule: "敌方豁免技能",
+        roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "目标 CON 豁免" },
+        tags: ["豁免", "毒素", "减益"],
+      },
+      {
+        id: "CR3A",
+        name: "惊慌缩伏",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "无需掷骰；小怪生命过低时缩成一团",
+        effect: "用于教学怪物行为：弱小敌人不会死战到底，HP 归 0 前也会出现畏惧和退缩。",
+        cooldown: "剧情表现",
+        rule: "行为提示",
+        roll: { kind: "none" },
+        tags: ["行为", "怕光", "撤退"],
+      },
+    ],
+    nonCombatSkills: [],
+  },
+  {
+    id: "tutorial-crawler-b",
+    name: "裂隙爬兽B",
+    faction: "enemy",
+    role: "小怪 / 豁免教学",
+    portrait: "爬B",
+    model: "crawler",
+    hp: 28,
+    maxHp: 28,
+    ac: 12,
+    speed: 25,
+    proficiency: 2,
+    abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
+    resourceProfile: ["低伤害豁免", "怕光", "被击败即退出战斗"],
+    statuses: ["惊慌", "孢尘", "教学敌人"],
+    traits: ["HP28 / AC12", "CON +1", "伤害已降低", "用孢尘展示豁免机制"],
+    skills: [
+      {
+        id: "CR2B",
+        name: "孢尘喷吐",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "目标 CON 豁免 DC11；1d4 毒素",
+        effect: "教学重点：敌人也会使用让你豁免的技能。体质高的冒险者更容易抵抗，瑟琳则需要小心。",
+        cooldown: "每回合 1 次",
+        rule: "敌方豁免技能",
+        roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "目标 CON 豁免" },
+        tags: ["豁免", "毒素", "减益"],
+      },
+      {
+        id: "CR1B",
+        name: "畏光爪击",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "DEX + 熟练 vs AC；1d4+2 挥砍",
+        effect: "基础爪击，主要用于展示 AC 的防护价值。冒险者 AC18 很难被命中，瑟琳 AC14 会更危险。",
+        cooldown: "每回合 1 次",
+        rule: "敌方攻击检定",
+        roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击命中判定" },
+        tags: ["攻击", "低伤害", "教学"],
+      },
+      {
+        id: "CR3B",
+        name: "惊慌缩伏",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "无需掷骰；被光照或重击压制时退缩",
+        effect: "用于教学战斗叙事：敌人行为会根据伤势和恐惧改变，KP 描写会体现骰点结果。",
+        cooldown: "剧情表现",
+        rule: "行为提示",
+        roll: { kind: "none" },
+        tags: ["行为", "怕光", "撤退"],
+      },
+    ],
+    nonCombatSkills: [],
+  },
+  {
+    id: "tutorial-crawler-c",
+    name: "裂隙爬兽C",
+    faction: "enemy",
+    role: "小怪 / 轮转教学",
+    portrait: "爬C",
+    model: "crawler",
+    hp: 28,
+    maxHp: 28,
+    ac: 12,
+    speed: 25,
+    proficiency: 2,
+    abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
+    resourceProfile: ["混合方式", "怕光", "展示多目标轮转"],
+    statuses: ["惊慌", "畏光", "教学敌人"],
+    traits: ["HP28 / AC12", "DEX +2", "伤害已降低", "展示三对多回合轮转"],
+    skills: [
+      {
+        id: "CR1C",
+        name: "畏光爪击",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "DEX + 熟练 vs AC；1d4+2 挥砍",
+        effect: "连续小怪攻击展示多回合压力：看看瑟琳是否需要治疗",
+        cooldown: "每回合 1 次",
+        rule: "敌方攻击检定",
+        roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击命中判定" },
+        tags: ["攻击", "低伤害", "教学"],
+      },
+      {
+        id: "CR2C",
+        name: "孢尘喷吐",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "目标 CON 豁免 DC11；1d4 毒素",
+        effect: "配合其他小怪攻击，让我方承受足够伤害以展示治疗的重要性。",
+        cooldown: "每回合 1 次",
+        rule: "敌方豁免技能",
+        roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "目标 CON 豁免" },
+        tags: ["豁免", "毒素", "减益"],
+      },
+      {
+        id: "CR3C",
+        name: "惊慌缩伏",
+        resource: "战斗技能",
+        source: "敌方技能",
+        formula: "无需掷骰；同伴被击败后更加畏缩",
+        effect: "展示怪物在劣势下行为改变：同伴倒下的恐慌会蔓延。",
+        cooldown: "剧情表现",
+        rule: "行为提示",
+        roll: { kind: "none" },
+        tags: ["行为", "怕光", "撤退"],
+      },
+    ],
+    nonCombatSkills: [],
+  },
+];
+
+const TEST_BATTLE_CONFIG: BattleConfig = {
+  units: SIMPLE_BATTLE_UNITS,
+  quickRules: QUICK_RULES,
+  eyebrow: "B1 COMBAT RULE SANDBOX",
+  title: "B1 层战斗测试",
+  subtitle: "三技能简化战斗：指定对象后过骰子判定，AI KP 会按点数、伤害和治疗描述行动结果。",
+  backLabel: "返回测试",
+  rerollLog: "重新进行全员 1D20 先攻判定。",
+  initialLog: "战斗测试按三技能简化规则初始化：选技能、指定对象、掷骰结算。",
+  initiativeNote: "全员同时进行 1D20 判定：D20 + 敏捷调整值 + 其他加值。",
+  winTitle: "战斗测试胜利",
+  loseTitle: "战斗测试失败",
+  winText: "敌方已经全部失去战斗能力。本次节奏调校目标达成，可以继续测试下一场战斗。",
+  loseText: "我方已经全部失去战斗能力，可以重投先攻重新测试。",
+};
+
+const TUTORIAL_BATTLE_CONFIG: BattleConfig = {
+  units: TUTORIAL_BATTLE_UNITS,
+  quickRules: TUTORIAL_QUICK_RULES,
+  eyebrow: "FIRST COMBAT TUTORIAL",
+  title: "补给平台教学战斗",
+  subtitle: "冒险者与瑟琳对抗三只裂隙爬兽：先学先攻、攻击、豁免、治疗，再继续主线。",
+  backLabel: "返回剧情",
+  rerollLog: "教学战斗重置：重新投先攻，并恢复冒险者、瑟琳和三只裂隙爬兽的 HP。",
+  initialLog: "新手教学开始：先看教学说明，再投先攻；本场敌人伤害降低，重点是理解流程。",
+  initiativeNote: "5 位单位同时进行 1D20 判定：D20 + 敏捷调整值 + 其他加值。数值最高者先行动。",
+  winTitle: "教学战斗胜利",
+  loseTitle: "教学战斗失败",
+  winText: "三只裂隙爬兽已经失去战斗能力。你掌握了先攻、攻击、豁免、治疗和回合推进。",
+  loseText: "本场是教学战斗，可以重投先攻重新练习；敌人伤害较低，优先让冒险者承伤。",
+  completeLabel: "继续剧情",
+  tutorialIntro: {
+    title: "瑟琳的战斗教学",
+    subtitle: "一步一步来：先看先攻，再看行动。战斗必胜，重点是理解每一步为什么发生。",
+    steps: [
+      { title: "① 先攻", text: "开场所有单位投 1D20 + 敏捷调整值。行动条从左到右显示顺序，当前行动者高亮。" },
+      { title: "② 选择技能", text: "轮到你时点下方技能，选攻击（稳步斩击）、检定（盾牌压制）或治疗（回气）。" },
+      { title: "③ 指定目标", text: "选完技能后，敌对单位会发光。点击目标确认释放，攻击打敌人，治疗点我方。" },
+      { title: "④ 观察骰子", text: "右侧弹出 3D 骰子展示 D20 结果和加值 vs 目标AC/DC，看清通过还是失败再点继续。" },
+      { title: "⑤ 防御思路", text: "冒险者 AC18 很难被命中，瑟琳 AC14 较脆。高AC = 更难被打中，前排承伤是基础策略。" },
+      { title: "⑥ 治疗时机", text: "回气和逆钟愈合恢复 HP。受伤后用治疗维持血量，不要等 HP 过低才动手。" },
+    ],
+    enemySkills: [
+      { name: "裂隙爬兽A", skills: ["畏光爪击：D20 + 敏捷 vs AC，低伤害近战。", "孢尘喷吐：目标体质豁免 DC11，成功半效。", "惊慌缩伏：展示怪物受伤后的退缩行为。"] },
+      { name: "裂隙爬兽B", skills: ["孢尘喷吐：优先展示豁免与半效。", "畏光爪击：展示瑟琳 AC 较低、前排更适合承伤。", "惊慌缩伏：被光照或重击压制时会畏缩。"] },
+      { name: "裂隙爬兽C", skills: ["畏光爪击：多只小怪轮番攻击，体会回合交替的压力。", "孢尘喷吐：毒素持续消耗我方血量，治疗的重要性。", "惊慌缩伏：同伴倒下后更加畏缩。"] },
+    ],
+  },
+};
+
+function getBattleConfig(mode: BattleTestScreenProps["mode"]): BattleConfig {
+  return mode === "tutorial" ? TUTORIAL_BATTLE_CONFIG : TEST_BATTLE_CONFIG;
+}
+
+function applyOpeningEffectsToUnits(units: BattleUnit[], effects: BattleOpeningEffect[] = []) {
+  if (!effects.length) return units;
+
+  return units.map((unit) => {
+    const unitEffects = effects.filter((effect) => effect.unitId === unit.id);
+    if (!unitEffects.length) return unit;
+
+    const hpDelta = unitEffects.reduce((sum, effect) => sum + (effect.hpDelta ?? 0), 0);
+    const acDelta = unitEffects.reduce((sum, effect) => sum + (effect.acDelta ?? 0), 0);
+    const statuses = unitEffects.flatMap((effect) => effect.statuses ?? []);
+    const traits = unitEffects.flatMap((effect) => effect.traits ?? []);
+    const nextHp = Math.max(1, Math.min(unit.maxHp, unit.hp + hpDelta));
+    const nextAc = Math.max(6, unit.ac + acDelta);
+
+    return {
+      ...unit,
+      hp: nextHp,
+      ac: nextAc,
+      statuses: [...unit.statuses, ...statuses],
+      traits: [...unit.traits, ...traits],
+    };
+  });
+}
+
 function abilityModifier(score: number) {
   return Math.floor((score - 10) / 2);
 }
@@ -759,7 +1209,7 @@ function buildInitiative(units: BattleUnit[]): InitiativeEntry[] {
   });
 }
 
-function sortInitiative(entries: InitiativeEntry[], unitMap: Map<string, BattleUnit>) {
+function sortInitiative(entries: InitiativeEntry[], unitMap: Map<string, BattleUnit>, unitOrder: BattleUnit[] = SIMPLE_BATTLE_UNITS) {
   return [...entries].sort((a, b) => {
     if (b.total !== a.total) return b.total - a.total;
     if (b.dexMod !== a.dexMod) return b.dexMod - a.dexMod;
@@ -767,7 +1217,9 @@ function sortInitiative(entries: InitiativeEntry[], unitMap: Map<string, BattleU
     const unitA = unitMap.get(a.unitId);
     const unitB = unitMap.get(b.unitId);
     if (unitA?.faction !== unitB?.faction) return unitA?.faction === "ally" ? -1 : 1;
-    return SIMPLE_BATTLE_UNITS.findIndex((unit) => unit.id === a.unitId) - SIMPLE_BATTLE_UNITS.findIndex((unit) => unit.id === b.unitId);
+    const indexA = unitOrder.findIndex((unit) => unit.id === a.unitId);
+    const indexB = unitOrder.findIndex((unit) => unit.id === b.unitId);
+    return (indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA) - (indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB);
   });
 }
 
@@ -1124,33 +1576,54 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
   };
 }
 
-export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
-  const [initiative, setInitiative] = useState(() => buildInitiative(SIMPLE_BATTLE_UNITS));
+export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEffects = [] }: BattleTestScreenProps) {
+  const config = useMemo(() => getBattleConfig(mode), [mode]);
+  const battleBaseUnits = useMemo(() => applyOpeningEffectsToUnits(config.units, openingEffects), [config.units, openingEffects]);
+  const openingLogLines = useMemo(() => openingEffects.map((effect) => effect.log), [openingEffects]);
+  const [initiative, setInitiative] = useState(() => buildInitiative(battleBaseUnits));
   const [phase, setPhase] = useState<BattlePhase>("initiative");
   const [rollRunId, setRollRunId] = useState(1);
   const [turnIndex, setTurnIndex] = useState(0);
-  const [unitHp, setUnitHp] = useState(() => Object.fromEntries(SIMPLE_BATTLE_UNITS.map((unit) => [unit.id, unit.hp])));
+  const [unitHp, setUnitHp] = useState(() => Object.fromEntries(battleBaseUnits.map((unit) => [unit.id, unit.hp])));
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [actionUnitId, setActionUnitId] = useState<string | null>(null);
   const [targetSelection, setTargetSelection] = useState<TargetSelection | null>(null);
   const [activeDice, setActiveDice] = useState<DiceResult | null>(null);
   const [lastEffect, setLastEffect] = useState<BattleEffect | null>(null);
+  const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null);
+  const [battleAnimation, setBattleAnimation] = useState<BattleAnimationCue | null>(null);
   const enemyActingKeyRef = useRef<string | null>(null);
+  const battleAnimationTimerRef = useRef<number | null>(null);
   const [usedResources, setUsedResources] = useState<Record<string, Partial<Record<BattleResource, boolean>>>>({});
-  const [battleLog, setBattleLog] = useState<string[]>([
-    "战斗测试按三技能简化规则初始化：选技能、指定对象、掷骰结算。",
-  ]);
+  const [battleLog, setBattleLog] = useState<string[]>([...openingLogLines, config.initialLog].slice(0, 4));
+  const [showTutorialIntro, setShowTutorialIntro] = useState(() => Boolean(config.tutorialIntro));
+  const [showQuickRules, setShowQuickRules] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(-2);
+  const [tutorialHint, setTutorialHint] = useState<string | null>(null);
+  const tutorialHintTimerRef = useRef<number | null>(null);
+
+  const showTutorialHint = useCallback((text: string, durationMs = 5000) => {
+    if (tutorialHintTimerRef.current) window.clearTimeout(tutorialHintTimerRef.current);
+    setTutorialHint(text);
+    tutorialHintTimerRef.current = window.setTimeout(() => setTutorialHint(null), durationMs);
+  }, []);
+
+  // 教学步骤推进
+  const advanceTutorialStep = useCallback((step: number) => {
+    if (mode !== "tutorial") return;
+    setTutorialStep((current) => (step > current ? step : current));
+  }, [mode]);
 
   const battleUnits = useMemo(
     () =>
-      SIMPLE_BATTLE_UNITS.map((unit) => ({
+      battleBaseUnits.map((unit) => ({
         ...unit,
         hp: Math.max(0, Math.min(unit.maxHp, unitHp[unit.id] ?? unit.hp)),
       })),
-    [unitHp],
+    [battleBaseUnits, unitHp],
   );
   const unitMap = useMemo(() => new Map(battleUnits.map((unit) => [unit.id, unit])), [battleUnits]);
-  const orderedInitiative = useMemo(() => sortInitiative(initiative, unitMap), [initiative, unitMap]);
+  const orderedInitiative = useMemo(() => sortInitiative(initiative, unitMap, battleBaseUnits), [battleBaseUnits, initiative, unitMap]);
   const activeEntry = orderedInitiative[turnIndex % orderedInitiative.length];
   const activeUnit = activeEntry ? unitMap.get(activeEntry.unitId) : undefined;
   const activeUnitId = activeUnit?.id;
@@ -1171,14 +1644,39 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
   const pendingTargetIds = useMemo(() => new Set(pendingTargets.map((unit) => unit.id)), [pendingTargets]);
   const enemyTurn = phase === "battle" && activeUnit?.faction === "enemy";
 
-  const completeInitiative = useCallback(() => setPhase("battle"), []);
+  const completeInitiative = useCallback(() => {
+    setPhase("battle");
+    advanceTutorialStep(0);
+    showTutorialHint("📊 先攻完成！看左侧行动条，高亮的是当前行动角色。等轮到你时，点击下方技能面板选择一个技能", 8000);
+  }, [advanceTutorialStep, showTutorialHint]);
 
   function pushBattleLog(line: string) {
     setBattleLog((current) => [line, ...current].slice(0, 4));
   }
 
+  function clearBattleAnimation() {
+    if (battleAnimationTimerRef.current) {
+      window.clearTimeout(battleAnimationTimerRef.current);
+      battleAnimationTimerRef.current = null;
+    }
+    setBattleAnimation(null);
+  }
+
+  function triggerBattleAnimation(unit: BattleUnit, skill: BattleSkill, target: BattleUnit) {
+    if (battleAnimationTimerRef.current) {
+      window.clearTimeout(battleAnimationTimerRef.current);
+    }
+
+    const id = Date.now();
+    setBattleAnimation({ id, actorId: unit.id, targetId: target.id, skillId: skill.id });
+    battleAnimationTimerRef.current = window.setTimeout(() => {
+      setBattleAnimation((current) => (current?.id === id ? null : current));
+      battleAnimationTimerRef.current = null;
+    }, unit.model === "lisa" || unit.model === "selin" ? 1100 : 820);
+  }
+
   function rerollInitiative() {
-    setInitiative(buildInitiative(SIMPLE_BATTLE_UNITS));
+    setInitiative(buildInitiative(battleBaseUnits));
     setPhase("initiative");
     setRollRunId((id) => id + 1);
     setTurnIndex(0);
@@ -1187,10 +1685,18 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
     setTargetSelection(null);
     setActiveDice(null);
     setLastEffect(null);
+    setPendingSettlement(null);
+    if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
+    clearBattleAnimation();
     enemyActingKeyRef.current = null;
-    setUnitHp(Object.fromEntries(SIMPLE_BATTLE_UNITS.map((unit) => [unit.id, unit.hp])));
+    setUnitHp(Object.fromEntries(battleBaseUnits.map((unit) => [unit.id, unit.hp])));
     setUsedResources({});
-    pushBattleLog("重新进行全员 1D20 先攻判定。");
+    setShowTutorialIntro(Boolean(config.tutorialIntro));
+    setShowQuickRules(false);
+    setTutorialStep(-2);
+    setTutorialHint(null);
+    prevAllyHpRef.current = {};
+    pushBattleLog(config.rerollLog);
   }
 
   function advanceTurn() {
@@ -1210,6 +1716,9 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
     setTargetSelection(null);
     setUsedResources({});
     setActiveDice(null);
+    setPendingSettlement(null);
+    if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
+    clearBattleAnimation();
     enemyActingKeyRef.current = null;
   }
 
@@ -1218,14 +1727,59 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
       resolveAction(pendingActor, pendingSkill, unit);
       return;
     }
-
     if (unit.id === activeUnit?.id && unit.faction === "ally" && phase === "battle") {
       setActionUnitId(unit.id);
       return;
     }
-
     setSelectedUnitId(unit.id);
   }
+
+  // 骰子关闭后的结算处理：延迟800ms执行伤害/治疗/特效/播报
+  const settlementTimerRef = useRef<number | null>(null);
+
+  function executeSettlement(settlement: PendingSettlement) {
+    const { unit, target, skill, effect } = settlement;
+    applyHpEffect(unit, target, skill, effect);
+    setLastEffect(effect);
+    triggerBattleAnimation(unit, skill, target);
+    pushBattleLog(`${unit.name} 对 ${target.name} 使用 ${skill.name}：${effect.title}`);
+    pushBattleLog(effect.narration);
+
+    if (!settlement.isEnemy) {
+      advanceTutorialStep(3);
+      if (skill.roll.kind === "healing") {
+        showTutorialHint("💚 治疗生效！HP已恢复，查看恢复量", 4000);
+      } else if (effect.success) {
+        showTutorialHint("⚔️ 命中！仔细观察KP的战斗描写和伤害数值", 4000);
+      } else {
+        showTutorialHint("💨 未命中/擦伤！即使失手也可能造成压制伤害", 4000);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!pendingSettlement || activeDice) return;
+    // 骰子已关闭，延迟800ms结算
+    settlementTimerRef.current = window.setTimeout(() => {
+      executeSettlement(pendingSettlement);
+      // 敌方结算后推进回合
+      if (pendingSettlement.isEnemy) {
+        advanceTurn();
+        setUsedResources({});
+        enemyActingKeyRef.current = null;
+      }
+      setPendingSettlement(null);
+    }, 800);
+    return () => {
+      if (settlementTimerRef.current) window.clearTimeout(settlementTimerRef.current);
+    };
+  }, [pendingSettlement, activeDice]); // eslint-disable-line
+
+  useEffect(() => {
+    return () => {
+      if (settlementTimerRef.current) window.clearTimeout(settlementTimerRef.current);
+    };
+  }, []);
 
   function resolveAction(unit: BattleUnit, skill: BattleSkill, target: BattleUnit) {
     if (battleWon || battleLost || unit.hp <= 0 || target.hp <= 0 || skill.locked || resourceIsSpent(skill.resource, usedResources[unit.id] ?? {})) return;
@@ -1238,14 +1792,21 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
       },
     }));
 
+    // 阶段1：掷骰 → 只显示骰子动画，不结算
     const dice = rollSkillDice(unit, skill, target);
     const effect = buildBattleEffect(unit, target, skill, dice);
-    applyHpEffect(unit, target, skill, effect);
     setTargetSelection(null);
-    setLastEffect(effect);
-    pushBattleLog(`${unit.name} 对 ${target.name} 使用 ${skill.name}：${effect.title}`);
-    pushBattleLog(effect.narration);
-    if (dice) setActiveDice(dice);
+    setActiveDice(dice);  // 弹出骰子界面
+
+    // 保存待结算数据，骰子关闭后执行
+    setPendingSettlement({ unit, target, skill, effect });
+
+    advanceTutorialStep(3);
+    if (skill.roll.kind === "healing") {
+      showTutorialHint("💚 治疗骰已投出！观察骰子恢复量 → 点击任意处关闭 → 关闭后HP才会恢复", 5000);
+    } else {
+      showTutorialHint("⚔️ 攻击骰已投出！观察 3D 骰子和判定结果 → 点击任意处关闭 → 关闭后结算伤害", 5000);
+    }
   }
 
   function applyHpEffect(actor: BattleUnit, target: BattleUnit, skill: BattleSkill, effect: BattleEffect) {
@@ -1272,7 +1833,54 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
 
     setTargetSelection({ unitId: unit.id, skillId: skill.id });
     pushBattleLog(`${unit.name} 准备 ${skill.name}，等待指定释放对象。`);
+    advanceTutorialStep(2);
+    if (skill.roll.kind === "healing") {
+      showTutorialHint("💚 选择了治疗技能！点击我方角色头像指定恢复对象", 4000);
+    } else {
+      showTutorialHint("🎯 技能已选择！现在点击发光的敌方目标确认攻击", 4000);
+    }
   }
+
+  useEffect(() => {
+    return () => {
+      if (battleAnimationTimerRef.current) {
+        window.clearTimeout(battleAnimationTimerRef.current);
+      }
+      if (tutorialHintTimerRef.current) {
+        window.clearTimeout(tutorialHintTimerRef.current);
+      }
+    };
+  }, []);
+
+  // 教学：检测玩家回合开始（只在 step < 1 时触发）
+  useEffect(() => {
+    if (phase !== "battle" || tutorialStep >= 1 || !activeUnitId || activeFaction !== "ally") return;
+    const unit = unitMap.get(activeUnitId);
+    if (!unit) return;
+    advanceTutorialStep(1);
+    showTutorialHint(`🎮 轮到${unit.name}了！点击下方技能面板选择一个技能：攻击（稳步斩击）、检定（盾牌压制）、治疗（回气）`, 6000);
+  }, [activeUnitId, activeFaction, phase, tutorialStep]); // eslint-disable-line
+
+  // 教学：检测友方受伤 — 提示治疗
+  const prevAllyHpRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (mode !== "tutorial" || tutorialStep < 3) { return; }
+    for (const ally of allies) {
+      const prev = prevAllyHpRef.current[ally.id] ?? ally.maxHp;
+      if (ally.hp < prev && ally.hp > 0 && ally.hp < ally.maxHp * 0.8) {
+        advanceTutorialStep(5);
+        showTutorialHint("💊 注意血量！当HP下降时考虑使用「回气」或「逆钟愈合」恢复。受伤后再用治疗最划算", 6000);
+      }
+      prevAllyHpRef.current[ally.id] = ally.hp;
+    }
+  }, [allies, tutorialStep, mode]); // eslint-disable-line
+
+  // 教学：战斗胜利提示
+  useEffect(() => {
+    if (mode !== "tutorial" || !battleWon) return;
+    advanceTutorialStep(7);
+    showTutorialHint("🎉 恭喜完成教学战斗！你已掌握：先攻 → 选择技能 → 指定目标 → 观察骰子 → 防御思路 → 治疗时机。继续主线剧情吧！", 9000);
+  }, [battleWon, mode]); // eslint-disable-line
 
   useEffect(() => {
     if (phase !== "battle" || battleWon || battleLost || !activeUnitId || activeFaction !== "enemy") return;
@@ -1291,6 +1899,8 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
     setActionUnitId(null);
     setTargetSelection(null);
     pushBattleLog(`${actingUnit.name} 的敌方回合开始，我方操作锁定。`);
+    advanceTutorialStep(4);
+    showTutorialHint("🛡️ 敌方回合！注意看冒险者 AC18 很难被命中，瑟琳 AC14 较脆。高护甲 = 更难被打中", 5000);
 
     const currentAllies = [...unitMap.values()].filter((unit) => unit.faction === "ally" && unit.hp > 0);
     const currentEnemies = [...unitMap.values()].filter((unit) => unit.faction === "enemy" && unit.hp > 0);
@@ -1305,20 +1915,14 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
     const rollTimer = window.setTimeout(() => {
       const dice = rollSkillDice(actingUnit, skill, target);
       const effect = buildBattleEffect(actingUnit, target, skill, dice);
-      applyHpEffect(actingUnit, target, skill, effect);
-      setLastEffect(effect);
-      pushBattleLog(`${actingUnit.name} 自动对 ${target.name} 使用 ${skill.name}：${effect.title}`);
-      pushBattleLog(effect.narration);
       if (dice) setActiveDice(dice);
+      // 延迟结算：骰子关闭后由 settleEffect 处理
+      setPendingSettlement({ unit: actingUnit, target, skill, effect, isEnemy: true });
     }, BATTLE_TUNING.enemyRollDelayMs);
 
-    const endTimer = window.setTimeout(() => {
-      advanceTurn();
-      setUsedResources({});
-      setActiveDice(null);
-      setTargetSelection(null);
-      enemyActingKeyRef.current = null;
-    }, BATTLE_TUNING.enemyEndDelayMs);
+    return () => {
+      window.clearTimeout(rollTimer);
+    };
 
     return () => {
       window.clearTimeout(rollTimer);
@@ -1343,20 +1947,19 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
 
       <header className="battle-hud-header">
         <div>
-          <p className="eyebrow">B1 COMBAT RULE SANDBOX</p>
-          <h1>B1 层战斗测试</h1>
-          <small>三技能简化战斗：指定对象后过骰子判定，AI KP 会按点数、伤害和治疗描述行动结果。</small>
+          <p className="eyebrow">{config.eyebrow}</p>
+          <h1>{config.title}</h1>
+          <small>{config.subtitle}</small>
         </div>
         <div className="battle-hud-actions">
-          <button type="button" className="ghost-button" onClick={rerollInitiative}>
-            重投先攻
-          </button>
-          <button type="button" className="ghost-button" onClick={nextTurn} disabled={phase !== "battle" || enemyTurn || battleWon || battleLost}>
+          <button type="button" className="ghost-button" onClick={nextTurn} disabled={phase !== "battle" || enemyTurn || battleWon || battleLost || Boolean(activeDice)}>
             下一行动
           </button>
-          <button type="button" className="ghost-button" onClick={onBack}>
-            返回测试
-          </button>
+          {mode !== "tutorial" && (
+            <button type="button" className="ghost-button" onClick={onBack}>
+              {config.backLabel}
+            </button>
+          )}
         </div>
       </header>
 
@@ -1374,7 +1977,7 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
               onClick={() => setSelectedUnitId(unit.id)}
               aria-current={isActive ? "true" : undefined}
             >
-              <span className={`battle-avatar-mark battle-avatar-${unit.model}`}>{unit.portrait}</span>
+              <span className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
               <span className="initiative-token-copy">
                 <b>{unit.name}</b>
                 <small>
@@ -1388,14 +1991,35 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
         })}
       </section>
 
-      <section className="battle-rules-dock" aria-label="规则速查">
-        {QUICK_RULES.map((rule) => (
-          <article key={rule.title}>
-            <b>{rule.title}</b>
-            <span>{rule.text}</span>
-          </article>
-        ))}
-      </section>
+      {/* 右上角规则速查按钮 + 可折叠面板 */}
+      <button
+        type="button"
+        className="battle-rules-toggle"
+        onClick={() => setShowQuickRules((v) => !v)}
+        aria-expanded={showQuickRules}
+        aria-label="规则速查"
+      >
+        📖 规则
+      </button>
+      <AnimatePresence>
+        {showQuickRules && (
+          <motion.section
+            className={`battle-rules-dock ${mode === "tutorial" ? "is-tutorial" : ""}`}
+            aria-label="规则速查"
+            initial={{ opacity: 0, scale: 0.92, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: -10 }}
+            transition={{ duration: 0.25 }}
+          >
+            {config.quickRules.map((rule) => (
+              <article key={rule.title}>
+                <b>{rule.title}</b>
+                <span>{rule.text}</span>
+              </article>
+            ))}
+          </motion.section>
+        )}
+      </AnimatePresence>
 
       {enemyTurn && activeUnit && (
         <section className="battle-enemy-turn-lock" aria-label="敌方回合">
@@ -1406,12 +2030,17 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
 
       {(battleWon || battleLost) && (
         <section className={`battle-end-banner ${battleWon ? "is-win" : "is-lose"}`} aria-label="战斗结果">
-          <b>{battleWon ? "战斗测试胜利" : "战斗测试失败"}</b>
+          <b>{battleWon ? config.winTitle : config.loseTitle}</b>
           <span>
             {battleWon
-              ? "敌方已经全部失去战斗能力。本次节奏调校目标达成，可以继续测试下一场战斗。"
-              : "我方已经全部失去战斗能力，可以重投先攻重新测试。"}
+              ? config.winText
+              : config.loseText}
           </span>
+          {battleWon && config.completeLabel && onComplete && (
+            <button type="button" className="start-button" onClick={onComplete}>
+              {config.completeLabel}
+            </button>
+          )}
         </section>
       )}
 
@@ -1426,6 +2055,9 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
               unit={unit}
               active={unit.id === activeUnit?.id && phase === "battle"}
               targetable={pendingTargetIds.has(unit.id)}
+              casting={battleAnimation?.actorId === unit.id}
+              impacted={battleAnimation?.targetId === unit.id}
+              animationKey={battleAnimation?.id}
               onClick={() => handleModelClick(unit)}
             />
           ))}
@@ -1437,20 +2069,29 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
               unit={unit}
               active={unit.id === activeUnit?.id && phase === "battle"}
               targetable={pendingTargetIds.has(unit.id)}
+              casting={battleAnimation?.actorId === unit.id}
+              impacted={battleAnimation?.targetId === unit.id}
+              animationKey={battleAnimation?.id}
               onClick={() => handleModelClick(unit)}
             />
           ))}
         </div>
       </section>
 
+      {/* 左侧：战斗记录 — 我方角色下方 */}
       <aside className="battle-log-panel" aria-label="战斗记录">
-        <span>规则事件</span>
+        <span>战斗记录</span>
         {battleLog.map((line) => (
           <p key={line}>{line}</p>
         ))}
       </aside>
 
-      {lastEffect && <BattleEffectPanel effect={lastEffect} />}
+      {/* 底部：AI KP 回合结算 — 视觉小说对话框风格 */}
+      <AnimatePresence>
+        {lastEffect && (
+          <BattleEffectPanel effect={lastEffect} />
+        )}
+      </AnimatePresence>
 
       <div className="battle-turn-plate">
         <span>{phase === "battle" ? "当前行动" : "等待先攻揭示"}</span>
@@ -1496,12 +2137,60 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
 
       <DiceRollOverlay dice={activeDice} dieType="d20" onClose={() => setActiveDice(null)} />
 
+      {/* 教学步骤提示浮层 */}
       <AnimatePresence>
-        {phase === "initiative" && (
+        {tutorialHint && mode === "tutorial" && (
+          <motion.div
+            className="tutorial-step-hint"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            style={{
+              position: "fixed",
+              bottom: 140,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 110,
+              background: "linear-gradient(135deg, rgba(20,20,40,0.95), rgba(30,30,60,0.95))",
+              border: "1px solid rgba(180,160,120,0.5)",
+              borderRadius: 12,
+              padding: "12px 24px",
+              color: "#e8d5a3",
+              fontSize: 15,
+              fontWeight: 500,
+              textAlign: "center",
+              maxWidth: "90vw",
+              pointerEvents: "none",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+            }}
+          >
+            {tutorialHint}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showTutorialIntro && config.tutorialIntro && (
+          <BattleTutorialIntro
+            intro={config.tutorialIntro}
+            onStart={() => {
+              setShowTutorialIntro(false);
+              advanceTutorialStep(-1);
+              showTutorialHint("👆 点击下方「开始先攻」按钮，观察5位角色的行动顺序排列", 6000);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {phase === "initiative" && !showTutorialIntro && (
           <InitiativeRollOverlay
             key={rollRunId}
             entries={initiative}
             unitMap={unitMap}
+            unitOrder={battleBaseUnits}
+            note={config.initiativeNote}
             onComplete={completeInitiative}
           />
         )}
@@ -1510,18 +2199,93 @@ export function BattleTestScreen({ onBack }: BattleTestScreenProps) {
   );
 }
 
+function BattleTutorialIntro({
+  intro,
+  onStart,
+}: {
+  intro: NonNullable<BattleConfig["tutorialIntro"]>;
+  onStart: () => void;
+}) {
+  return (
+    <motion.section
+      className="battle-tutorial-intro-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={intro.title}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="battle-tutorial-intro"
+        initial={{ opacity: 0, scale: 0.96, y: 18 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 18 }}
+      >
+        <header>
+          <div>
+            <p className="eyebrow">COMBAT BASICS</p>
+            <h2>{intro.title}</h2>
+            <small>{intro.subtitle}</small>
+          </div>
+          <button type="button" className="ghost-button" onClick={onStart}>
+            关闭说明
+          </button>
+        </header>
+
+        <div className="battle-tutorial-grid">
+          <section className="battle-tutorial-steps">
+            {intro.steps.map((step, index) => (
+              <article key={step.title}>
+                <span>{index + 1}</span>
+                <div>
+                  <b>{step.title}</b>
+                  <p>{step.text}</p>
+                </div>
+              </article>
+            ))}
+          </section>
+
+          <aside className="battle-tutorial-enemies">
+            <b>小怪技能组</b>
+            {intro.enemySkills.map((enemy) => (
+              <section key={enemy.name}>
+                <span>{enemy.name}</span>
+                {enemy.skills.map((skill) => (
+                  <p key={skill}>{skill}</p>
+                ))}
+              </section>
+            ))}
+          </aside>
+        </div>
+
+        <footer>
+          <span>胜利条件：让三只裂隙爬兽的 HP 归 0。战斗结束后回到剧情。</span>
+          <button type="button" className="start-button" onClick={onStart}>
+            开始先攻
+          </button>
+        </footer>
+      </motion.div>
+    </motion.section>
+  );
+}
+
 function InitiativeRollOverlay({
   entries,
   unitMap,
+  unitOrder,
+  note,
   onComplete,
 }: {
   entries: InitiativeEntry[];
   unitMap: Map<string, BattleUnit>;
+  unitOrder: BattleUnit[];
+  note: string;
   onComplete: () => void;
 }) {
   const [settled, setSettled] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const orderedResults = useMemo(() => sortInitiative(entries, unitMap), [entries, unitMap]);
+  const orderedResults = useMemo(() => sortInitiative(entries, unitMap, unitOrder), [entries, unitMap, unitOrder]);
 
   useEffect(() => {
     const settleTimer = window.setTimeout(() => setSettled(true), 1300);
@@ -1554,7 +2318,7 @@ function InitiativeRollOverlay({
         <header>
           <p className="eyebrow">INITIATIVE ROLL</p>
           <h2>同时投掷先攻</h2>
-          <small>7 位单位同时进行 1D20 判定：D20 + 敏捷调整值 + 其他加值。</small>
+          <small>{note}</small>
         </header>
 
         <div className="battle-init-roll-grid">
@@ -1616,8 +2380,8 @@ function RosterPanel({
           className={`battle-roster-unit ${unit.id === activeUnitId ? "is-active" : ""} ${unit.hp <= 0 ? "is-defeated" : ""}`}
           onClick={() => onSelect(unit.id)}
         >
-          <span className={`battle-avatar-mark battle-avatar-${unit.model}`}>{unit.portrait}</span>
-          <span className="battle-roster-copy">
+                <span className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
+                <span className="battle-roster-copy">
             <b>{unit.name}</b>
             <small>
               HP {unit.hp}/{unit.maxHp} · AC {unit.ac}
@@ -1636,26 +2400,49 @@ function BattleModel({
   unit,
   active,
   targetable,
+  casting,
+  impacted,
+  animationKey,
   onClick,
 }: {
   unit: BattleUnit;
   active: boolean;
   targetable: boolean;
+  casting: boolean;
+  impacted: boolean;
+  animationKey?: number;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`battle-combatant ${active ? "is-active" : ""} ${targetable ? "is-targetable" : ""} ${unit.hp <= 0 ? "is-defeated" : ""} ${unit.faction === "enemy" ? "is-enemy" : "is-ally"}`}
+      className={`battle-combatant ${active ? "is-active" : ""} ${targetable ? "is-targetable" : ""} ${casting ? "is-casting" : ""} ${impacted ? "is-impacted" : ""} ${unit.hp <= 0 ? "is-defeated" : ""} ${unit.faction === "enemy" ? "is-enemy" : "is-ally"}`}
       onClick={onClick}
       aria-label={unit.name}
     >
       <span className={`battle-sprite battle-sprite-${unit.model}`}>
-        <span className="sprite-aura" />
-        <span className="sprite-head" />
-        <span className="sprite-body" />
-        <span className="sprite-weapon" />
+        {unit.model === "adventurer" ? (
+          <span
+            className="sprite-sheet"
+            style={{
+              backgroundImage: `url(/assets/chibi/selin/selin_chibi_spritesheet.png)`,
+            }}
+          />
+        ) : unit.model === "lisa" || unit.model === "selin" ? (
+          <>
+            <span className="lisa-sprite-sheet is-idle" />
+            {casting && <span key={animationKey} className="lisa-sprite-sheet is-cast" />}
+          </>
+        ) : (
+          <>
+            <span className="sprite-aura" />
+            <span className="sprite-head" />
+            <span className="sprite-body" />
+            <span className="sprite-weapon" />
+          </>
+        )}
       </span>
+      {impacted && <span key={`impact-${animationKey ?? unit.id}`} className="battle-impact-effect" aria-hidden="true" />}
       <span className="battle-combatant-name">{unit.name}</span>
       <span className="battle-combatant-hp">
         <i style={{ width: `${getHpPercent(unit)}%` }} />
@@ -1666,24 +2453,28 @@ function BattleModel({
 
 function BattleEffectPanel({ effect }: { effect: BattleEffect }) {
   return (
-    <motion.aside
+    <motion.section
       key={effect.id}
-      className={`battle-effect-panel ${effect.success === false ? "is-fail" : ""}`}
-      aria-label="回合效果"
-      initial={{ opacity: 0, y: 16 }}
+      className={`battle-effect-panel ${effect.success === false ? "is-fail" : "is-win"}`}
+      aria-label="AI KP 回合结算"
+      initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
     >
-      <span>AI KP 回合结算</span>
-      <h2>{effect.title}</h2>
-      <p>
-        <b>{effect.actorName}</b> 对 <b>{effect.targetName}</b> 使用 <b>{effect.skillName}</b>
-      </p>
-      <strong>{effect.resultLine}</strong>
-      {typeof effect.amount === "number" && <em>{effect.amount}</em>}
-      <small>{effect.formula}</small>
-      <blockquote>{effect.narration}</blockquote>
-      <p>{effect.detail}</p>
-    </motion.aside>
+      <div className="vn-dialogue-box">
+        <span className="vn-speaker-tag">
+          {effect.actorName} · {effect.skillName}
+        </span>
+        <p className="vn-result-line">
+          <b>{effect.resultLine}</b>
+          {typeof effect.amount === "number" && (
+            <em className="vn-amount">{effect.amount}</em>
+          )}
+        </p>
+        <blockquote className="vn-narration">{effect.narration}</blockquote>
+        <small className="vn-formula">{effect.formula}</small>
+      </div>
+    </motion.section>
   );
 }
 
@@ -1715,7 +2506,7 @@ function UnitDetailModal({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="battle-modal-header">
-          <div className={`battle-avatar-mark battle-avatar-${unit.model}`}>{unit.portrait}</div>
+          <div className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
           <div>
             <span>{unit.name}</span>
             <small>{unit.role}</small>
@@ -1924,7 +2715,7 @@ function ActionPanel({
             <div>
               {pendingTargets.map((target) => (
                 <button key={target.id} type="button" onClick={() => onSelectTarget(target)}>
-                  <span className={`battle-avatar-mark battle-avatar-${target.model}`}>{target.portrait}</span>
+                  <span className={`battle-avatar-mark ${AVATAR_MAP[target.model] ? 'battle-avatar-img' : `battle-avatar-${target.model}`}`} style={AVATAR_MAP[target.model] ? { backgroundImage: `url(${AVATAR_MAP[target.model]})` } : undefined} />
                   <b>{target.name}</b>
                   <small>
                     HP {target.hp}/{target.maxHp} · AC {target.ac}

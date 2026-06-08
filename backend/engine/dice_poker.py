@@ -299,7 +299,8 @@ def _find_near_straight(dice: list[int]) -> Optional[tuple[list[int], int]]:
     best = None
     for start in range(1, 4):
         window = set(range(start, start + 5))
-        overlap = uniq_set := set(uniq) & window
+        uniq_set = set(uniq)
+        overlap = uniq_set & window
         if len(overlap) >= 4:
             missing = (window - uniq_set).pop() if (window - uniq_set) else None
             keep_idx = [i for i, d in enumerate(dice) 
