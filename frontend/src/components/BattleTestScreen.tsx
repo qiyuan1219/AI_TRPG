@@ -1923,11 +1923,6 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
     return () => {
       window.clearTimeout(rollTimer);
     };
-
-    return () => {
-      window.clearTimeout(rollTimer);
-      window.clearTimeout(endTimer);
-    };
   }, [activeFaction, activeUnitId, battleLost, battleWon, orderedInitiative.length, phase, turnIndex]);
 
   useEffect(() => {
