@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface SkillEffectConfig {
-  kind: "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail";
+  kind: "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail" | "poison" | "shadow" | "wind" | "earth" | "water" | "shield" | "buff" | "debuff" | "critical";
   attacker?: string;
   target?: string;
 }
@@ -24,7 +24,18 @@ const FX_CONFIG = {
   radiant:   { particles: 6,  colors: ["#fef08a","#ffe066","#ffffff"],  glyph: "☀️",  duration: 0.7 },
   heal:      { particles: 8,  colors: ["#86efac","#4ade80","#bbf7d0"],  glyph: "💚",  duration: 0.8 },
   fail:      { particles: 2,  colors: ["#888","#555"],                   glyph: "💨",  duration: 0.45 },
+  poison:    { particles: 7,  colors: ["#a3e635","#84cc16","#4d7c0f"],  glyph: "🧪",  duration: 0.85 },
+  shadow:    { particles: 6,  colors: ["#6b21a8","#3b0764","#1e1b4b"],  glyph: "🌑",  duration: 0.75 },
+  wind:      { particles: 8,  colors: ["#e0f2fe","#bae6fd","#ffffff"],  glyph: "🍃",  duration: 0.7 },
+  earth:     { particles: 5,  colors: ["#a16207","#854d0e","#713f12"],  glyph: "🪨",  duration: 0.65 },
+  water:     { particles: 7,  colors: ["#38bdf8","#0284c7","#e0f2fe"],  glyph: "💧",  duration: 0.7 },
+  shield:    { particles: 4,  colors: ["#c7d2fe","#a5b4fc","#ffffff"],  glyph: "🛡️",  duration: 0.6 },
+  buff:      { particles: 6,  colors: ["#fbbf24","#f59e0b","#fef3c7"],  glyph: "⬆️",  duration: 0.65 },
+  debuff:    { particles: 5,  colors: ["#dc2626","#991b1b","#7f1d1d"],  glyph: "⬇️",  duration: 0.65 },
+  critical:  { particles: 12, colors: ["#fbbf24","#f59e0b","#ffffff","#fef08a"], glyph: "⭐", duration: 0.9 },
 } as const;
+
+type FxKind = keyof typeof FX_CONFIG;
 
 function rand(min: number, max: number) {
   return Math.random() * (max - min) + min;
@@ -75,8 +86,10 @@ export function SkillEffectOverlay({ config, onDone }: SkillEffectOverlayProps) 
   if (!config || !show) return null;
 
   const fx = FX_CONFIG[config.kind] ?? FX_CONFIG.fail;
-  const isPhysical = config.kind === "slash" || config.kind === "bash" || config.kind === "pierce";
-  const isMagic = config.kind === "fire" || config.kind === "ice" || config.kind === "lightning" || config.kind === "arcane";
+  const isPhysical = config.kind === "slash" || config.kind === "bash" || config.kind === "pierce" || config.kind === "earth";
+  const isMagic = config.kind === "fire" || config.kind === "ice" || config.kind === "lightning" || config.kind === "arcane" || config.kind === "poison" || config.kind === "shadow" || config.kind === "water" || config.kind === "wind";
+  const isBuff = config.kind === "buff" || config.kind === "shield";
+  const isDebuff = config.kind === "debuff" || config.kind === "poison";
 
   return (
     <div className="skill-fx-overlay">
@@ -135,6 +148,7 @@ export function SkillEffectOverlay({ config, onDone }: SkillEffectOverlayProps) 
                 background:
                   config.kind === "slash" ? "linear-gradient(90deg, transparent, #ffe8a0, #fff)" :
                   config.kind === "pierce" ? "linear-gradient(90deg, transparent, #c0d0ff, #fff)" :
+                  config.kind === "earth" ? "linear-gradient(90deg, transparent, #d4a84a, #fff)" :
                   "linear-gradient(90deg, transparent, #d4c0a0, #fff)",
               }}
             />
@@ -156,8 +170,8 @@ export function SkillEffectOverlay({ config, onDone }: SkillEffectOverlayProps) 
         />
       )}
 
-      {/* 治疗上升 */}
-      {config.kind === "heal" && (
+      {/* 治疗/增益上升 */}
+      {(config.kind === "heal" || isBuff) && (
         <motion.div
           className="skill-fx-heal-rise"
           initial={{ y: 0, opacity: 0 }}
@@ -174,6 +188,39 @@ export function SkillEffectOverlay({ config, onDone }: SkillEffectOverlayProps) 
           ))}
         </motion.div>
       )}
+
+      {/* 减益下降 */}
+      {isDebuff && !isMagic && (
+        <motion.div
+          className="skill-fx-heal-rise"
+          initial={{ y: 0, opacity: 0 }}
+          animate={{ y: 80, opacity: [0, 0.8, 0] }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+        >
+          {["-","-","-","-"].map((s, i) => (
+            <span key={i} style={{
+              left: `${rand(-50, 50)}px`,
+              fontSize: `${rand(18, 28)}px`,
+              color: fx.colors[i % 3],
+              textShadow: `0 0 12px ${fx.colors[0]}`,
+            }}>{s}</span>
+          ))}
+        </motion.div>
+      )}
+
+      {/* 暴击额外光效 */}
+      {config.kind === "critical" && (
+        <motion.div
+          className="skill-fx-ring"
+          initial={{ scale: 0.1, opacity: 0, borderWidth: 8 }}
+          animate={{ scale: [0.1, 2, 3], opacity: [1, 0.6, 0], borderWidth: [8, 4, 0] }}
+          transition={{ duration: 0.7 }}
+          style={{
+            borderColor: "#fbbf24",
+            boxShadow: "0 0 50px #fbbf24, 0 0 100px #f59e0b, inset 0 0 30px #fef08a",
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -182,26 +229,18 @@ export function SkillEffectOverlay({ config, onDone }: SkillEffectOverlayProps) 
 export function inferSkillEffect(diceData: Record<string, any> | null | undefined): SkillEffectConfig | null {
   try {
     if (!diceData) return null;
-    const attr = String(diceData["属性"] ?? diceData["武器"] ?? "");
-    const success = Boolean(diceData["成功"] ?? diceData["命中"]);
+    // 直接使用掷骰时写入的特效类型
+    const fxKind = diceData["fxKind"] ?? diceData["effectKind"] ?? diceData["特效类型"];
+    const validKinds = new Set(["slash","bash","pierce","fire","ice","lightning","arcane","radiant","heal","fail","poison","shadow","wind","earth","water","shield","buff","debuff","critical"]);
+    const hasSuccessSignal = Object.prototype.hasOwnProperty.call(diceData, "成功") || Object.prototype.hasOwnProperty.call(diceData, "命中");
+    const success = hasSuccessSignal ? Boolean(diceData["成功"] ?? diceData["命中"]) : true;
 
     if (!success) return { kind: "fail" };
 
-    const kindMap: [RegExp, SkillEffectConfig["kind"]][] = [
-      [/火|炎|燃|灼|flare|burn|flame/i, "fire"],
-      [/冰|霜|冻|cold|frost|chill|freeze/i, "ice"],
-      [/雷|电|闪|lightning|shock|spark/i, "lightning"],
-      [/光|圣|耀|radiant|holy/i, "radiant"],
-      [/刺|穿|pierce|stab|rapier|匕首/i, "pierce"],
-      [/钝|锤|打|bash|bludgeon|mace|hammer/i, "bash"],
-      [/挥|砍|斩|剑|斧|slash|cleave|sword|axe/i, "slash"],
-      [/奥|秘|魔|arcane|spell|magic/i, "arcane"],
-      [/治|愈|疗|heal|cure|restore/i, "heal"],
-    ];
-
-    for (const [re, kind] of kindMap) {
-      if (re.test(attr)) return { kind };
+    if (fxKind && typeof fxKind === "string" && validKinds.has(fxKind)) {
+      return { kind: fxKind as SkillEffectConfig["kind"] };
     }
+
     return { kind: "slash" };
   } catch {
     return null;

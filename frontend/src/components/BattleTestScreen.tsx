@@ -15,6 +15,18 @@ const AVATAR_MAP: Record<string, string> = {
   crawler: '/assets/chibi/crawler/avatar.png',
 };
 
+/* ===== Q版战斗精灵图映射 ===== */
+const SPRITE_SHEET_MAP: Record<string, string> = {
+  adventurer: '/assets/chibi/adventurer/adventurer_chibi_spritesheet.png',
+  selin: '/assets/chibi/selin/selin_chibi_spritesheet.png',
+  senluo: '/assets/chibi/senluo/senluo_chibi_spritesheet.png',
+  liyase: '/assets/chibi/liyase/liyase_chibi_spritesheet.png',
+  ailin: '/assets/chibi/ailin/ailin_chibi_spritesheet.png',
+  kelaiya: '/assets/chibi/kelaiya/kelaiya_chibi_spritesheet.png',
+  leiduo: '/assets/chibi/leiduo/leiduo_chibi_spritesheet.png',
+  crawler: '/assets/chibi/crawler/crawler_chibi_spritesheet.png',
+};
+
 interface BattleTestScreenProps {
   onBack: () => void;
   mode?: "test" | "tutorial";
@@ -61,7 +73,8 @@ interface NonCombatSkill {
   effect: string;
 }
 
-type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler";
+type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "liyase" | "ailin" | "kelaiya" | "leiduo";
+type BattleFxKind = "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail" | "poison" | "shadow" | "wind" | "earth" | "water" | "shield" | "buff" | "debuff" | "critical";
 
 interface BattleUnit {
   id: string;
@@ -103,6 +116,7 @@ interface BattleAnimationCue {
   actorId: string;
   targetId: string;
   skillId: string;
+  effectKind: BattleFxKind;
 }
 
 interface BattleEffect {
@@ -1095,20 +1109,134 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
   },
 ];
 
+/* 测试战斗阵容：冒险者+瑟琳 vs 三只裂隙爬兽（与教学配置相同） */
+const TEST_BATTLE_UNITS: BattleUnit[] = [
+  {
+    id: "test-adventurer", name: "冒险者", faction: "ally", role: "战士 Lv.3", portrait: "冒", model: "adventurer",
+    hp: 30, maxHp: 30, ac: 18, speed: 30, proficiency: 2,
+    abilities: { str: 16, dex: 13, con: 15, int: 10, wis: 12, cha: 8 },
+    resourceProfile: ["攻击", "检定", "治疗"], statuses: ["前排"], traits: ["HP30/AC18"],
+    skills: [
+      { id: "T1", name: "稳步斩击", resource: "战斗技能", source: "职业技能", formula: "STR+熟练 vs AC；1d8+3", effect: "基础攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "str", targetAc: 12, label: "稳步斩击" }, tags: ["攻击"] },
+      { id: "T2", name: "盾牌压制", resource: "战斗技能", source: "职业技能", formula: "STR运动 DC12；1d4+3", effect: "技能检定", cooldown: "每回合1次", rule: "技能检定", roll: { kind: "ability", ability: "str", dc: 12, label: "盾牌压制" }, tags: ["检定"] },
+      { id: "T3", name: "回气", resource: "战斗技能", source: "职业技能", formula: "恢复1d10+3", effect: "治疗自身", cooldown: "每战斗1次", rule: "治疗骰", roll: { kind: "healing", dieType: "d10", diceCount: 1, bonus: 3, label: "回气" }, tags: ["治疗"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-selin", name: "瑟琳", faction: "ally", role: "时间法师", portrait: "瑟", model: "selin",
+    hp: 24, maxHp: 24, ac: 14, speed: 30, proficiency: 2, initiativeBonus: 1,
+    abilities: { str: 8, dex: 14, con: 12, int: 16, wis: 14, cha: 11 },
+    resourceProfile: ["法术攻击", "豁免", "治疗"], statuses: ["后排"], traits: ["HP24/AC14"],
+    skills: [
+      { id: "S1", name: "银钟光束", resource: "战斗技能", source: "队友技能", formula: "INT+熟练 vs AC；1d8+3光耀", effect: "法术攻击", cooldown: "每回合1次", rule: "法术攻击", roll: { kind: "attack", ability: "int", targetAc: 12, label: "银钟光束" }, tags: ["法术"] },
+      { id: "S2", name: "时隙牵引", resource: "战斗技能", source: "队友技能", formula: "目标DEX豁免DC13；1d6+3力场", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免判定", roll: { kind: "save", dc: 13, targetSaveBonus: 2, label: "时隙牵引" }, tags: ["豁免"] },
+      { id: "S3", name: "逆钟愈合", resource: "战斗技能", source: "队友技能", formula: "恢复1d8+3", effect: "治疗队友", cooldown: "每战斗2次", rule: "治疗骰", roll: { kind: "healing", dieType: "d8", diceCount: 1, bonus: 3, label: "逆钟愈合" }, tags: ["治疗"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-senluo", name: "森洛", faction: "ally", role: "矮人·铁锅战士", portrait: "森", model: "senluo",
+    hp: 48, maxHp: 48, ac: 16, speed: 25, proficiency: 2,
+    abilities: { str: 16, dex: 12, con: 16, int: 10, wis: 14, cha: 8 },
+    resourceProfile: ["攻击", "治疗", "范围"], statuses: ["前排"], traits: ["HP48/AC16", "矮人韧性"],
+    skills: [
+      { id: "SN1", name: "铁锅猛击", resource: "战斗技能", source: "队友技能", formula: "STR+熟练 vs AC；1d8+3钝击", effect: "命中可眩晕", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "str", targetAc: 14, label: "铁锅猛击" }, tags: ["攻击"] },
+      { id: "SN2", name: "矮人炖汤", resource: "战斗技能", source: "队友技能", formula: "恢复2d6+3", effect: "治疗队友", cooldown: "每战斗2次", rule: "治疗骰", roll: { kind: "healing", dieType: "d6", diceCount: 2, bonus: 3, label: "矮人炖汤" }, tags: ["治疗"] },
+      { id: "SN3", name: "辣椒炸弹", resource: "战斗技能", source: "队友技能", formula: "范围DEX豁免DC14；2d6火焰", effect: "范围火焰+目盲", cooldown: "每战斗1次", rule: "范围豁免", roll: { kind: "save", dc: 14, targetSaveBonus: 2, label: "辣椒炸弹" }, tags: ["范围"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-liyase", name: "莉亚瑟", faction: "ally", role: "精灵·神射手", portrait: "莉", model: "liyase",
+    hp: 36, maxHp: 36, ac: 16, speed: 35, proficiency: 2,
+    abilities: { str: 10, dex: 18, con: 13, int: 12, wis: 16, cha: 10 },
+    resourceProfile: ["远程", "标记", "掩护"], statuses: ["后排"], traits: ["HP36/AC16", "长弓"],
+    skills: [
+      { id: "LY1", name: "精准射击", resource: "战斗技能", source: "队友技能", formula: "DEX+熟练 vs AC；1d8+4穿刺", effect: "远程攻击+标记", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 14, label: "精准射击" }, tags: ["远程"] },
+      { id: "LY2", name: "猎人印记", resource: "战斗技能", source: "队友技能", formula: "额外1d6伤害", effect: "标记目标增伤", cooldown: "每战斗3次", rule: "额外伤害", roll: { kind: "damage", dieType: "d6", diceCount: 1, bonus: 0, label: "猎人印记" }, tags: ["增伤"] },
+      { id: "LY3", name: "掩护箭雨", resource: "战斗技能", source: "队友技能", formula: "范围DEX豁免DC15；2d6穿刺", effect: "范围减速", cooldown: "每战斗1次", rule: "范围豁免", roll: { kind: "save", dc: 15, targetSaveBonus: 2, label: "掩护箭雨" }, tags: ["范围"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-ailin", name: "艾琳", faction: "ally", role: "精灵·生命牧师", portrait: "艾", model: "ailin",
+    hp: 28, maxHp: 28, ac: 14, speed: 30, proficiency: 2,
+    abilities: { str: 8, dex: 14, con: 13, int: 12, wis: 18, cha: 15 },
+    resourceProfile: ["治疗", "祝福", "护盾"], statuses: ["后排"], traits: ["HP28/AC14", "治疗+2"],
+    skills: [
+      { id: "AL1", name: "生命之光", resource: "战斗技能", source: "队友技能", formula: "恢复2d8+4", effect: "治疗+解控", cooldown: "每回合1次", rule: "治疗骰", roll: { kind: "healing", dieType: "d8", diceCount: 2, bonus: 4, label: "生命之光" }, tags: ["治疗"] },
+      { id: "AL2", name: "神圣祝福", resource: "战斗技能", source: "队友技能", formula: "攻击+1d4", effect: "祝福队友", cooldown: "每战斗3次", rule: "增益", roll: { kind: "none" }, tags: ["增益"] },
+      { id: "AL3", name: "白枝护盾", resource: "战斗技能", source: "队友技能", formula: "减伤2d6", effect: "反应护盾", cooldown: "每战斗2次", rule: "减伤", roll: { kind: "damage", dieType: "d6", diceCount: 2, bonus: 0, label: "白枝护盾" }, tags: ["减伤"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-kelaiya", name: "克莱娅", faction: "ally", role: "猫人·怪物猎人", portrait: "克", model: "kelaiya",
+    hp: 34, maxHp: 34, ac: 15, speed: 35, proficiency: 2,
+    abilities: { str: 10, dex: 18, con: 12, int: 13, wis: 14, cha: 10 },
+    resourceProfile: ["偷袭", "拆陷阱", "撤退"], statuses: ["潜行"], traits: ["HP34/AC15", "偷袭2d6"],
+    skills: [
+      { id: "KL1", name: "猫爪突袭", resource: "战斗技能", source: "队友技能", formula: "DEX+熟练 vs AC；1d6+4+2d6偷袭", effect: "潜行偷袭", cooldown: "每回合1次", rule: "偷袭", roll: { kind: "attack", ability: "dex", targetAc: 14, label: "猫爪突袭" }, tags: ["攻击"] },
+      { id: "KL2", name: "陷阱拆除", resource: "战斗技能", source: "队友技能", formula: "DEX巧手DC14", effect: "拆除+反伤", cooldown: "每战斗2次", rule: "技能检定", roll: { kind: "ability", ability: "dex", dc: 14, label: "陷阱拆除" }, tags: ["反伤"] },
+      { id: "KL3", name: "烟幕撤退", resource: "战斗技能", source: "队友技能", formula: "制造烟雾", effect: "遮蔽脱离", cooldown: "每战斗1次", rule: "遮蔽", roll: { kind: "none" }, tags: ["遮蔽"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-leiduo", name: "雷铎", faction: "ally", role: "机械人形·大盾", portrait: "雷", model: "leiduo",
+    hp: 55, maxHp: 55, ac: 20, speed: 25, proficiency: 2,
+    abilities: { str: 18, dex: 10, con: 18, int: 12, wis: 10, cha: 8 },
+    resourceProfile: ["格挡", "修复", "护卫"], statuses: ["前排"], traits: ["HP55/AC20", "机械体"],
+    skills: [
+      { id: "LD1", name: "盾墙格挡", resource: "战斗技能", source: "队友技能", formula: "STR+熟练 vs AC；1d8+4钝击", effect: "命中后AC+2", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "str", targetAc: 14, label: "盾墙格挡" }, tags: ["攻击"] },
+      { id: "LD2", name: "炉心修复", resource: "战斗技能", source: "队友技能", formula: "恢复1d12+4", effect: "自我修复", cooldown: "每战斗2次", rule: "治疗骰", roll: { kind: "healing", dieType: "d12", diceCount: 1, bonus: 4, label: "炉心修复" }, tags: ["治疗"] },
+      { id: "LD3", name: "守护协议", resource: "战斗技能", source: "队友技能", formula: "代伤+减半", effect: "替队友承伤", cooldown: "每轮1次", rule: "反应", roll: { kind: "none" }, tags: ["护卫"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-crawler-a", name: "裂隙爬兽A", faction: "enemy", role: "小怪", portrait: "爬A", model: "crawler",
+    hp: 28, maxHp: 28, ac: 12, speed: 25, proficiency: 2,
+    abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
+    resourceProfile: ["攻击", "豁免"], statuses: ["怕光"], traits: ["HP28/AC12"],
+    skills: [
+      { id: "CA1", name: "畏光爪击", resource: "战斗技能", source: "敌方技能", formula: "DEX+熟练 vs AC；1d4+2", effect: "近战攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击" }, tags: ["攻击"] },
+      { id: "CA2", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "CON豁免DC11；1d4毒素", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免技能", roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "孢尘喷吐" }, tags: ["豁免"] },
+      { id: "CA3", name: "惊慌缩伏", resource: "战斗技能", source: "敌方技能", formula: "剧情表现", effect: "受伤后退缩", cooldown: "剧情", rule: "行为", roll: { kind: "none" }, tags: ["行为"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-crawler-b", name: "裂隙爬兽B", faction: "enemy", role: "小怪", portrait: "爬B", model: "crawler",
+    hp: 28, maxHp: 28, ac: 12, speed: 25, proficiency: 2,
+    abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
+    resourceProfile: ["豁免", "攻击"], statuses: ["孢尘"], traits: ["HP28/AC12"],
+    skills: [
+      { id: "CB1", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "CON豁免DC11；1d4毒素", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免技能", roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "孢尘喷吐" }, tags: ["豁免"] },
+      { id: "CB2", name: "畏光爪击", resource: "战斗技能", source: "敌方技能", formula: "DEX+熟练 vs AC；1d4+2", effect: "近战攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击" }, tags: ["攻击"] },
+      { id: "CB3", name: "惊慌缩伏", resource: "战斗技能", source: "敌方技能", formula: "剧情表现", effect: "被压制后退缩", cooldown: "剧情", rule: "行为", roll: { kind: "none" }, tags: ["行为"] },
+    ], nonCombatSkills: [],
+  },
+  {
+    id: "test-crawler-c", name: "裂隙爬兽C", faction: "enemy", role: "小怪", portrait: "爬C", model: "crawler",
+    hp: 28, maxHp: 28, ac: 12, speed: 25, proficiency: 2,
+    abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
+    resourceProfile: ["混合"], statuses: ["畏光"], traits: ["HP28/AC12"],
+    skills: [
+      { id: "CC1", name: "畏光爪击", resource: "战斗技能", source: "敌方技能", formula: "DEX+熟练 vs AC；1d4+2", effect: "近战攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击" }, tags: ["攻击"] },
+      { id: "CC2", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "CON豁免DC11；1d4毒素", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免技能", roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "孢尘喷吐" }, tags: ["豁免"] },
+      { id: "CC3", name: "惊慌缩伏", resource: "战斗技能", source: "敌方技能", formula: "剧情表现", effect: "同伴倒下后畏缩", cooldown: "剧情", rule: "行为", roll: { kind: "none" }, tags: ["行为"] },
+    ], nonCombatSkills: [],
+  },
+];
+
 const TEST_BATTLE_CONFIG: BattleConfig = {
-  units: SIMPLE_BATTLE_UNITS,
+  units: TEST_BATTLE_UNITS,
   quickRules: QUICK_RULES,
-  eyebrow: "B1 COMBAT RULE SANDBOX",
-  title: "B1 层战斗测试",
-  subtitle: "三技能简化战斗：指定对象后过骰子判定，AI KP 会按点数、伤害和治疗描述行动结果。",
+  eyebrow: "COMBAT SANDBOX",
+  title: "战斗测试",
+  subtitle: "冒险者+瑟琳+森洛+莉亚瑟+艾琳+克莱娅+雷铎 vs 三只裂隙爬兽",
   backLabel: "返回测试",
   rerollLog: "重新进行全员 1D20 先攻判定。",
-  initialLog: "战斗测试按三技能简化规则初始化：选技能、指定对象、掷骰结算。",
-  initiativeNote: "全员同时进行 1D20 判定：D20 + 敏捷调整值 + 其他加值。",
+  initialLog: "战斗测试初始化：7名我方 + 3名敌方，选技能、指定对象、掷骰结算。",
+  initiativeNote: "10位单位同时1D20判定：D20 + 敏捷调整值 + 其他加值。",
   winTitle: "战斗测试胜利",
   loseTitle: "战斗测试失败",
-  winText: "敌方已经全部失去战斗能力。本次节奏调校目标达成，可以继续测试下一场战斗。",
-  loseText: "我方已经全部失去战斗能力，可以重投先攻重新测试。",
+  winText: "三只裂隙爬兽已失去战斗能力，测试完成。",
+  loseText: "我方全部失去战斗能力，可重投先攻重新测试。",
 };
 
 const TUTORIAL_BATTLE_CONFIG: BattleConfig = {
@@ -1486,6 +1614,7 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
   if (skill.roll.kind === "none") return null;
 
   const now = Date.now();
+  const fxKind = getBattleFxKind(unit, skill);
 
   if (skill.roll.kind === "attack") {
     const roll = rollD20();
@@ -1504,6 +1633,9 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
         总计: total,
         目标AC: targetAc,
         命中: roll === 20 || (roll !== 1 && total >= targetAc),
+        特效类型: fxKind,
+        fxKind,
+        effectKind: fxKind,
         id: now,
       },
     };
@@ -1526,6 +1658,9 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
         总计: total,
         DC: dc,
         成功: roll === 20 || (roll !== 1 && total >= dc),
+        特效类型: fxKind,
+        fxKind,
+        effectKind: fxKind,
         id: now,
       },
     };
@@ -1548,6 +1683,9 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
         总计: total,
         DC: dc,
         成功: roll === 20 || (roll !== 1 && total >= dc),
+        特效类型: fxKind,
+        fxKind,
+        effectKind: fxKind,
         id: now,
       },
     };
@@ -1571,9 +1709,169 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
       加值: bonus,
       总计: total,
       描述: count > 1 ? `${count}${dieType} 合计 ${rolls.join(" + ")} = ${rawTotal}` : "结果已生成",
+      特效类型: fxKind,
+      fxKind,
+      effectKind: fxKind,
       id: now,
     },
   };
+}
+
+/* ===== 技能名→特效类型 ===== */
+function skillNameToFxKind(name: string): string {
+  const m: [RegExp, string][] = [
+    // 治疗
+    [/回气|治疗|愈合|恢复|修复|炖汤|heal|cure|restore/i, "heal"],
+    // 火焰
+    [/火|炎|燃|灼|辣椒|flare|burn|flame/i, "fire"],
+    // 冰霜
+    [/冰|霜|冻|cold|frost|freeze/i, "ice"],
+    // 雷电
+    [/雷|电|闪|lightning|shock|thunder/i, "lightning"],
+    // 光耀
+    [/光|圣|耀|银钟|radiant|holy/i, "radiant"],
+    // 毒素
+    [/毒|孢尘|poison|venom|toxic/i, "poison"],
+    // 暗影
+    [/暗|影|shadow|dark|necrotic/i, "shadow"],
+    // 风
+    [/风|箭雨|wind|gale|tempest/i, "wind"],
+    // 钝击
+    [/钝|锤|锅|压制|bash|bludgeon|mace|hammer/i, "bash"],
+    // 穿刺
+    [/刺|穿|射击|pierce|stab|rapier/i, "pierce"],
+    // 挥砍
+    [/挥|砍|斩|爪|剑|斧|slash|cleave|sword|axe/i, "slash"],
+    // 护盾/防御
+    [/盾|护|格挡|guard|block|ward|shield/i, "shield"],
+    // 增益/祝福
+    [/祝福|增益|强化|印记|buff|bless/i, "buff"],
+    // 诅咒/减益
+    [/诅咒|减益|debuff|curse/i, "debuff"],
+    // 奥术/魔法
+    [/奥|秘|魔|牵引|arcane|spell|magic/i, "arcane"],
+  ];
+  for (const [re, kind] of m) {
+    if (re.test(name)) return kind;
+  }
+  return "slash";
+}
+
+function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
+  if (skill.roll.kind === "healing") return "heal";
+
+  const byId: Record<string, BattleFxKind> = {
+    F1: "slash",
+    F2: "shield",
+    F3: "heal",
+    F4: "debuff",
+    F5: "shield",
+    F6: "slash",
+    F7: "earth",
+    T1: "slash",
+    T2: "shield",
+    T3: "heal",
+    GM1: "bash",
+    GM2: "shield",
+    GM3: "shield",
+    GM4: "earth",
+    LS1: "shadow",
+    LS2: "shadow",
+    LS3: "poison",
+    LS4: "poison",
+    TL1: "fire",
+    TL2: "shield",
+    TL3: "lightning",
+    TL4: "arcane",
+    TL5: "radiant",
+    ET1: "slash",
+    ET2: "fire",
+    ET3: "debuff",
+    ET4: "shadow",
+    EA1: "shadow",
+    EA2: "poison",
+    EA3: "arcane",
+    EB1: "arcane",
+    EB2: "shadow",
+    EB3: "poison",
+    TA1: "slash",
+    TA2: "shield",
+    TA3: "heal",
+    SE1: "radiant",
+    SE2: "arcane",
+    SE3: "heal",
+    S1: "radiant",
+    S2: "arcane",
+    S3: "heal",
+    SN1: "bash",
+    SN2: "heal",
+    SN3: "fire",
+    LY1: "pierce",
+    LY2: "buff",
+    LY3: "wind",
+    AL1: "heal",
+    AL2: "buff",
+    AL3: "shield",
+    KL1: "shadow",
+    KL2: "debuff",
+    KL3: "shadow",
+    LD1: "shield",
+    LD2: "heal",
+    LD3: "shield",
+    CA1: "slash",
+    CA2: "poison",
+    CA3: "fail",
+    CB1: "poison",
+    CB2: "slash",
+    CB3: "fail",
+    CC1: "slash",
+    CC2: "poison",
+    CC3: "fail",
+    CR1A: "slash",
+    CR2A: "poison",
+    CR3A: "fail",
+    CR1B: "slash",
+    CR2B: "poison",
+    CR3B: "fail",
+    CR1C: "slash",
+    CR2C: "poison",
+    CR3C: "fail",
+  };
+
+  const idMatch = byId[skill.id];
+  if (idMatch) return idMatch;
+
+  if (skill.roll.kind === "none") {
+    if (unit.model === "ailin" || unit.model === "leiduo") return "shield";
+    return "buff";
+  }
+
+  switch (unit.model) {
+    case "selin":
+      return "arcane";
+    case "senluo":
+    case "grum":
+      return "bash";
+    case "liyase":
+      return "pierce";
+    case "ailin":
+      return "radiant";
+    case "kelaiya":
+    case "lisa":
+      return "shadow";
+    case "leiduo":
+      return "shield";
+    case "crawler":
+      return "poison";
+    case "talia":
+      return "fire";
+    case "templar":
+      return "slash";
+    case "shade":
+      return "shadow";
+    default:
+      return skillNameToFxKind(skill.name) as BattleFxKind;
+  }
 }
 
 export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEffects = [] }: BattleTestScreenProps) {
@@ -1593,6 +1891,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
   const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null);
   const [battleAnimation, setBattleAnimation] = useState<BattleAnimationCue | null>(null);
   const enemyActingKeyRef = useRef<string | null>(null);
+  const [enemyTurnDone, setEnemyTurnDone] = useState(false);
   const battleAnimationTimerRef = useRef<number | null>(null);
   const [usedResources, setUsedResources] = useState<Record<string, Partial<Record<BattleResource, boolean>>>>({});
   const [battleLog, setBattleLog] = useState<string[]>([...openingLogLines, config.initialLog].slice(0, 4));
@@ -1668,11 +1967,12 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
     }
 
     const id = Date.now();
-    setBattleAnimation({ id, actorId: unit.id, targetId: target.id, skillId: skill.id });
+    const effectKind = getBattleFxKind(unit, skill);
+    setBattleAnimation({ id, actorId: unit.id, targetId: target.id, skillId: skill.id, effectKind });
     battleAnimationTimerRef.current = window.setTimeout(() => {
       setBattleAnimation((current) => (current?.id === id ? null : current));
       battleAnimationTimerRef.current = null;
-    }, unit.model === "lisa" || unit.model === "selin" ? 1100 : 820);
+    }, effectKind === "heal" || effectKind === "shield" || effectKind === "arcane" ? 1100 : 860);
   }
 
   function rerollInitiative() {
@@ -1686,6 +1986,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
     setActiveDice(null);
     setLastEffect(null);
     setPendingSettlement(null);
+    setEnemyTurnDone(false);
     if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
     clearBattleAnimation();
     enemyActingKeyRef.current = null;
@@ -1717,6 +2018,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
     setUsedResources({});
     setActiveDice(null);
     setPendingSettlement(null);
+    setEnemyTurnDone(false);
     if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
     clearBattleAnimation();
     enemyActingKeyRef.current = null;
@@ -1762,10 +2064,9 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
     // 骰子已关闭，延迟800ms结算
     settlementTimerRef.current = window.setTimeout(() => {
       executeSettlement(pendingSettlement);
-      // 敌方结算后推进回合
       if (pendingSettlement.isEnemy) {
-        advanceTurn();
-        setUsedResources({});
+        // 敌方结算后不自动推进，等待玩家点击"下一行动"
+        setEnemyTurnDone(true);
         enemyActingKeyRef.current = null;
       }
       setPendingSettlement(null);
@@ -1885,6 +2186,9 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
   useEffect(() => {
     if (phase !== "battle" || battleWon || battleLost || !activeUnitId || activeFaction !== "enemy") return;
 
+    // 敌方已完成动作，等待玩家点击"下一行动"推进
+    if (enemyTurnDone) return;
+
     const actingUnit = unitMap.get(activeUnitId);
     if (!actingUnit) return;
     if (actingUnit.hp <= 0) {
@@ -1947,9 +2251,6 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
           <small>{config.subtitle}</small>
         </div>
         <div className="battle-hud-actions">
-          <button type="button" className="ghost-button" onClick={nextTurn} disabled={phase !== "battle" || enemyTurn || battleWon || battleLost || Boolean(activeDice)}>
-            下一行动
-          </button>
           {mode !== "tutorial" && (
             <button type="button" className="ghost-button" onClick={onBack}>
               {config.backLabel}
@@ -1973,14 +2274,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
               aria-current={isActive ? "true" : undefined}
             >
               <span className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
-              <span className="initiative-token-copy">
-                <b>{unit.name}</b>
-                <small>
-                  {entry.roll} {formatModifier(entry.dexMod)}
-                  {entry.otherBonus ? ` ${formatModifier(entry.otherBonus)}` : ""} = {entry.total}
-                </small>
-              </span>
-              <i>{index + 1}</i>
+              <span className="initiative-rank-badge">{index + 1}</span>
             </button>
           );
         })}
@@ -2017,9 +2311,13 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
       </AnimatePresence>
 
       {enemyTurn && activeUnit && (
-        <section className="battle-enemy-turn-lock" aria-label="敌方回合">
-          <b>敌方回合</b>
-          <span>{activeUnit.name} 正在自动行动，我方操作暂时锁定。</span>
+        <section className={`battle-enemy-turn-lock ${enemyTurnDone ? "is-done" : ""}`} aria-label="敌方回合">
+          <b>{enemyTurnDone ? "敌方回合结束" : "敌方回合"}</b>
+          <span>
+            {enemyTurnDone
+              ? `${activeUnit.name} 行动完毕，点击「下一行动」继续`
+              : `${activeUnit.name} 正在自动行动，我方操作暂时锁定。`}
+          </span>
         </section>
       )}
 
@@ -2053,6 +2351,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
               casting={battleAnimation?.actorId === unit.id}
               impacted={battleAnimation?.targetId === unit.id}
               animationKey={battleAnimation?.id}
+              effectKind={battleAnimation?.targetId === unit.id ? battleAnimation.effectKind : undefined}
               onClick={() => handleModelClick(unit)}
             />
           ))}
@@ -2067,6 +2366,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
               casting={battleAnimation?.actorId === unit.id}
               impacted={battleAnimation?.targetId === unit.id}
               animationKey={battleAnimation?.id}
+              effectKind={battleAnimation?.targetId === unit.id ? battleAnimation.effectKind : undefined}
               onClick={() => handleModelClick(unit)}
             />
           ))}
@@ -2084,7 +2384,25 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
       {/* 底部：AI KP 回合结算 — 视觉小说对话框风格 */}
       <AnimatePresence>
         {lastEffect && (
-          <BattleEffectPanel effect={lastEffect} />
+          <motion.section
+            key={lastEffect.id}
+            className={`battle-effect-panel ${lastEffect.success === false ? "is-fail" : "is-win"}`}
+            aria-label="AI KP 回合结算"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+          >
+            <BattleEffectPanel
+              effect={lastEffect}
+              nextTurnLabel={
+                enemyTurn && !enemyTurnDone ? "等待敌方行动结束"
+                : enemyTurn && enemyTurnDone ? "敌方行动完毕，下一行动 →"
+                : "下一行动 →"
+              }
+              nextTurnDisabled={phase !== "battle" || (enemyTurn && !enemyTurnDone) || battleWon || battleLost || Boolean(activeDice)}
+              onNextTurn={nextTurn}
+            />
+          </motion.section>
         )}
       </AnimatePresence>
 
@@ -2324,7 +2642,7 @@ function InitiativeRollOverlay({
 
             return (
               <article key={unit.id} className={`battle-init-card ${revealed ? "is-revealed" : ""}`}>
-                <span className={`battle-avatar-mark battle-avatar-${unit.model}`}>{unit.portrait}</span>
+                <span className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
                 <div className="battle-init-card-copy">
                   <b>{unit.name}</b>
                   <small>{unit.faction === "ally" ? "我方" : "敌方"}</small>
@@ -2377,13 +2695,15 @@ function RosterPanel({
         >
                 <span className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
                 <span className="battle-roster-copy">
-            <b>{unit.name}</b>
+            <span className="roster-name-hp">
+              <b>{unit.name}</b>
+              <span className="battle-mini-hp">
+                <i style={{ width: `${getHpPercent(unit)}%` }} />
+              </span>
+            </span>
             <small>
               HP {unit.hp}/{unit.maxHp} · AC {unit.ac}
             </small>
-            <span className="battle-mini-hp">
-              <i style={{ width: `${getHpPercent(unit)}%` }} />
-            </span>
           </span>
         </button>
       ))}
@@ -2398,6 +2718,7 @@ function BattleModel({
   casting,
   impacted,
   animationKey,
+  effectKind = "slash",
   onClick,
 }: {
   unit: BattleUnit;
@@ -2406,6 +2727,7 @@ function BattleModel({
   casting: boolean;
   impacted: boolean;
   animationKey?: number;
+  effectKind?: BattleFxKind;
   onClick: () => void;
 }) {
   return (
@@ -2416,18 +2738,13 @@ function BattleModel({
       aria-label={unit.name}
     >
       <span className={`battle-sprite battle-sprite-${unit.model}`}>
-        {unit.model === "adventurer" ? (
+        {SPRITE_SHEET_MAP[unit.model] ? (
           <span
             className="sprite-sheet"
             style={{
-              backgroundImage: `url(/assets/chibi/selin/selin_chibi_spritesheet.png)`,
+              backgroundImage: `url(${SPRITE_SHEET_MAP[unit.model]})`,
             }}
           />
-        ) : unit.model === "lisa" || unit.model === "selin" ? (
-          <>
-            <span className="lisa-sprite-sheet is-idle" />
-            {casting && <span key={animationKey} className="lisa-sprite-sheet is-cast" />}
-          </>
         ) : (
           <>
             <span className="sprite-aura" />
@@ -2437,29 +2754,40 @@ function BattleModel({
           </>
         )}
       </span>
-      {impacted && <span key={`impact-${animationKey ?? unit.id}`} className="battle-impact-effect" aria-hidden="true" />}
-      <span className="battle-combatant-name">{unit.name}</span>
-      <span className="battle-combatant-hp">
-        <i style={{ width: `${getHpPercent(unit)}%` }} />
+      {impacted && (
+        <span
+          key={`impact-${animationKey ?? unit.id}`}
+          className={`battle-impact-effect battle-impact-${effectKind}`}
+          aria-hidden="true"
+        >
+          <i />
+          <i />
+          <i />
+          <i />
+          <i />
+        </span>
+      )}
+      <span className="battle-combatant-info">
+        <span className="battle-combatant-name">{unit.name}</span>
+        <span className="battle-combatant-hp">
+          <i style={{ width: `${getHpPercent(unit)}%` }} />
+        </span>
       </span>
     </button>
   );
 }
 
-function BattleEffectPanel({ effect }: { effect: BattleEffect }) {
+function BattleEffectPanel({ effect, nextTurnLabel, nextTurnDisabled, onNextTurn }: {
+  effect: BattleEffect;
+  nextTurnLabel: string;
+  nextTurnDisabled: boolean;
+  onNextTurn: () => void;
+}) {
   return (
-    <motion.section
-      key={effect.id}
-      className={`battle-effect-panel ${effect.success === false ? "is-fail" : "is-win"}`}
-      aria-label="AI KP 回合结算"
-      initial={{ opacity: 0, y: 40 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-    >
-      <div className="vn-dialogue-box">
-        <span className="vn-speaker-tag">
-          {effect.actorName} · {effect.skillName}
-        </span>
+    <div className="vn-dialogue-box">
+      <span className="vn-speaker-tag">
+        {effect.actorName} · {effect.skillName}
+      </span>
         <p className="vn-result-line">
           <b>{effect.resultLine}</b>
           {typeof effect.amount === "number" && (
@@ -2468,8 +2796,15 @@ function BattleEffectPanel({ effect }: { effect: BattleEffect }) {
         </p>
         <blockquote className="vn-narration">{effect.narration}</blockquote>
         <small className="vn-formula">{effect.formula}</small>
+        <button
+          type="button"
+          className="vn-next-turn-btn"
+          disabled={nextTurnDisabled}
+          onClick={(e) => { e.stopPropagation(); onNextTurn(); }}
+        >
+          {nextTurnLabel}
+        </button>
       </div>
-    </motion.section>
   );
 }
 
