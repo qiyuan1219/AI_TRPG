@@ -21,6 +21,7 @@ def _choice(
     failure_contamination: int = 0,
     flags: list[str] | None = None,
     blocks_rewards: list[str] | None = None,
+    starts_battle: bool = False,
 ) -> dict:
     return {
         "id": choice_id,
@@ -36,6 +37,7 @@ def _choice(
         "failure_contamination": failure_contamination,
         "flags": flags or [],
         "blocks_rewards": blocks_rewards or [],
+        "starts_battle": starts_battle,
     }
 
 
@@ -93,6 +95,8 @@ SIDE_EVENT_DEFINITIONS: dict[str, dict] = {
             "last_choice": None,
             "last_roll": None,
             "battle_log": [],
+            "pending_battle": None,
+            "battle_result": None,
         },
         "opening_choices": [
             _choice(
@@ -154,6 +158,15 @@ SIDE_EVENT_DEFINITIONS: dict[str, dict] = {
             ),
         ],
         "crisis_choices": [
+            _choice(
+                "enter_battle",
+                "正面清剿污染菌核",
+                "让布洛克锁定污染菌核，你带队正面迎击拟声孢群和污染藤蔓。",
+                2,
+                threat=-2,
+                flags=["准备清剿污染菌核"],
+                starts_battle=True,
+            ),
             _choice(
                 "protect_block",
                 "保护布洛克净化菌核",
@@ -266,7 +279,9 @@ def resolve_side_event_choice(event_id: str, state: dict, choice_id: str) -> dic
         if reward not in state["blocked_rewards"]:
             state["blocked_rewards"].append(reward)
 
-    if state["phase"] == "opening":
+    if choice.get("starts_battle"):
+        phase_note = _queue_side_event_battle(state)
+    elif state["phase"] == "opening":
         state["phase"] = "crisis"
         phase_note = "支线进入危机战斗：污染藤蔓开始收紧，拟声孢群从菌盖后方滑出。"
     else:
@@ -274,8 +289,7 @@ def resolve_side_event_choice(event_id: str, state: dict, choice_id: str) -> dic
         phase_note = "危机战斗继续。"
 
     if state["phase"] == "crisis" and (state["threat"] <= 0 or state["round"] >= 3):
-        _complete_event(event, state)
-        phase_note = state["result_text"]
+        phase_note = _queue_side_event_battle(state)
 
     state["last_choice"] = _public_choice(choice)
     state["last_roll"] = roll
@@ -293,6 +307,62 @@ def resolve_side_event_choice(event_id: str, state: dict, choice_id: str) -> dic
         "roll": roll,
         "success": success,
         "phase_note": phase_note,
+        "state": state,
+    }
+
+
+def resolve_side_event_battle_result(event_id: str, state: dict, result: str) -> dict:
+    event = SIDE_EVENT_DEFINITIONS[event_id]
+    if state.get("phase") != "battle_pending":
+        raise ValueError("当前支线没有等待结算的战斗")
+
+    normalized = result.strip().lower()
+    if normalized not in {"win", "lose"}:
+        raise ValueError("无效的支线战斗结果")
+
+    trust_before = state["trust"]
+    threat_before = state["threat"]
+    contamination_before = state["contamination"]
+
+    state["pending_battle"] = None
+    state["battle_result"] = normalized
+
+    if normalized == "win":
+        state["trust"] = _clamp(state["trust"] + 8, 0, 100)
+        state["threat"] = 0
+        for flag in ["击败污染菌核", "保护净化"]:
+            if flag not in state["flags"]:
+                state["flags"].append(flag)
+        phase_note = "污染菌核被压制，布洛克获得了净化菌林的窗口。"
+    else:
+        state["trust"] = _clamp(state["trust"] - 5, 0, 100)
+        state["threat"] = 0
+        state["contamination"] = max(0, state["contamination"] + 2)
+        if "支线战斗失利" not in state["flags"]:
+            state["flags"].append("支线战斗失利")
+        phase_note = "队伍被孢粉逼退，布洛克勉强救场，但污染已经加重。"
+
+    _complete_event(event, state)
+    if normalized == "win":
+        state["result_title"] = "击败污染菌核"
+        state["result_text"] = "污染菌核被压制，回声渐渐恢复为自然的重复声。布洛克抓住窗口完成净化，低声承认你们这次配合得不错。"
+    else:
+        state["result_title"] = "孢粉中脱险"
+        state["result_text"] = "拟声孢群被暂时逼退，但队伍吸入了过量孢粉。布洛克把你们拖出污染圈，语气粗硬地提醒下次别让菌核拖进节奏。"
+
+    state["battle_log"].append({
+        "choice": "支线战斗",
+        "roll": None,
+        "trust_delta": state["trust"] - trust_before,
+        "threat_delta": state["threat"] - threat_before,
+        "contamination_delta": state["contamination"] - contamination_before,
+        "note": phase_note,
+        "battle_result": normalized,
+    })
+
+    return {
+        "result": normalized,
+        "phase_note": state["result_text"],
         "state": state,
     }
 
@@ -351,6 +421,12 @@ def _complete_event(event: dict, state: dict) -> None:
     else:
         state["result_title"] = "击退污染"
         state["result_text"] = "队伍稳定住局面，污染藤蔓缩回菌盖阴影。布洛克把剩下的净化粉收好，提醒你别把漂亮当安全。"
+
+
+def _queue_side_event_battle(state: dict) -> str:
+    state["phase"] = "battle_pending"
+    state["pending_battle"] = "block_echo_forest_battle"
+    return "支线进入战斗：污染菌核暴露，拟声孢群和污染藤蔓开始围攻队伍。"
 
 
 def _public_choice(choice: dict) -> dict:

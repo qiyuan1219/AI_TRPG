@@ -11,6 +11,7 @@ from engine.companion_events import (
     create_side_event_session,
     get_event_public_data,
     resolve_side_event_choice,
+    resolve_side_event_battle_result,
     snapshot_side_event,
 )
 from kp.dm_service import companion_side_event_chat, companion_side_event_feedback
@@ -32,6 +33,10 @@ class SideEventChoiceRequest(BaseModel):
 
 class SideEventChatRequest(BaseModel):
     message: str
+
+
+class SideEventBattleResultRequest(BaseModel):
+    result: str
 
 
 @router_companion_events.get("")
@@ -73,6 +78,8 @@ async def choose_side_event(session_id: str, req: SideEventChoiceRequest):
 
     if state.get("phase") == "dialogue":
         raise HTTPException(400, "支线危机已结算，请进入自由对话或重新开始")
+    if state.get("phase") not in {"opening", "crisis"}:
+        raise HTTPException(400, "当前支线阶段不能继续普通选择")
 
     try:
         outcome = resolve_side_event_choice(event_id, state, req.choice_id)
@@ -107,6 +114,37 @@ async def get_side_event_feedback(session_id: str):
         "state": snapshot_side_event(event_id, state),
         "outcome": outcome,
         "feedback": await _build_side_event_feedback(event_id, state, outcome),
+    }
+
+
+@router_companion_events.post("/{session_id}/battle-result")
+async def complete_side_event_battle(session_id: str, req: SideEventBattleResultRequest):
+    session = _get_session(session_id)
+    event_id = session["event_id"]
+    state = session["state"]
+
+    try:
+        battle_outcome = resolve_side_event_battle_result(event_id, state, req.result)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+
+    event = SIDE_EVENT_DEFINITIONS[event_id]
+    feedback = await companion_side_event_feedback(
+        event=event,
+        state=snapshot_side_event(event_id, state),
+        choice={
+            "label": "支线战斗胜利" if battle_outcome["result"] == "win" else "支线战斗失利",
+            "text": battle_outcome["phase_note"],
+        },
+        roll=None,
+        phase_note=battle_outcome["phase_note"],
+    )
+
+    return {
+        "event": get_event_public_data(event_id),
+        "state": snapshot_side_event(event_id, state),
+        "battle_result": battle_outcome,
+        "feedback": feedback,
     }
 
 

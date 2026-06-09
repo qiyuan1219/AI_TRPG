@@ -47,7 +47,7 @@ export interface CompanionSideEventChoice {
 }
 
 export interface CompanionSideEventState {
-  phase: 'opening' | 'crisis' | 'dialogue';
+  phase: 'opening' | 'crisis' | 'battle_pending' | 'dialogue';
   trust: number;
   trust_band: string;
   threat: number;
@@ -62,6 +62,8 @@ export interface CompanionSideEventState {
   last_choice?: CompanionSideEventChoice | null;
   last_roll?: Record<string, any> | null;
   battle_log: Array<Record<string, any>>;
+  pending_battle?: string | null;
+  battle_result?: string | null;
   choices: CompanionSideEventChoice[];
 }
 
@@ -229,6 +231,28 @@ export async function getCompanionSideEventFeedback(
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, '支线反馈生成失败'));
+  }
+
+  return response.json();
+}
+
+export async function completeCompanionSideEventBattle(
+  sessionId: string,
+  result: 'win' | 'lose',
+): Promise<{
+  event: CompanionSideEventInfo;
+  state: CompanionSideEventState;
+  battle_result: Record<string, any>;
+  feedback: string;
+}> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/battle-result`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ result }),
+  }, '支线战斗结算失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线战斗结算失败'));
   }
 
   return response.json();

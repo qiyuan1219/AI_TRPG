@@ -27,20 +27,25 @@ const SPRITE_SHEET_MAP: Record<string, string> = {
   crawler: '/assets/chibi/crawler/crawler_chibi_spritesheet.png',
 };
 
-interface BattleTestScreenProps {
-  onBack: () => void;
-  mode?: "test" | "tutorial";
-  onComplete?: () => void;
-  openingEffects?: BattleOpeningEffect[];
+export interface BattleResult {
+  outcome: "win" | "lose";
 }
 
-type Faction = "ally" | "enemy";
-type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
-type BattleResource = "战斗技能" | "移动" | "动作" | "附赠动作" | "自由互动" | "反应";
-type BattlePhase = "initiative" | "battle";
-type RollKind = "attack" | "ability" | "save" | "healing" | "damage" | "none";
+interface BattleTestScreenProps {
+  onBack: () => void;
+  mode?: "test" | "tutorial" | "side-event";
+  onComplete?: (result?: BattleResult) => void;
+  openingEffects?: BattleOpeningEffect[];
+  battleConfigOverride?: BattleConfig;
+}
 
-interface SkillRollSpec {
+export type Faction = "ally" | "enemy";
+export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
+export type BattleResource = "战斗技能" | "移动" | "动作" | "附赠动作" | "自由互动" | "反应";
+type BattlePhase = "initiative" | "battle";
+export type RollKind = "attack" | "ability" | "save" | "healing" | "damage" | "none";
+
+export interface SkillRollSpec {
   kind: RollKind;
   ability?: AbilityKey;
   dieType?: DieType;
@@ -52,7 +57,7 @@ interface SkillRollSpec {
   label?: string;
 }
 
-interface BattleSkill {
+export interface BattleSkill {
   id: string;
   name: string;
   resource: BattleResource;
@@ -67,16 +72,16 @@ interface BattleSkill {
   locked?: boolean;
 }
 
-interface NonCombatSkill {
+export interface NonCombatSkill {
   name: string;
   check: string;
   effect: string;
 }
 
-type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "liyase" | "ailin" | "kelaiya" | "leiduo";
+export type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "liyase" | "ailin" | "kelaiya" | "leiduo";
 type BattleFxKind = "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail" | "poison" | "shadow" | "wind" | "earth" | "water" | "shield" | "buff" | "debuff" | "critical";
 
-interface BattleUnit {
+export interface BattleUnit {
   id: string;
   name: string;
   faction: Faction;
@@ -141,7 +146,7 @@ interface PendingSettlement {
   isEnemy?: boolean;
 }
 
-interface BattleOpeningEffect {
+export interface BattleOpeningEffect {
   unitId: string;
   hpDelta?: number;
   acDelta?: number;
@@ -150,22 +155,22 @@ interface BattleOpeningEffect {
   log: string;
 }
 
-interface QuickRule {
+export interface QuickRule {
   title: string;
   text: string;
 }
 
-interface TutorialIntroStep {
+export interface TutorialIntroStep {
   title: string;
   text: string;
 }
 
-interface TutorialEnemySkillBrief {
+export interface TutorialEnemySkillBrief {
   name: string;
   skills: string[];
 }
 
-interface BattleConfig {
+export interface BattleConfig {
   units: BattleUnit[];
   quickRules: QuickRule[];
   eyebrow: string;
@@ -1874,8 +1879,8 @@ function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
   }
 }
 
-export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEffects = [] }: BattleTestScreenProps) {
-  const config = useMemo(() => getBattleConfig(mode), [mode]);
+export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEffects = [], battleConfigOverride }: BattleTestScreenProps) {
+  const config = useMemo(() => battleConfigOverride ?? getBattleConfig(mode), [battleConfigOverride, mode]);
   const battleBaseUnits = useMemo(() => applyOpeningEffectsToUnits(config.units, openingEffects), [config.units, openingEffects]);
   const openingLogLines = useMemo(() => openingEffects.map((effect) => effect.log), [openingEffects]);
   const [initiative, setInitiative] = useState(() => buildInitiative(battleBaseUnits));
@@ -2251,7 +2256,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
           <small>{config.subtitle}</small>
         </div>
         <div className="battle-hud-actions">
-          {mode !== "tutorial" && (
+          {mode !== "tutorial" && mode !== "side-event" && (
             <button type="button" className="ghost-button" onClick={onBack}>
               {config.backLabel}
             </button>
@@ -2329,8 +2334,8 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
               ? config.winText
               : config.loseText}
           </span>
-          {battleWon && config.completeLabel && onComplete && (
-            <button type="button" className="start-button" onClick={onComplete}>
+          {(battleWon || battleLost) && config.completeLabel && onComplete && (
+            <button type="button" className="start-button" onClick={() => onComplete({ outcome: battleWon ? "win" : "lose" })}>
               {config.completeLabel}
             </button>
           )}
