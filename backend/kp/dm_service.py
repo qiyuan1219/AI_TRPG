@@ -365,6 +365,156 @@ async def dm_narrate_stream(prompt: str, state: dict) -> AsyncGenerator[str, Non
         if d and d.content: yield d.content
 
 
+def _fallback_companion_feedback(event: dict, state: dict, choice: dict) -> str:
+    companion = event["companion"]["name"]
+    trust_band = state.get("trust_band", "正常")
+    if state.get("completed"):
+        return (
+            f"{state.get('result_text') or '危机暂时解除。'}\n\n"
+            f"{companion}把铁锅往身后一背，看了你一眼：“记住刚才脚下的声音。"
+            f"孢海不是故意吓你，它只是照自己的方式活着。你现在和我的关系是：{trust_band}。”"
+        )
+    return (
+        f"你选择了“{choice.get('label', '行动')}”。菌林深处的呼救声忽远忽近，污染藤蔓开始收紧。\n\n"
+        f"{companion}低声提醒：“别只听声音，看它重复的位置。活路通常藏在规律里。”"
+    )
+
+
+def sanitize_companion_side_event_text(text: str) -> str:
+    """Keep AI side-event replies suitable for the in-game dialogue box."""
+    cleaned_lines: list[str] = []
+    banned_prefixes = (
+        "KP视角",
+        "KP 视角",
+        "布洛克·铁锅",
+        "布洛克",
+        "同伴回应",
+        "末结算提示",
+        "结算提示",
+        "奖励提示",
+        "引导",
+    )
+    for raw_line in (text or "").replace("\r\n", "\n").split("\n"):
+        line = raw_line.strip()
+        if not line:
+            if cleaned_lines and cleaned_lines[-1]:
+                cleaned_lines.append("")
+            continue
+        line = line.strip("*#- \t")
+        for prefix in banned_prefixes:
+            if line.startswith(prefix):
+                _, sep, tail = line.partition("：")
+                if not sep:
+                    _, sep, tail = line.partition(":")
+                line = tail.strip() if sep else line
+                break
+        line = line.strip("*#- \t")
+        if line:
+            cleaned_lines.append(line)
+
+    cleaned = "\n".join(cleaned_lines).strip()
+    while "\n\n\n" in cleaned:
+        cleaned = cleaned.replace("\n\n\n", "\n\n")
+    return cleaned
+
+
+async def companion_side_event_feedback(
+    event: dict,
+    state: dict,
+    choice: dict,
+    roll: dict | None,
+    phase_note: str,
+) -> str:
+    companion = event["companion"]["name"]
+    roll_text = "无检定"
+    if roll:
+        roll_text = (
+            f"{roll.get('检定')}：{roll.get('掷骰')}，加值 {roll.get('加值')}，"
+            f"总计 {roll.get('总计')} vs DC{roll.get('DC')}，"
+            f"{'成功' if roll.get('成功') else '失败'}"
+        )
+
+    prompt = f"""
+你是《地心之门》第一幕同伴支线的 AI 主持人。
+当前支线：{event['title']}
+地点：{event['location']}
+同伴：{companion}
+同伴说话风格：粗硬、生态专家、会把危险和食物放在一起讲；不是冷血，他保护生态也保护队伍。
+玩家选择：{choice.get('label')} - {choice.get('text')}
+检定结果：{roll_text}
+当前状态：信任值 {state.get('trust')}（{state.get('trust_band')}），威胁 {state.get('threat')}/{state.get('max_threat')}，孢子污染 {state.get('contamination')}
+结算说明：{phase_note}
+获得奖励：{', '.join(state.get('rewards') or []) or '暂无'}
+已发生标记：{', '.join(state.get('flags') or []) or '暂无'}
+
+请输出 2-3 段可直接放进游戏文本框的中文反馈。
+严格格式要求：
+1. 只写正文，不要写 Markdown，不要加粗，不要项目符号。
+2. 不要出现“KP视角”“布洛克·铁锅（信任值...）”“末结算提示”“奖励提示”等标题或调试说明。
+3. 第一段写场面变化，第二段自然写出布洛克的反应或台词。
+4. 如果支线已结算，可以在正文里自然提到奖励或代价；如果未结算，只用剧情语气引导继续处理危机。
+5. 不要提前揭示：{'; '.join(event.get('forbidden') or [])}
+"""
+    fallback = _fallback_companion_feedback(event, state, choice)
+    try:
+        completion = await _create_chat_completion(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": "你是中文 TRPG AI 主持人，回复要短、可直接显示在游戏 UI 中。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.75,
+            max_tokens=520,
+            stream=False,
+        )
+        content = completion.choices[0].message.content if completion.choices else ""
+        return sanitize_companion_side_event_text(content) or fallback
+    except Exception:
+        return fallback
+
+
+async def companion_side_event_chat(
+    event: dict,
+    state: dict,
+    message: str,
+    history: list[dict] | None = None,
+) -> str:
+    companion = event["companion"]["name"]
+    history_text = json.dumps(history or [], ensure_ascii=False)
+    prompt = f"""
+你正在扮演《地心之门》第一幕同伴支线结束后的自由对话 NPC：{companion}。
+当前支线：{event['title']}
+地点：{event['location']}
+当前信任值：{state.get('trust')}（{state.get('trust_band')}）
+支线结果：{state.get('result_title')} / {state.get('result_text')}
+奖励：{', '.join(state.get('rewards') or []) or '暂无'}
+可聊范围：{'; '.join(event.get('chat_topics') or [])}
+禁止提前回答：{'; '.join(event.get('forbidden') or [])}
+历史对话：{history_text}
+玩家问：{message}
+
+请只以“布洛克”的口吻回答，1-3 段中文。信任值越高，他越愿意解释生态细节和私人情绪；信任值低则更短、更粗硬。
+严格格式要求：只写布洛克会说出口的话，不要写 Markdown，不要写“布洛克：”“KP视角”“旁白”“末结算提示”等标题。
+如果玩家问到禁止内容，请自然回避，并把话题拉回回声菌林、孢海生态或后续骨柱湿地风险。
+"""
+    fallback = "布洛克哼了一声：“这个问题先放着。你要是真想活到骨柱湿地，就先记住：会发光的不一定安全，会喊救命的也不一定是人。”"
+    try:
+        completion = await _create_chat_completion(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": "你只扮演布洛克·铁锅，不要跳出角色。"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.8,
+            max_tokens=460,
+            stream=False,
+        )
+        content = completion.choices[0].message.content if completion.choices else ""
+        return sanitize_companion_side_event_text(content) or fallback
+    except Exception:
+        return fallback
+
+
 def _fallback_bargain_judgement(
     item_name: str,
     base_price: int,

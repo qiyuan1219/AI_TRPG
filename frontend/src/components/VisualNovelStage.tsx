@@ -5,6 +5,9 @@ import { EventFeed, type EventFeedItem } from './EventFeed';
 
 /* 角色立绘映射 */
 const PORTRAIT_MAP: Record<string, string> = {
+  '布洛克·铁锅': '/assets/characters/senluo/senluo_idle.png',
+  '布洛克': '/assets/characters/senluo/senluo_idle.png',
+  '森洛·铁锅': '/assets/characters/senluo/senluo_idle.png',
   冒险者: '/assets/characters/adventurer/adventurer_idle.png',
   瑟琳: '/assets/characters/selin/selin_idle.png',
   森洛: '/assets/characters/senluo/senluo_idle.png',

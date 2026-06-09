@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { BargainTestScreen } from "./BargainTestScreen";
 import { BattleTestScreen } from "./BattleTestScreen";
+import { CompanionEventTestScreen } from "./CompanionEventTestScreen";
 import { DiceRollOverlay, type DieType } from "./DiceRollOverlay";
 import { PortraitTestScreen } from "./PortraitTestScreen";
 import { YachtDiceTestScreen } from "./YachtDiceTestScreen";
@@ -11,7 +12,7 @@ interface TestScreenProps {
   onBack: () => void;
 }
 
-type TestMode = "menu" | "dice-select" | "dice-roll" | "battle" | "yacht" | "bargain" | "portrait";
+type TestMode = "menu" | "dice-select" | "dice-roll" | "battle" | "yacht" | "bargain" | "portrait" | "companion-event";
 
 const DICE_OPTIONS: Array<{ type: DieType; label: string; sides: number }> = [
   { type: "d4", label: "四面骰", sides: 4 },
@@ -53,7 +54,7 @@ export function TestScreen({ onBack }: TestScreenProps) {
       setMode("menu");
       return;
     }
-    if (mode === "portrait") {
+    if (mode === "portrait" || mode === "companion-event") {
       setMode("menu");
       return;
     }
@@ -100,6 +101,10 @@ export function TestScreen({ onBack }: TestScreenProps) {
     return <PortraitTestScreen onBack={() => setMode("menu")} />;
   }
 
+  if (mode === "companion-event") {
+    return <CompanionEventTestScreen onBack={() => setMode("menu")} />;
+  }
+
   return (
     <main className="test-screen">
       <motion.section
@@ -139,6 +144,10 @@ export function TestScreen({ onBack }: TestScreenProps) {
             <button type="button" className="test-mode-button" onClick={() => setMode("portrait")}>
               <span>🧑 角色立绘</span>
               <small>加载全部7位角色的正比立绘，模拟视觉小说对话，验证立绘资源完整性</small>
+            </button>
+            <button type="button" className="test-mode-button" onClick={() => setMode("companion-event")}>
+              <span>同伴支线事件</span>
+              <small>布洛克“回声菌林”：触发顺序、危机战斗、信任奖励与 AI 自由对话</small>
             </button>
           </section>
         )}

@@ -12,6 +12,7 @@ if sys.platform == "win32":
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from api.routes_companion_events import router_companion_events
 from api.routes_dnd import router_dnd
 from api.routes_dice_poker import router_poker
 from config import HOST, PORT, CORS_ORIGINS
@@ -34,6 +35,7 @@ app.add_middleware(
 # 注册路由
 app.include_router(router_dnd)
 app.include_router(router_poker)
+app.include_router(router_companion_events)
 
 
 @app.get("/")

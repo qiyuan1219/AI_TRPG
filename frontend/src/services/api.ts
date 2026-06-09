@@ -34,6 +34,73 @@ export interface BargainJudgeResult {
   boss_reply: string;
 }
 
+export interface CompanionSideEventChoice {
+  id: string;
+  label: string;
+  text: string;
+  trust: number;
+  check?: {
+    label: string;
+    dc: number;
+    bonus: number;
+  } | null;
+}
+
+export interface CompanionSideEventState {
+  phase: 'opening' | 'crisis' | 'dialogue';
+  trust: number;
+  trust_band: string;
+  threat: number;
+  max_threat: number;
+  contamination: number;
+  round: number;
+  flags: string[];
+  rewards: string[];
+  completed: boolean;
+  result_title: string;
+  result_text: string;
+  last_choice?: CompanionSideEventChoice | null;
+  last_roll?: Record<string, any> | null;
+  battle_log: Array<Record<string, any>>;
+  choices: CompanionSideEventChoice[];
+}
+
+export interface CompanionSideEventInfo {
+  id: string;
+  companion: {
+    id: string;
+    name: string;
+    trust_key: string;
+    portrait: string;
+  };
+  title: string;
+  location: string;
+  eyebrow: string;
+  summary: string;
+  opening: string;
+  objectives: string[];
+  free_chat_prompt: string;
+  chat_topics: string[];
+}
+
+export interface CompanionSideEventStartResult {
+  session_id: string;
+  event: CompanionSideEventInfo;
+  state: CompanionSideEventState;
+}
+
+export interface CompanionSideEventChoiceResult {
+  event: CompanionSideEventInfo;
+  state: CompanionSideEventState;
+  outcome: {
+    choice: CompanionSideEventChoice;
+    roll?: Record<string, any> | null;
+    success?: boolean | null;
+    phase_note: string;
+  };
+  feedback: string;
+}
+
 function toSafeMessage(value: unknown, fallback: string) {
   const message = String(value || '').trim();
   if (!message) return fallback;
@@ -113,6 +180,72 @@ export async function judgeBargain(payload: BargainJudgePayload): Promise<Bargai
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, '讲价判定失败'));
+  }
+
+  return response.json();
+}
+
+export async function startCompanionSideEvent(
+  eventId = 'block_echo_forest',
+  initialTrust = 55,
+): Promise<CompanionSideEventStartResult> {
+  const response = await apiFetch(`${BASE}/side-events/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_id: eventId, initial_trust: initialTrust }),
+  }, '支线事件启动失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线事件启动失败'));
+  }
+
+  return response.json();
+}
+
+export async function chooseCompanionSideEvent(
+  sessionId: string,
+  choiceId: string,
+  includeFeedback = true,
+): Promise<CompanionSideEventChoiceResult> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/choose`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ choice_id: choiceId, include_feedback: includeFeedback }),
+  }, '支线选择结算失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线选择结算失败'));
+  }
+
+  return response.json();
+}
+
+export async function getCompanionSideEventFeedback(
+  sessionId: string,
+): Promise<CompanionSideEventChoiceResult> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/feedback`, {
+    method: 'POST',
+  }, '支线反馈生成失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线反馈生成失败'));
+  }
+
+  return response.json();
+}
+
+export async function chatCompanionSideEvent(
+  sessionId: string,
+  message: string,
+): Promise<{ reply: string; history: Array<Record<string, string>>; state: CompanionSideEventState }> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  }, '支线自由对话失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线自由对话失败'));
   }
 
   return response.json();
