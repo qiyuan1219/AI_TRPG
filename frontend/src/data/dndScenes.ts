@@ -3,11 +3,21 @@ import type { GameState, SceneVisual } from '../types/game';
 export const DND_SCENES: SceneVisual[] = [
   {
     id: 'inverse-city',
-    title: '逆穹城',
+    title: '逆穹悬城',
     subtitle: '倒挂在穹顶下的奇迹城邦',
-    aliases: ['逆穹城', '倒挂城市', '城市', '城中'],
+    aliases: ['逆穹悬城', '逆穹城', '倒挂城市', '城市', '城中', '主缆街', '入城平台'],
     themeClass: 'scene-crown-city',
-    backgroundImage: '/assets/scenes/inverse-city.jpg',
+    backgroundImage: '/assets/scenes/01inverse-city-first-sight.webp',
+    bgStages: [
+      {
+        trigger: '补给吊箱从缆车上震落',
+        image: '/assets/scenes/02tutorial-battle-trigger.webp',
+      },
+      {
+        trigger: '裂隙爬兽被银白色光芒逼退',
+        image: '/assets/scenes/03post-battle-street.webp',
+      },
+    ],
   },
   {
     id: 'guild',
@@ -15,19 +25,26 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '委托、远征档案与失踪者名单',
     aliases: ['冒险者公会', '公会', '公会大厅'],
     themeClass: 'scene-guild',
+    backgroundImage: '/assets/scenes/04guild-interior.webp',
+    bgStages: [
+      {
+        trigger: '推开厚重的橡木门',
+        image: '/assets/scenes/04guild-interior.webp',
+      },
+    ],
   },
   {
     id: 'tavern',
     title: '回声酒馆',
     subtitle: '传闻、情报与一杯暖酒',
-    aliases: ['回声酒馆', '酒馆', '碎盾'],
+    aliases: ['回声酒馆', '酒馆', '萨洛'],
     themeClass: 'scene-guild',
   },
   {
     id: 'market',
     title: '补给市场',
-    subtitle: '抗孢面罩、冷光灯与药剂',
-    aliases: ['补给市场', '市场', '黑市'],
+    subtitle: '抗孢面罩、冷光灯、远征工具与黑市讲价',
+    aliases: ['补给市场', '市场', '黑市', '黑市摊位', '奥兰', '讲价'],
     themeClass: 'scene-library',
   },
   {
@@ -43,6 +60,13 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '治疗、安魂与远征者遗录',
     aliases: ['静默神殿', '神殿'],
     themeClass: 'scene-sanctum',
+    backgroundImage: '/assets/scenes/05temple-interior.png',
+    bgStages: [
+      {
+        trigger: '静默神殿',
+        image: '/assets/scenes/05temple-interior.png',
+      },
+    ],
   },
   {
     id: 'observatory',

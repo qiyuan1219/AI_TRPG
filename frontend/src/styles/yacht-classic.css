@@ -1,0 +1,303 @@
+﻿.yacht-screen {
+  min-height: 100vh;
+  overflow: auto;
+  background:
+    linear-gradient(180deg, rgba(10, 17, 23, 0.58), rgba(10, 11, 15, 0.96)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 96px),
+    #151a21;
+}
+
+.yacht-layout {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+.yacht-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.yacht-game-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 16px;
+  align-items: start;
+}
+
+.yacht-play-panel,
+.yacht-score-panel,
+.yacht-rules-panel {
+  border: 1px solid rgba(231, 211, 161, 0.2);
+  border-radius: 8px;
+  background: rgba(16, 19, 26, 0.82);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.22);
+}
+
+.yacht-play-panel {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.yacht-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(231, 211, 161, 0.16);
+}
+
+.yacht-status-row div {
+  display: grid;
+  gap: 3px;
+}
+
+.yacht-status-row span {
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.yacht-status-row b {
+  color: var(--text);
+  font-size: 1.08rem;
+}
+
+.yacht-status-row strong {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 1.35rem;
+}
+
+.yacht-dice-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.yacht-die {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 184px;
+  padding: 10px;
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+}
+
+.yacht-die:hover:not(:disabled) {
+  border-color: rgba(95, 183, 167, 0.7);
+  background: rgba(95, 183, 167, 0.1);
+}
+
+.yacht-die.is-locked {
+  border-color: rgba(239, 213, 140, 0.76);
+  background: rgba(212, 168, 67, 0.12);
+}
+
+.yacht-die.is-reroll {
+  border-color: rgba(95, 183, 167, 0.78);
+  background: rgba(95, 183, 167, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(95, 183, 167, 0.28);
+}
+
+.yacht-die span {
+  color: var(--gold-soft);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.yacht-dice-canvas {
+  border: 1px solid rgba(212, 168, 67, 0.24);
+  box-shadow: 0 0 24px rgba(72, 30, 120, 0.16), inset 0 0 18px rgba(212, 168, 67, 0.06);
+}
+
+.yacht-dice-canvas .dice-result-badge {
+  width: 48px;
+  height: 48px;
+  border-width: 2px;
+}
+
+.yacht-dice-canvas .badge-num {
+  font-size: 27px;
+}
+
+.yacht-control-row {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.yacht-control-row p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.yacht-rules-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.yacht-rules-panel h2,
+.yacht-rules-panel h3 {
+  margin: 0;
+  color: var(--gold-soft);
+}
+
+.yacht-rules-panel h2 {
+  font-size: 1.12rem;
+}
+
+.yacht-rules-panel h3 {
+  font-size: 0.96rem;
+}
+
+.yacht-rules-panel p,
+.yacht-rules-panel li {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.yacht-rules-panel p,
+.yacht-rules-panel ol {
+  margin: 0;
+}
+
+.yacht-rules-panel ol {
+  display: grid;
+  gap: 5px;
+  padding-left: 22px;
+}
+
+.yacht-score-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.yacht-score-panel > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(231, 211, 161, 0.16);
+}
+
+.yacht-score-panel > header span {
+  color: var(--gold-soft);
+  font-size: 1.12rem;
+  font-weight: 900;
+}
+
+.yacht-score-panel > header small {
+  color: var(--muted);
+}
+
+.yacht-score-section {
+  display: grid;
+  gap: 7px;
+}
+
+.yacht-score-section h2 {
+  margin: 4px 0 0;
+  color: var(--teal);
+  font-size: 0.9rem;
+}
+
+.yacht-score-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid rgba(231, 211, 161, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  text-align: left;
+}
+
+.yacht-score-row:hover:not(:disabled) {
+  border-color: rgba(239, 213, 140, 0.58);
+  background: rgba(212, 168, 67, 0.11);
+}
+
+.yacht-score-row.is-scored {
+  border-color: rgba(95, 183, 167, 0.32);
+  background: rgba(95, 183, 167, 0.08);
+  opacity: 1;
+}
+
+.yacht-score-row span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.yacht-score-row b,
+.yacht-score-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.yacht-score-row b {
+  color: var(--text);
+}
+
+.yacht-score-row small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.yacht-score-row strong,
+.yacht-score-total-row b,
+.yacht-grand-total b {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 1rem;
+  text-align: right;
+}
+
+.yacht-score-total-row,
+.yacht-grand-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--muted);
+}
+
+.yacht-grand-total {
+  min-height: 44px;
+  border: 1px solid rgba(239, 213, 140, 0.32);
+  background: rgba(212, 168, 67, 0.12);
+  color: var(--gold-soft);
+  font-weight: 900;
+}
+
+.yacht-grand-total b {
+  font-size: 1.4rem;
+}
+
+.yacht-screen {
+  background:
+    linear-gradient(180deg, rgba(8, 12, 18, 0.42), rgba(8, 12, 18, 0.94)),
+    url("/assets/battle/b1-sanctum-placeholder.png") center / cover fixed,
+    #131821;
+}
+

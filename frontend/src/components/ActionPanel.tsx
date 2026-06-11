@@ -5,9 +5,19 @@ interface ActionPanelProps {
   suggestions: ActionSuggestion[];
   disabled: boolean;
   onSubmit: (text: string) => void;
+  placeholder?: string;
+  helperText?: string;
+  suggestionMode?: 'submit' | 'fill';
 }
 
-export function ActionPanel({ suggestions, disabled, onSubmit }: ActionPanelProps) {
+export function ActionPanel({
+  suggestions,
+  disabled,
+  onSubmit,
+  placeholder = '输入你的行动……',
+  helperText,
+  suggestionMode = 'submit',
+}: ActionPanelProps) {
   const [customAction, setCustomAction] = useState('');
 
   function submit(text: string) {
@@ -18,16 +28,27 @@ export function ActionPanel({ suggestions, disabled, onSubmit }: ActionPanelProp
   }
 
   return (
-    <div className="action-panel">
-      <div className="suggestion-grid">
-        {suggestions.map((item) => (
-          <button key={item.id} type="button" onClick={() => submit(item.text)} disabled={disabled}>
-            {item.label}
-          </button>
-        ))}
-      </div>
+    <div className="vn-choices-list">
+      {helperText && <p className="vn-choice-helper">{helperText}</p>}
+      {suggestions.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          className="vn-choice-btn"
+          onClick={() => {
+            if (suggestionMode === 'fill') {
+              setCustomAction(item.text);
+              return;
+            }
+            submit(item.text);
+          }}
+          disabled={disabled}
+        >
+          {item.label}
+        </button>
+      ))}
       <form
-        className="custom-action"
+        className="vn-choice-custom"
         onSubmit={(event) => {
           event.preventDefault();
           submit(customAction);
@@ -36,7 +57,7 @@ export function ActionPanel({ suggestions, disabled, onSubmit }: ActionPanelProp
         <input
           value={customAction}
           onChange={(event) => setCustomAction(event.target.value)}
-          placeholder="输入你的行动"
+          placeholder={placeholder}
           disabled={disabled}
         />
         <button type="submit" disabled={disabled || !customAction.trim()}>

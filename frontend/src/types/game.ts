@@ -22,7 +22,14 @@ export interface SceneVisual {
   subtitle: string;
   aliases: string[];
   themeClass: string;
-  backgroundImage?: string;  // 场景背景图，渐进式浮现
+  backgroundImage?: string;        // 场景背景图，渐进式浮现
+  bgStages?: SceneBgStage[];       // 多阶段背景切换
+}
+
+/** 场景背景的阶段切换：当文本中出现 trigger 短语时切换到对应背景 */
+export interface SceneBgStage {
+  trigger: string;      // 文本匹配词
+  image: string;        // 背景图路径
 }
 
 export interface GameState {
@@ -85,12 +92,15 @@ export interface CreateGamePayload {
   attr_wis: number;
   attr_cha: number;
   level?: number;
+  skip_opening?: boolean;
 }
 
 export interface CreateGameResult {
   game_id: string;
   session_id?: string;
   opening: string;
+  opening_script?: Array<{ speaker: string; text: string }>;  // 固定开场脚本，speaker绝对正确
+  opening_hints?: string[];                                    // 开场HINTS
   state: GameState;
 }
 

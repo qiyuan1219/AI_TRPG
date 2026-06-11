@@ -332,136 +332,144 @@ export function YachtDiceTestScreen({ onBack }: YachtDiceTestScreenProps) {
   }
 
   return (
-    <main className="yacht-vn-screen">
-      <div className="yacht-vn-bg" />
-      <div className="yacht-vn-vignette" />
+    <main className="yvn-canvas">
+      {/* 背景 */}
+      <div className="yvn-bg" />
+      <div className="yvn-vignette" />
 
       {/* 顶栏 */}
-      <header className="yacht-vn-header">
+      <header className="yvn-topbar">
         <button type="button" className="ghost-button" onClick={onBack}>← 返回</button>
-        <span>快艇骰子 · 回声酒馆</span>
-        <div className="yacht-vn-gold">💰 {gold.toLocaleString()}G</div>
+        <span className="yvn-title">快艇骰子 · 回声酒馆</span>
+        <span className="yvn-gold">💰 {gold.toLocaleString()}G</span>
       </header>
 
-      {/* 舞台 */}
-      <section className="yacht-vn-stage">
-        {/* NPC气泡 */}
-        <div className="yacht-vn-npc-row">
-          <div className="yacht-vn-npc-portrait">
-            <div className="yacht-vn-npc-face"><span>🧔‍♂️</span><small>萨洛</small></div>
-            <div className="yacht-vn-npc-face" style={{ marginTop: 4 }}><span>🧙‍♀️</span><small>瑟琳</small></div>
-          </div>
-          <AnimatePresence mode="wait">
-            <motion.div key={atmosphere} className="yacht-vn-bubble" initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:0.28}}>
-              <p>{atmosphere}</p>
-              {message && <span className="yacht-vn-bubble-tag">{message}</span>}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* 入场/结束状态 */}
+      {/* 舞台：赌桌 + 骰子 */}
+      <section className="yvn-stage">
+        {/* 入场 */}
         {sessionState === "idle" && (
-          <div className="yacht-vn-idle">
+          <div className="yvn-center-card">
             <p>快艇骰子——回声酒馆最受欢迎的赌局。萨洛坐庄，瑟琳在一旁等你决定。</p>
             <button type="button" className="start-button" onClick={enterGame} disabled={gold<ENTRY_FEE}>支付 50G 入场</button>
           </div>
         )}
 
-        {/* 瑟琳行动选择 */}
+        {/* 瑟琳行动 */}
         {sessionState === "prep" && !serlynCheck && !serlynSkipped && (
-          <div className="yacht-vn-serlyn">
-            <Dice3DView dieType="d20" roll={serlynCheck?.roll??null} rolling={Boolean(serlynCheck?.rolling)} revealed={Boolean(serlynCheck)} size={92} className="yacht-vn-dice-sm" />
-            <div className="yacht-vn-serlyn-btns">
-              <button type="button" className="yacht-vn-choice-btn" onClick={()=>runSerlynCheck("stealth")}>潜行偷窥</button>
-              <button type="button" className="yacht-vn-choice-btn" onClick={()=>runSerlynCheck("favor")}>人情说服</button>
+          <div className="yvn-serlyn-bar">
+            <Dice3DView dieType="d20" roll={serlynCheck?.roll??null} rolling={Boolean(serlynCheck?.rolling)} revealed={Boolean(serlynCheck)} size={72} className="yvn-d20-sm" />
+            <div className="yvn-choices">
+              <button type="button" className="yvn-btn-choice" onClick={()=>runSerlynCheck("stealth")}>🔍 潜行偷窥</button>
+              <button type="button" className="yvn-btn-choice" onClick={()=>runSerlynCheck("favor")}>💬 人情说服</button>
               <button type="button" className="ghost-button" onClick={skipSerlynAction}>跳过</button>
             </div>
             <small>潜行成功透露敌骰 / 人情成功额外重掷</small>
           </div>
         )}
 
-        {serlynCheck?.rolling && <div className="yacht-vn-rolling">🎲 瑟琳行动判定中…</div>}
+        {serlynCheck?.rolling && <div className="yvn-loading">🎲 瑟琳行动判定中…</div>}
 
-        {/* 骰子面板 */}
+        {/* 对局骰子 */}
         {(sessionState === "playing" || sessionState === "round-settled") && (
-          <div className="yacht-vn-dice-area">
-            <DiceHandSimple title="敌方" subtitle={roundSettled?`${enemyHand.label}·${enemyHand.score}分`:`隐藏`} dice={enemyDice} visibleIndexes={roundSettled?[0,1,2,3,4]:revealedEnemyIndexes} rolling={rolling} revealed={revealed} />
-            <DiceHandSimple title="我方" subtitle={`${playerHand.label}·${playerHand.score}分`} dice={playerDice} visibleIndexes={roundStarted?[0,1,2,3,4]:[]} locking={playerLocked} rolling={rolling} revealed={revealed} canToggle={sessionState==="playing"&&roundStarted&&!rolling} onToggle={togglePlayerLock} />
+          <div className="yvn-duel">
+            <DiceHandSimple
+              title="萨洛" subtitle={roundSettled ? `${enemyHand.label} · ${enemyHand.score}分` : "盖牌"}
+              dice={enemyDice} visibleIndexes={roundSettled ? [0,1,2,3,4] : revealedEnemyIndexes}
+              rolling={rolling} revealed={revealed} isEnemy
+            />
+            <div className="yvn-vs">VS</div>
+            <DiceHandSimple
+              title="我方" subtitle={`${playerHand.label} · ${playerHand.score}分`}
+              dice={playerDice} visibleIndexes={roundStarted ? [0,1,2,3,4] : []}
+              locking={playerLocked} rolling={rolling} revealed={revealed}
+              canToggle={sessionState==="playing"&&roundStarted&&!rolling} onToggle={togglePlayerLock}
+            />
           </div>
         )}
 
+        {/* 规则 */}
+        <button type="button" className="yvn-rules-btn" onClick={()=>setShowRules(!showRules)}>
+          {showRules ? "收起" : "📋 牌型规则"}
+        </button>
+        {showRules && (
+          <div className="yvn-rules">
+            {HAND_RULES.map(r => <span key={r.label}><b>{r.label}</b> {r.score}</span>)}
+          </div>
+        )}
+      </section>
+
+      {/* 底部对话框（跟剧情界面同款） */}
+      <div className="yvn-dialogue">
         {/* AI参谋 */}
         {advisorPlan && (
-          <div className="yacht-vn-advisor">
+          <div className="yvn-advisor">
             <span>🧠 AI参谋</span>
             <p>{advisorPlan.headline}</p>
             <button type="button" className="ghost-button" onClick={applyAdvisorLocks}>按建议标记</button>
           </div>
         )}
 
-        {/* 操作按钮 */}
-        <div className="yacht-vn-actions-row">
-          {sessionState === "prep" && (serlynCheck || serlynSkipped) && (
-            <button type="button" className="start-button" onClick={startRound} disabled={rolling||!canStartRound}>开始本轮</button>
-          )}
-          {sessionState === "playing" && (
-            <>
-              <button type="button" className="start-button" onClick={rerollUnlockedDice} disabled={rolling||rerollsLeft<=0}>
-                {rerollsLeft>0?`重掷 (${rerollsLeft}/${maxRerolls})`:"重掷已用完"}
-              </button>
-              <button type="button" className="ghost-button" onClick={settleHands} disabled={rolling}>结算牌型</button>
-            </>
-          )}
-          {sessionState === "round-settled" && roundWinner === "player" && (
-            <>
-              <button type="button" className="start-button" onClick={cashOut}>拿走 {prize}G</button>
-              <button type="button" className="ghost-button" onClick={continueAfterWin}>{roundNumber>=MAX_ROUNDS?"收走最终奖池":`翻倍 (${stake*2}G)`}</button>
-            </>
-          )}
-          {sessionState === "round-settled" && roundWinner === "enemy" && (
-            <>
-              <Dice3DView dieType="d20" roll={pleaCheck?.roll??null} rolling={Boolean(pleaCheck?.rolling)} revealed={Boolean(pleaCheck)} size={72} className="yacht-vn-dice-sm" />
-              <button type="button" className="ghost-button" onClick={runPleaCheck} disabled={Boolean(pleaCheck)}>求情判定</button>
-            </>
-          )}
-          {sessionState === "round-settled" && roundWinner === "draw" && (
-            <button type="button" className="ghost-button" onClick={restartDrawRound}>平局重开</button>
-          )}
-          {(sessionState === "cashed-out" || sessionState === "failed") && (
-            <button type="button" className="ghost-button" onClick={resetGame}>再来一局</button>
-          )}
-        </div>
+        <div className="yvn-dialogue-inner">
+          <AnimatePresence mode="wait">
+            <motion.div key={atmosphere} className="yvn-dialogue-text" initial={{opacity:0,y:4}} animate={{opacity:1,y:0}} exit={{opacity:0}} transition={{duration:0.2}}>
+              <p>{atmosphere}</p>
+              {message && <span className="yvn-dialogue-hint">{message}</span>}
+            </motion.div>
+          </AnimatePresence>
 
-        {/* 规则展开 */}
-        <button type="button" className="yacht-vn-rules-toggle" onClick={()=>setShowRules(!showRules)}>
-          {showRules?"收起规则":"📋 牌型规则"}
-        </button>
-        {showRules && (
-          <div className="yacht-vn-rules">
-            {HAND_RULES.map(r=><span key={r.label}><b>{r.label}</b>{r.score} <i>{r.sample}</i></span>)}
+          <div className="yvn-dialogue-actions">
+            {sessionState === "prep" && (serlynCheck || serlynSkipped) && (
+              <button type="button" className="start-button" onClick={startRound} disabled={rolling||!canStartRound}>🎲 开始本轮</button>
+            )}
+            {sessionState === "playing" && (
+              <>
+                <button type="button" className="start-button" onClick={rerollUnlockedDice} disabled={rolling||rerollsLeft<=0}>
+                  🎲 {rerollsLeft>0?`重掷 (${rerollsLeft}/${maxRerolls})`:"重掷已用完"}
+                </button>
+                <button type="button" className="ghost-button" onClick={settleHands} disabled={rolling}>结算牌型</button>
+              </>
+            )}
+            {sessionState === "round-settled" && roundWinner === "player" && (
+              <>
+                <button type="button" className="start-button" onClick={cashOut}>💰 拿走 {prize}G</button>
+                <button type="button" className="ghost-button" onClick={continueAfterWin}>{roundNumber>=MAX_ROUNDS?"收走最终奖池":`翻倍 (${stake*2}G)`}</button>
+              </>
+            )}
+            {sessionState === "round-settled" && roundWinner === "enemy" && (
+              <>
+                <Dice3DView dieType="d20" roll={pleaCheck?.roll??null} rolling={Boolean(pleaCheck?.rolling)} revealed={Boolean(pleaCheck)} size={56} className="yvn-d20-sm" />
+                <button type="button" className="ghost-button" onClick={runPleaCheck} disabled={Boolean(pleaCheck)}>🙏 求情判定</button>
+              </>
+            )}
+            {sessionState === "round-settled" && roundWinner === "draw" && (
+              <button type="button" className="ghost-button" onClick={restartDrawRound}>🔄 平局重开</button>
+            )}
+            {(sessionState === "cashed-out" || sessionState === "failed") && (
+              <button type="button" className="ghost-button" onClick={resetGame}>🔄 再来一局</button>
+            )}
           </div>
-        )}
-      </section>
+        </div>
+      </div>
     </main>
   );
 }
 
 /* ---- 简化骰子手 ---- */
-function DiceHandSimple({ title, subtitle, dice, visibleIndexes, rolling, revealed, locking, canToggle, onToggle }: {
+function DiceHandSimple({ title, subtitle, dice, visibleIndexes, rolling, revealed, locking, canToggle, onToggle, isEnemy }: {
   title: string; subtitle: string; dice: number[]; visibleIndexes: number[]; rolling: boolean; revealed: boolean;
-  locking?: boolean[]; canToggle?: boolean; onToggle?: (i:number)=>void;
+  locking?: boolean[]; canToggle?: boolean; onToggle?: (i:number)=>void; isEnemy?: boolean;
 }) {
   const vs = new Set(visibleIndexes);
   return (
-    <div className="yacht-vn-hand">
+    <div className={`yvn-hand ${isEnemy ? "is-enemy" : ""}`}>
       <header><span>{title}</span><small>{subtitle}</small></header>
-      <div className="yacht-vn-dice-row">
+      <div className="yvn-dice-row">
         {dice.map((v,i)=>{
           const vis=vs.has(i), dieR=vis&&(revealed||(locking?locking[i]:false)), dieL=rolling&&(locking?!locking[i]:true);
           return (
-            <button key={i} type="button" className={`yacht-vn-die ${locking&&!locking[i]?"is-reroll":""}`} onClick={()=>onToggle?.(i)} disabled={!canToggle}>
-              <Dice3DView dieType="d6" roll={vis?v:null} rolling={dieL} revealed={dieR} size={100} className="yacht-vn-die-3d" faceStyle="pips" showResultBadge={false} />
-              {!vis && <i className="yacht-vn-die-hidden">?</i>}
+            <button key={i} type="button" className={`yvn-die ${locking&&!locking[i]?"is-reroll":""}`} onClick={()=>onToggle?.(i)} disabled={!canToggle}>
+              <Dice3DView dieType="d6" roll={vis?v:null} rolling={dieL} revealed={dieR} size={92} faceStyle="pips" showResultBadge={false} />
+              {!vis && <i className="yvn-die-hidden">?</i>}
             </button>
           );
         })}

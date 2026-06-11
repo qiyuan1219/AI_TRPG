@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Dice3DView, DiceRollOverlay, type DieType } from "./DiceRollOverlay";
 import type { DiceResult } from "../types/game";
+import { fetchBattleNarration, fetchAdvantage } from "../services/api";
+
+export interface BattleResult {
+  outcome: "win" | "lose";
+}
 
 /* ===== 战斗头像映射（Q版截取，52×52） ===== */
 const AVATAR_MAP: Record<string, string> = {
@@ -29,18 +34,20 @@ const SPRITE_SHEET_MAP: Record<string, string> = {
 
 interface BattleTestScreenProps {
   onBack: () => void;
-  mode?: "test" | "tutorial";
-  onComplete?: () => void;
+  mode?: "test" | "tutorial" | "side-event";
+  onComplete?: (result?: BattleResult) => void;
+  onSkip?: () => void;
   openingEffects?: BattleOpeningEffect[];
+  battleConfigOverride?: BattleConfig;
 }
 
-type Faction = "ally" | "enemy";
-type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
-type BattleResource = "战斗技能" | "移动" | "动作" | "附赠动作" | "自由互动" | "反应";
+export type Faction = "ally" | "enemy";
+export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
+export type BattleResource = "战斗技能" | "移动" | "动作" | "附赠动作" | "自由互动" | "反应";
 type BattlePhase = "initiative" | "battle";
-type RollKind = "attack" | "ability" | "save" | "healing" | "damage" | "none";
+export type RollKind = "attack" | "ability" | "save" | "healing" | "damage" | "none";
 
-interface SkillRollSpec {
+export interface SkillRollSpec {
   kind: RollKind;
   ability?: AbilityKey;
   dieType?: DieType;
@@ -52,7 +59,7 @@ interface SkillRollSpec {
   label?: string;
 }
 
-interface BattleSkill {
+export interface BattleSkill {
   id: string;
   name: string;
   resource: BattleResource;
@@ -67,16 +74,16 @@ interface BattleSkill {
   locked?: boolean;
 }
 
-interface NonCombatSkill {
+export interface NonCombatSkill {
   name: string;
   check: string;
   effect: string;
 }
 
-type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "liyase" | "ailin" | "kelaiya" | "leiduo";
+export type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "liyase" | "ailin" | "kelaiya" | "leiduo";
 type BattleFxKind = "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail" | "poison" | "shadow" | "wind" | "earth" | "water" | "shield" | "buff" | "debuff" | "critical";
 
-interface BattleUnit {
+export interface BattleUnit {
   id: string;
   name: string;
   faction: Faction;
@@ -141,7 +148,7 @@ interface PendingSettlement {
   isEnemy?: boolean;
 }
 
-interface BattleOpeningEffect {
+export interface BattleOpeningEffect {
   unitId: string;
   hpDelta?: number;
   acDelta?: number;
@@ -150,22 +157,22 @@ interface BattleOpeningEffect {
   log: string;
 }
 
-interface QuickRule {
+export interface QuickRule {
   title: string;
   text: string;
 }
 
-interface TutorialIntroStep {
+export interface TutorialIntroStep {
   title: string;
   text: string;
 }
 
-interface TutorialEnemySkillBrief {
+export interface TutorialEnemySkillBrief {
   name: string;
   skills: string[];
 }
 
-interface BattleConfig {
+export interface BattleConfig {
   units: BattleUnit[];
   quickRules: QuickRule[];
   eyebrow: string;
@@ -954,7 +961,7 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
     abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
     resourceProfile: ["低伤害攻击", "怕光", "被击败即退出战斗"],
     statuses: ["惊慌", "怕光", "教学敌人"],
-    traits: ["HP28 / AC12", "DEX +2", "伤害已降低", "优先攻击当前生命较低的我方"],
+    traits: ["HP28 / AC12", "DEX +2", "伤害已降低", "随机选择攻击目标"],
     skills: [
       {
         id: "CR1A",
@@ -1134,7 +1141,7 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     ], nonCombatSkills: [],
   },
   {
-    id: "test-senluo", name: "森洛", faction: "ally", role: "矮人·铁锅战士", portrait: "森", model: "senluo",
+    id: "test-senluo", name: "布洛克", faction: "ally", role: "矮人·铁锅战士", portrait: "布", model: "senluo",
     hp: 48, maxHp: 48, ac: 16, speed: 25, proficiency: 2,
     abilities: { str: 16, dex: 12, con: 16, int: 10, wis: 14, cha: 8 },
     resourceProfile: ["攻击", "治疗", "范围"], statuses: ["前排"], traits: ["HP48/AC16", "矮人韧性"],
@@ -1145,7 +1152,7 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     ], nonCombatSkills: [],
   },
   {
-    id: "test-liyase", name: "莉亚瑟", faction: "ally", role: "精灵·神射手", portrait: "莉", model: "liyase",
+    id: "test-liyase", name: "莉娅", faction: "ally", role: "精灵·神射手", portrait: "莉", model: "liyase",
     hp: 36, maxHp: 36, ac: 16, speed: 35, proficiency: 2,
     abilities: { str: 10, dex: 18, con: 13, int: 12, wis: 16, cha: 10 },
     resourceProfile: ["远程", "标记", "掩护"], statuses: ["后排"], traits: ["HP36/AC16", "长弓"],
@@ -1167,7 +1174,7 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     ], nonCombatSkills: [],
   },
   {
-    id: "test-kelaiya", name: "克莱娅", faction: "ally", role: "猫人·怪物猎人", portrait: "克", model: "kelaiya",
+    id: "test-kelaiya", name: "凯娅", faction: "ally", role: "猫人·怪物猎人", portrait: "凯", model: "kelaiya",
     hp: 34, maxHp: 34, ac: 15, speed: 35, proficiency: 2,
     abilities: { str: 10, dex: 18, con: 12, int: 13, wis: 14, cha: 10 },
     resourceProfile: ["偷袭", "拆陷阱", "撤退"], statuses: ["潜行"], traits: ["HP34/AC15", "偷袭2d6"],
@@ -1228,7 +1235,7 @@ const TEST_BATTLE_CONFIG: BattleConfig = {
   quickRules: QUICK_RULES,
   eyebrow: "COMBAT SANDBOX",
   title: "战斗测试",
-  subtitle: "冒险者+瑟琳+森洛+莉亚瑟+艾琳+克莱娅+雷铎 vs 三只裂隙爬兽",
+  subtitle: "冒险者+瑟琳+布洛克+莉娅+艾琳+凯娅+雷铎 vs 三只裂隙爬兽",
   backLabel: "返回测试",
   rerollLog: "重新进行全员 1D20 先攻判定。",
   initialLog: "战斗测试初始化：7名我方 + 3名敌方，选技能、指定对象、掷骰结算。",
@@ -1309,6 +1316,14 @@ function formatModifier(value: number) {
   return value >= 0 ? `+${value}` : String(value);
 }
 
+/** 将文本中 XdY 格式的骰子标记加粗 */
+function boldifyDiceNotation(text: string): React.ReactNode[] {
+  const parts = text.split(/(\d+d\d+)/gi);
+  return parts.map((part, i) =>
+    /^\d+d\d+$/i.test(part) ? <b key={i}>{part}</b> : part
+  );
+}
+
 function rollDie(sides: number) {
   return Math.floor(Math.random() * sides) + 1;
 }
@@ -1382,6 +1397,31 @@ function getTargetCandidates(unit: BattleUnit, skill: BattleSkill, allies: Battl
   return livingAllies;
 }
 
+/** 从技能公式中解析伤害骰并实际掷出，返回各骰结果 */
+interface ParsedFormulaDice {
+  dieType: DieType;
+  count: number;
+  bonus: number;
+  rolls: number[];
+  rawTotal: number;
+  total: number;
+  label: string; // e.g. "1d8+3"
+}
+function rollFormulaDice(formula: string): ParsedFormulaDice | null {
+  // 只匹配伤害/治疗部分（命中后、恢复 等之后的内容）
+  const damagePart = formula.split(/；|;/)[1] ?? formula;
+  const match = damagePart.match(/(\d*)d(\d+)(?:\s*[+＋]\s*(\d+))?/i);
+  if (!match) return null;
+  
+  const count = Number(match[1] || 1);
+  const sides = Number(match[2]);
+  const dieType = `d${sides}` as DieType;
+  const bonus = Number(match[3] || 0);
+  const rolls = Array.from({ length: count }, () => rollDie(sides));
+  const rawTotal = rolls.reduce((sum, v) => sum + v, 0);
+  return { dieType, count, bonus, rolls, rawTotal, total: rawTotal + bonus, label: match[0].replace(/[\s+＋]/g, "") };
+}
+
 function rollFormulaAmount(formula: string) {
   const matches = [...formula.matchAll(/(\d*)d(\d+)(?:\s*[+＋]\s*(\d+))?/gi)];
   if (matches.length === 0) return null;
@@ -1399,6 +1439,28 @@ function rollFormulaAmount(formula: string) {
   });
 
   return { total, detail: parts.join("；") };
+}
+
+/** 仅掷伤害骰（用于攻击命中后的第二阶段） */
+function rollDamageOnly(skill: BattleSkill, unitName: string): DiceResult | null {
+  const fd = rollFormulaDice(skill.formula);
+  if (!fd) return null;
+  return {
+    type: "dice_test",
+    data: {
+      骰子: fd.dieType.toUpperCase(),
+      属性: `${unitName}：${skill.name}（伤害）`,
+      掷骰: `${fd.dieType.toUpperCase()}=${fd.rolls[0]}`,
+      结果: fd.rolls[0],
+      骰数: fd.count,
+      骰面: fd.dieType,
+      全部掷骰: fd.rolls,
+      加值: fd.bonus,
+      总计: fd.total,
+      描述: fd.count > 1 ? `${fd.count}${fd.dieType} 合计 ${fd.rolls.join(" + ")}` + (fd.bonus ? ` + ${fd.bonus} = ${fd.total}` : ` = ${fd.total}`) : "结果已生成",
+      id: Date.now(),
+    },
+  };
 }
 
 function diceLine(dice: DiceResult | null) {
@@ -1435,6 +1497,273 @@ function tuneDamageAmount(actor: BattleUnit, rawAmount: number) {
   return Math.max(1, Math.round(rawAmount * multiplier));
 }
 
+/** 循环计数器 —— 确保每类描述每次都不一样，用完一轮再从头开始 */
+const _cycle: Record<string, number> = {};
+function nextIndex(key: string, length: number): number {
+  const idx = (_cycle[key] ?? 0) % length;
+  _cycle[key] = idx + 1;
+  return idx;
+}
+
+/** 为每种描述类型定义尽量多的变体（至少 5-6 条），保证一整场战斗不重样 */
+
+const HIT_INTROS = [
+  (a: string, s: string, r: string) => `${a}挥出${s}，${r}精准命中——`,
+  (a: string, s: string, r: string) => `${a}的${s}以${r}穿过防线——`,
+  (a: string, s: string, r: string) => `${s}带着${r}的力道迎面而至——`,
+  (a: string, s: string, r: string) => `${a}抓住破绽，${s}的${r}毫不留情地招呼上去——`,
+  (a: string, s: string, r: string) => `${a}咬紧牙关，${s}挟着${r}一往无前地劈落——`,
+  (a: string, s: string, r: string) => `${a}算准了角度，${s}以${r}切入对手的防守盲区——`,
+  (a: string, s: string, r: string) => `${s}的寒光一闪，${r}已如毒蛇般咬向目标的要害——`,
+  (a: string, s: string, r: string) => `${a}一声低喝，${s}带着${r}破空而来——`,
+];
+
+const MID_CLAUSES = [
+  (t: string) => `${t}闷哼一声，`,
+  (t: string) => `${t}咬牙硬扛了这一下，`,
+  (t: string) => `${t}来不及完全闪避，`,
+  (t: string) => `${t}的防御在冲击下露出一丝裂痕，`,
+  (t: string) => `${t}脚下一个踉跄，`,
+  (t: string) => `${t}瞳孔骤然收缩，`,
+  (t: string) => `${t}倒吸一口凉气，`,
+  (t: string) => `${t}的面色白了一瞬，`,
+];
+
+const FIRE_IMPACTS = [
+  "烈焰在盔甲缝隙间爆燃，灼热的冲击波掀翻了周围的碎石",
+  "炽焰咆哮着吞噬了目标的防线，滚烫的气浪让空气都扭曲了起来",
+  "火星飞溅中，燃烧的轨迹在黑暗中划出一道刺眼的伤口",
+  "火光沿着命中的轨迹炸开，灼浪如鞭子般抽打在护甲的每一寸",
+  "赤红的火焰从武器尖端喷涌而出，在目标胸前绽开一朵死亡之花",
+  "高温瞬间熔化了铠甲边角，融化的金属液滴暗红地滴落在地",
+];
+
+const LIGHT_IMPACTS = [
+  "璀璨的光柱洞穿了暗幕，耀眼的白光在目标身上刻下灼烧的印记",
+  "圣光洪流倾泻而下，辉芒如刀刃般撕裂了阴影的庇护",
+  "光芒炸裂，每一缕辉光都像细针般刺入目标的形体，邪祟在光下扭曲哀嚎",
+  "一轮耀眼的白光从命中点向四周迸射，阴翳如潮水般被逼退了三尺",
+  "光耀涟漪层层荡开，目标体表缭绕的暗影发出一声凄厉的尖啸",
+  "神圣之力化作刺目的流星，在击中的地方留下一枚久久不散的亮白烙印",
+];
+
+const ICE_IMPACTS = [
+  "冰晶沿着命中点迅速蔓延，刺骨的寒意渗入骨髓",
+  "霜刃划过之处留下白痕，冻气凝结成狰狞的冰刺从内部撑开裂隙",
+  "寒流如潮水般涌过，目标的动作在低温中明显迟缓了下来",
+  "冰霜在创口处绽开，冷气顺着血液流淌，让对手的肢体僵硬了半拍",
+  "寒气噼啪作响地爬上护甲表面，所过之处凝出一层薄而脆的冰壳",
+  "刺骨的冻气灌入伤口，目标呼出的白雾里夹杂着一声低沉的痛呼",
+];
+
+const LIGHTNING_IMPACTS = [
+  "电弧在击中瞬间炸裂，蓝白色的闪电分支噼啪作响地爬满目标全身",
+  "雷霆劈落，电流沿着护甲的金属边缘跳跃，空气中弥漫着焦糊的气味",
+  "电光闪过之后，目标的肌肉仍在不由自主地痉挛抽搐",
+  "闪电如银蛇般窜入盔甲内部，噼里啪啦地沿着关节游走",
+  "一道刺目的蓝光贯穿了目标的躯干，跳动的电弧在其身周织成一张光网",
+  "雷击落下的瞬间空气被电离出刺鼻的臭氧味，目标的鬃毛根根倒竖",
+];
+
+const POISON_IMPACTS = [
+  "暗绿色的毒雾从创口渗入，皮肤下隐约可见黑色的细线在血管中蔓延",
+  "腐蚀性的能量发出令人不安的嘶嘶声，护甲表面肉眼可见地黯淡消融",
+  "毒素如活物般钻入伤口，目标的面色瞬间苍白了几分",
+  "紫黑色的雾瘴缠绕在伤口边缘，散发出甜腻而致命的气味",
+  "毒液接触到血肉的刹那泛起一串恶心的气泡，附近的皮肤迅速转为暗灰",
+  "暗蚀之力悄无声息地渗透防御，目标眼底闪过一丝不易察觉的异色",
+];
+
+const STEALTH_IMPACTS = [
+  "利刃从难以置信的角度切入，护甲的搭扣处溅出细碎的火星",
+  "身影一晃出现在目标背后，刀尖已经没入了甲片间的薄弱缝隙",
+  "攻击来自最不可能的方向——敌人甚至没来得及举盾，锋刃便已划开了一道深痕",
+  "阴影中无声地探出刀锋，等到察觉时尖端已刺破外层的皮革",
+  "一击得手便立即抽身，快得连影子都跟不上",
+  "刺客般的精准——刀尖恰好绕过肋骨，直抵最柔软的腹部一侧",
+];
+
+const KNOCKDOWN_IMPACTS = [
+  "巨力将目标整个掀离地面，沉重的身躯砸在地上溅起一片尘土",
+  "一击正中关节要害，目标感到下半身一阵酸麻，站立不稳地晃了两步",
+  "冲击力如铁锤般砸在目标的膝盖弯，逼得他不得不蹲身卸力",
+  "目标膝盖一软，重心被精准地瓦解，单膝重重砸在石板地面上",
+  "横扫的力道绊翻了对手的支撑腿，整个人失去平衡轰然侧倒",
+  "借力打力的一推，目标的下盘像被抽走了骨头般瞬间瓦解",
+];
+
+const BREAK_IMPACTS = [
+  "沉重的攻击砸在护甲上，甲片发出不堪重负的呻吟，向内凹陷出一块裂纹",
+  "这一击的力道贯穿了防具，护甲表层崩裂，碎片叮当作响地散落",
+  "钝器般的撞击让对方的防御出现了一道明显的缺口",
+  "护心镜在这一击下变了形，金属呻吟着向内塌陷",
+  "攻击精准落在甲片衔接处，铆钉崩飞，整块护板歪斜脱位",
+  "沉闷的撞击声之后，甲片中央赫然多了一个拳头大的凹坑",
+];
+
+const BIG_HIT_IMPACTS = [
+  "沉重的斩击切开空气，命中时爆出沉闷的回响，冲击力让目标整个人往后滑了一步",
+  "武器砸下的力量远超预期，护甲发出尖锐的金属扭曲声，裂纹如蛛网般扩散",
+  "这一击势大力沉，碰撞的瞬间迸发出刺耳的巨响，目标的身体明显晃了一晃",
+  "力道如山崩般倾泻而下，撞击处甲片翻卷，底下的衬垫被震得撕裂",
+  "轰然一击，冲击波肉眼可见地荡开——目标双脚离地了半寸才重新站稳",
+  "命中时一声炸雷般的闷响，周围的尘土都被气浪推成了一圈涟漪",
+];
+
+const SMALL_HIT_IMPACTS = [
+  "攻击精准地穿过防御空档，在目标的侧腹留下一道浅浅的血痕",
+  "利落的招式擦过护甲边缘，虽未正中要害，却也逼得对手倒吸一口凉气",
+  "出手迅捷而刁钻，角度刚好越过盾牌的遮蔽，在肩甲上敲出一小片凹痕",
+  "快如蜂蜇的一刺，只在目标臂甲上留下一道不足三寸的划痕",
+  "轻巧的一击撩过目标腰间，没有见血，但护甲下传来一声闷哼",
+  "角度极刁的一记点刺，撩过目标头盔侧沿，逼得对方仓促偏头",
+];
+
+const NORMAL_HIT_IMPACTS = [
+  "攻击结结实实撕开了对手的防线，命中处传来一声沉闷的撞击",
+  "兵刃交错的瞬间火花四溅，力道穿透了护具的防御层",
+  "这一招干脆利落，沿着护甲的缝隙切入，逼迫对手不得不重新调整姿态",
+  "武器在甲胄上拖出一道长长的白痕，金属摩擦的尖啸令人牙酸",
+  "一式当头劈下被架住，但余力顺着对方的手臂震了下去",
+  "双方身形交错，电光石火间已在对方身上留下了印记",
+];
+
+const HEAL_BIG = [
+  (a: string, t: string, amt: number) => `温暖的白光从${a}掌心涌出，如潮水般漫过${t}全身——${amt}点生命力重新灌注进四肢，连最深的那道伤口也开始收口愈合。`,
+  (a: string, t: string, amt: number) => `治愈之光轰然绽放，${t}感到一股暖流从头顶直灌脚底，${amt}点生命恢复让他的呼吸重新变得沉稳有力。`,
+  (a: string, t: string, amt: number) => `圣洁的光晕将${t}整个包裹，${amt}点生机如春泉般注入——翻卷的皮肉在光芒中缓缓平复，血痂悄然剥落。`,
+  (a: string, t: string, amt: number) => `${a}双手按在${t}的伤口上，随着一段古老咒文的吟诵，${amt}点生命之泉涌入体内，疼痛被温暖取代。`,
+];
+
+const HEAL_SMALL = [
+  (a: string, t: string, amt: number) => `${a}指尖流转的光辉轻触${t}的伤处，${amt}点生命悄然回填，伤口边缘以肉眼可见的速度收敛合拢。`,
+  (a: string, t: string, amt: number) => `一缕温润的魔力缠绕上${t}的创口，痛楚如水退潮般消散，恢复了${amt}点体力。`,
+  (a: string, t: string, amt: number) => `${a}低声念出一段短促的祷文，淡金色的光斑落在${t}身上，${amt}点生命力温柔地填补了伤势。`,
+  (a: string, t: string, amt: number) => `一颗发光的微尘飘入${t}的伤处，随即化作${amt}点暖意散开——伤口虽未全好，但流血已止。`,
+  (a: string, t: string, amt: number) => `${a}轻拍${t}的肩膀，一道细小的生命之线沿着手臂汇入对方体内，恢复了${amt}点体力。`,
+  (a: string, t: string, amt: number) => `空气中聚拢起淡绿的辉点，${amt}点治愈灵力如春雨般渗入${t}的伤口，带走了一部分疼痛。`,
+];
+
+const TRIGGERS = [
+  (a: string, t: string, s: string) => `${a}将${s}的印记悄然刻在${t}身侧，眸子紧锁着战场上的每一次风吹草动——只等敌人踏入陷阱的那一刻。`,
+  (a: string, t: string, s: string) => `${a}对${t}微微颔首，${s}已就位，魔力在无声中编织成一张守护之网。`,
+  (a: string, t: string, s: string) => `${a}架起${s}的架势，视线如鹰隼般扫过战场，护在${t}前方的每一步都蓄势待发。`,
+  (a: string, t: string, s: string) => `${a}五指一张，${s}的符文在${t}脚下亮起一圈微光——契约已成。`,
+  (a: string, t: string, s: string) => `${a}将重心压低，${s}的防御姿态在${t}身前展开一道无形的屏障。`,
+  (a: string, t: string, s: string) => `低沉的嗡鸣中，${a}的${s}在${t}周身浮现出一层半透明的能量波纹。`,
+];
+
+const DEFEATS = [
+  (a: string, s: string, r: string, t: string) => `${a}的${s}带着${r}轰然落下——${t}的身形在冲击中碎裂，轮廓崩解成一缕灰烬，散入地底的暗风中。`,
+  (a: string, s: string, r: string, t: string) => `${a}不给任何喘息之机，${s}以${r}彻底压垮了${t}。残躯摇晃了两下，最终无声地坍倒在地。`,
+  (a: string, s: string, r: string, t: string) => `${s}的最后一击来得迅猛而致命。${t}没能扛住这${r}，躯壳如枯叶般碎裂飘散。`,
+  (a: string, s: string, r: string, t: string) => `胜负已分——${a}的${s}带着${r}贯穿了${t}的防御，残破的身影跪倒在地，再也不动了。`,
+  (a: string, s: string, r: string, t: string) => `${s}的${r}是压倒骆驼的最后一根稻草。${t}的眼中闪过一丝不甘，旋即整个人如积木般解体崩塌。`,
+];
+
+const SAVE_HALVES = [
+  (t: string, s: string, a: string, amt: string) => `${t}在千钧一发之际侧身卸力，${s}的大部分威力被偏转滑开。但${a}的攻击并非全无收获——余波仍然刮过了目标的防线，留下${amt}伤害。`,
+  (t: string, s: string, a: string, amt: string) => `${t}的反应堪称老练，脚下步伐连退三步，把${s}的致命角度化解了大半。不过震荡的余力还是穿透了双臂，造成了${amt}伤害。`,
+  (t: string, s: string, a: string, amt: string) => `虽然${t}勉强扭身避开了正面，${s}的边锋仍擦过躯干，${a}逼出的这记半效攻击造成了${amt}伤害。`,
+  (t: string, s: string, a: string, amt: string) => `${t}一个后仰铁板桥险险避过全力一击，但${s}带起的冲击波还是追上了他——${amt}伤害。`,
+  (t: string, s: string, a: string, amt: string) => `${t}交叉双臂硬架，${s}的主力道被卸掉了大半，但震荡顺着骨骼传遍全身，扣去${amt}。`,
+];
+
+const GRAZES = [
+  (a: string, s: string, t: string, amt: number) => `${a}的${s}擦着${t}的护甲滑过，没有正中目标。但迅猛的攻势仍逼得${t}踉跄后退，铠甲边缘在皮肤上勒出一道浅痕——受到${amt}点压制伤害。`,
+  (a: string, s: string, t: string, amt: number) => `${s}并未彻底洞穿防御，${t}勉强架住了主要力道。可冲击的余波沿武器传导而上，震得他手腕发麻，扣去${amt}点体力。`,
+  (a: string, s: string, t: string, amt: number) => `${a}这一击角度差了半分，${t}侧身堪堪让过要害。然而兵器带起的风压仍在甲片上刮出刺耳的啸声，${amt}点擦伤随之烙在护甲之下。`,
+  (a: string, s: string, t: string, amt: number) => `${a}的${s}从${t}肩头不到一寸处掠过，攻势虽未洞穿，但强横的力道仍将${t}推得后退了两步，${amt}点压制。`,
+  (a: string, s: string, t: string, amt: number) => `${s}落空，但${a}顺势用兵器柄端顶了过去——${t}猝不及防，吃下了${amt}点钝击擦伤。`,
+];
+
+const CHECKS_NORMAL = [
+  (a: string, s: string, r: string, t: string) => `${a}施展${s}，${r}稳稳拿下了主动权。${t}被迫跟着对方的步调挪移，原本的防守节奏被打乱了半分。`,
+  (a: string, s: string, r: string, t: string) => `${s}的${r}让${a}占据了上风。${t}不得不仓促调整站位，这一回合的布局已经偏向了我方。`,
+  (a: string, s: string, r: string, t: string) => `${a}的${s}以${r}得手，${t}的站位被彻底打乱，原本严密的阵型露出了一道缺口。`,
+  (a: string, s: string, r: string, t: string) => `${s}的${r}如预料般生效——${t}踉跄着调整重心，整个攻防节奏在本回合被攥入了${a}手中。`,
+];
+
+const CHECKS_KNOCKDOWN = [
+  (a: string, s: string, r: string, t: string) => `${a}以${s}发起压制，${r}无可争议。${t}的身体被强行钉在原地，挣扎间膝盖重重砸进了尘土。`,
+  (a: string, s: string, r: string, t: string) => `${s}的${r}彻底瓦解了${t}的下盘，重心猛然倾覆，重重摔倒在地——周围的空气都为之一震。`,
+  (a: string, s: string, r: string, t: string) => `${a}的${s}以${r}扫倒了${t}，沉重的铠甲砸在地上发出沉闷的回响，扬起一圈灰尘。`,
+  (a: string, s: string, r: string, t: string) => `${s}的${r}正中${t}的支撑腿，关节发出一声令人牙酸的脆响，整个人像被伐倒的树一样侧向倾倒。`,
+];
+
+const MISSES = [
+  (a: string, s: string, r: string, t: string) => `${a}的${s}以${r || "判定"}袭去，${t}却以意想不到的角度拧身避开，兵刃从肩头上方呼啸而过。`,
+  (a: string, s: string, r: string, t: string) => `${s}出手迅猛，但${t}早一步看穿了轨迹——侧身滑步，攻击只撕裂了一片空气。`,
+  (a: string, s: string, r: string, t: string) => `${a}的${s}擦着${t}的衣角掠过，距离命中只差毫厘。${t}瞳孔微缩，显然也被这一击的凌厉吓了一跳。`,
+  (a: string, s: string, r: string, t: string) => `${a}奋力一击，${s}却砸在了${t}脚边的石板地上，碎石四溅但人毫发无伤。`,
+  (a: string, s: string, r: string, t: string) => `${s}划出一道弧线——${t}后撤一步刚好让过锋尖，冷风拂面却没有留下伤口。`,
+  (a: string, s: string, r: string, t: string) => `${t}将盾牌向上一顶，${s}从盾面上滑出刺耳的声音，偏移了致命的角度。`,
+];
+
+/* ===== 核心选择函数 ===== */
+function impactFlavor(skill: BattleSkill, amount?: number): string {
+  const isBigHit = amount !== undefined && amount >= 8;
+  const isSmallHit = amount !== undefined && amount <= 3;
+
+  if (skill.tags.includes("火焰")) return FIRE_IMPACTS[nextIndex("fire", FIRE_IMPACTS.length)];
+  if (skill.tags.includes("光耀") || skill.tags.includes("圣")) return LIGHT_IMPACTS[nextIndex("light", LIGHT_IMPACTS.length)];
+  if (skill.tags.includes("冰") || skill.tags.includes("霜") || skill.tags.includes("冻")) return ICE_IMPACTS[nextIndex("ice", ICE_IMPACTS.length)];
+  if (skill.tags.includes("雷") || skill.tags.includes("电")) return LIGHTNING_IMPACTS[nextIndex("lightning", LIGHTNING_IMPACTS.length)];
+  if (skill.tags.includes("毒") || skill.tags.includes("黯蚀")) return POISON_IMPACTS[nextIndex("poison", POISON_IMPACTS.length)];
+  if (skill.tags.includes("偷袭") || skill.tags.includes("隐形")) return STEALTH_IMPACTS[nextIndex("stealth", STEALTH_IMPACTS.length)];
+  if (skill.tags.includes("倒地") || skill.tags.includes("束缚")) return KNOCKDOWN_IMPACTS[nextIndex("knockdown", KNOCKDOWN_IMPACTS.length)];
+  if (skill.tags.includes("破甲") || skill.tags.includes("压制")) return BREAK_IMPACTS[nextIndex("break", BREAK_IMPACTS.length)];
+  if (isBigHit) return BIG_HIT_IMPACTS[nextIndex("bigHit", BIG_HIT_IMPACTS.length)];
+  if (isSmallHit) return SMALL_HIT_IMPACTS[nextIndex("smallHit", SMALL_HIT_IMPACTS.length)];
+  return NORMAL_HIT_IMPACTS[nextIndex("normalHit", NORMAL_HIT_IMPACTS.length)];
+}
+
+function healFlavor(actorName: string, targetName: string, amount?: number): string {
+  const amt = amount ?? 0;
+  if (amt >= 10) {
+    const fns = HEAL_BIG;
+    return fns[nextIndex("healBig", fns.length)](actorName, targetName, amt);
+  }
+  const fns = HEAL_SMALL;
+  return fns[nextIndex("healSmall", fns.length)](actorName, targetName, amt);
+}
+
+function triggerFlavor(actorName: string, targetName: string, skillName: string): string {
+  return TRIGGERS[nextIndex("trigger", TRIGGERS.length)](actorName, targetName, skillName);
+}
+
+function defeatFlavor(actorName: string, targetName: string, skillName: string, resultText: string): string {
+  return DEFEATS[nextIndex("defeat", DEFEATS.length)](actorName, skillName, resultText, targetName);
+}
+
+function hitFlavor(actorName: string, targetName: string, skillName: string, resultText: string, amount: number | undefined, skill: BattleSkill): string {
+  const amtText = amount !== undefined ? ` ${amount} 点伤害` : "效果";
+  const desc = impactFlavor(skill, amount);
+  const intro = HIT_INTROS[nextIndex("hitIntro", HIT_INTROS.length)](actorName, skillName, resultText);
+  const mid = MID_CLAUSES[nextIndex("midClause", MID_CLAUSES.length)](targetName);
+  return `${intro}${desc}。${mid}受到${amtText}。`;
+}
+
+function saveHalfFlavor(actorName: string, targetName: string, skillName: string, amount: number | undefined): string {
+  const amtText = amount !== undefined ? ` ${amount} 点（半效）` : "削弱后的冲击";
+  return SAVE_HALVES[nextIndex("saveHalf", SAVE_HALVES.length)](targetName, skillName, actorName, amtText);
+}
+
+function grazeFlavor(actorName: string, targetName: string, skillName: string, amount: number): string {
+  return GRAZES[nextIndex("graze", GRAZES.length)](actorName, skillName, targetName, amount);
+}
+
+function checkFlavor(actorName: string, targetName: string, skillName: string, resultText: string, skill: BattleSkill): string {
+  if (skill.tags.includes("倒地") || skill.tags.includes("束缚")) {
+    return CHECKS_KNOCKDOWN[nextIndex("checkKd", CHECKS_KNOCKDOWN.length)](actorName, skillName, resultText, targetName);
+  }
+  return CHECKS_NORMAL[nextIndex("checkNorm", CHECKS_NORMAL.length)](actorName, skillName, resultText, targetName);
+}
+
+function missFlavor(actorName: string, targetName: string, skillName: string, resultText: string): string {
+  return MISSES[nextIndex("miss", MISSES.length)](actorName, skillName, resultText, targetName);
+}
+
 function buildKpNarration({
   actor,
   target,
@@ -1452,50 +1781,45 @@ function buildKpNarration({
 }) {
   const total = getDiceTotal(dice);
   const resultText = total ? `${total} 点判定` : "这次行动";
-  const targetDefeated = amount !== undefined && isDamagingAction(actor, target, skill) && amount >= target.hp;
+  const isDefeated = amount !== undefined && isDamagingAction(actor, target, skill) && amount >= target.hp;
 
   if (outcome === "heal") {
-    return `KP：${actor.name}稳住呼吸，${skill.name}的光芒落在${target.name}身上，恢复了 ${amount ?? 0} 点生命。伤口收拢，${target.name}重新找回了站稳脚跟的力气。`;
+    return `KP：${healFlavor(actor.name, target.name, amount)}`;
   }
 
   if (outcome === "trigger") {
-    return `KP：${actor.name}把${skill.name}留作应对，视线牢牢压在${target.name}身侧。下一次危机到来时，这个选择会立刻改变战场。`;
+    return `KP：${triggerFlavor(actor.name, target.name, skill.name)}`;
   }
 
-  if (targetDefeated) {
-    return `KP：${actor.name}使用${skill.name}，${resultText}压过防线。${target.name}被这一击打得失去平衡，灰烬般的轮廓崩散在地，已经无法继续战斗。`;
+  if (isDefeated) {
+    return `KP：${defeatFlavor(actor.name, target.name, skill.name, resultText)}`;
   }
 
   if (outcome === "hit" || outcome === "save-full") {
-    const impact = skill.tags.includes("火焰")
-      ? "火光沿着命中的轨迹炸开"
-      : skill.tags.includes("倒地") || skill.tags.includes("束缚")
-        ? "冲击把目标的重心狠狠掀翻"
-        : skill.tags.includes("偷袭")
-          ? "刀锋从阴影里切入护甲缝隙"
-          : "这一击结结实实撕开了敌人的防线";
-    const amountText = amount !== undefined ? `${target.name}受到 ${amount} 点影响` : `${target.name}吃下了主要效果`;
-    return `KP：${actor.name}使用${skill.name}，${resultText}成功。${impact}，${amountText}，阵型被迫后退。`;
+    return `KP：${hitFlavor(actor.name, target.name, skill.name, resultText, amount, skill)}`;
   }
 
   if (outcome === "save-half") {
-    const amountText = amount !== undefined ? `造成 ${amount} 点半效伤害` : "保留了半效影响";
-    return `KP：${target.name}勉强扛住了${skill.name}的主要冲击，但余波仍然扫过战场。${actor.name}逼出了破绽，${amountText}。`;
+    return `KP：${saveHalfFlavor(actor.name, target.name, skill.name, amount)}`;
   }
 
   if (outcome === "graze") {
-    return `KP：${actor.name}的${skill.name}没有正面命中，但攻势没有白费。${target.name}被逼得撞开半步，护甲上留下擦伤，受到 ${amount ?? 0} 点压制伤害。`;
+    return `KP：${grazeFlavor(actor.name, target.name, skill.name, amount ?? 0)}`;
   }
 
   if (outcome === "check") {
-    return `KP：${actor.name}尝试${skill.name}，${resultText}通过。${target.name}被迫按你的节奏移动，战场主动权短暂向我方倾斜。`;
+    return `KP：${checkFlavor(actor.name, target.name, skill.name, resultText, skill)}`;
   }
 
-    return `KP：${actor.name}使用${skill.name}，但${resultText || "判定"}没能压过对方。${target.name}避开了关键威胁，不过这一瞬间的交锋仍让战场节奏被重新拉扯。`;
+  return `KP：${missFlavor(actor.name, target.name, skill.name, resultText)}`;
 }
 
 function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleSkill, dice: DiceResult | null): BattleEffect {
-  const amountRoll = rollFormulaAmount(skill.formula);
+  // 优先使用 DiceResult 中预掷的伤害骰结果，避免重复掷骰
+  const preRolledDamage = dice?.data["伤害总计"];
+  const amountRoll = (preRolledDamage !== undefined && preRolledDamage !== null)
+    ? { total: Number(preRolledDamage), detail: "" }
+    : rollFormulaAmount(skill.formula);
   const rawAmount = dice?.type === "dice_test" ? Number(dice.data["总计"] ?? dice.data["结果"] ?? 0) : amountRoll?.total;
   const damageAction = isDamagingAction(actor, target, skill);
   const tunedAmount = rawAmount && damageAction ? tuneDamageAmount(actor, rawAmount) : rawAmount;
@@ -1610,33 +1934,50 @@ function inferSaveAbility(skill: BattleSkill): AbilityKey {
   return "dex";
 }
 
-function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit): DiceResult | null {
+function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit, advType?: "advantage" | "disadvantage" | null): DiceResult | null {
   if (skill.roll.kind === "none") return null;
 
   const now = Date.now();
   const fxKind = getBattleFxKind(unit, skill);
 
+  const formulaDice = rollFormulaDice(skill.formula);
+
   if (skill.roll.kind === "attack") {
-    const roll = rollD20();
+    const roll1 = rollD20();
+    const roll2 = (advType && advType !== "advantage" && advType !== "disadvantage") ? 0 : (advType ? rollD20() : 0);
+    const useAdv = advType && roll2 > 0;
+    const finalRoll = useAdv
+      ? (advType === "advantage" ? Math.max(roll1, roll2) : Math.min(roll1, roll2))
+      : roll1;
     const abilityMod = abilityModifier(unit.abilities[skill.roll.ability ?? "str"]);
     const bonus = abilityMod + unit.proficiency + (skill.roll.bonus ?? 0) + (unit.faction === "ally" ? BATTLE_TUNING.allyHitBonus : 0);
-    const total = roll + bonus;
+    const total = finalRoll + bonus;
     const targetAc = target?.ac ?? skill.roll.targetAc ?? 14;
+
+    const hitResult = finalRoll === 20 || (finalRoll !== 1 && total >= targetAc);
 
     return {
       type: "attack_roll",
       data: {
         骰子: "D20",
         武器: `${unit.name}：${skill.name}`,
-        攻击掷骰: `D20=${roll}`,
+        攻击掷骰: `D20=${finalRoll}`,
         加值: bonus,
         总计: total,
         目标AC: targetAc,
-        命中: roll === 20 || (roll !== 1 && total >= targetAc),
+        命中: hitResult,
         特效类型: fxKind,
         fxKind,
         effectKind: fxKind,
         id: now,
+        附带伤害骰: formulaDice ? true : false,
+        伤害骰面: formulaDice?.dieType,
+        伤害骰数: formulaDice?.count,
+        全部伤害掷骰: formulaDice?.rolls,
+        伤害加值: formulaDice?.bonus ?? 0,
+        伤害总计: formulaDice?.total ?? 0,
+        优势掷骰: useAdv ? advType : undefined,
+        优势骰: useAdv ? [roll1, roll2] : undefined,
       },
     };
   }
@@ -1662,6 +2003,12 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
         fxKind,
         effectKind: fxKind,
         id: now,
+        附带伤害骰: formulaDice ? true : false,
+        伤害骰面: formulaDice?.dieType,
+        伤害骰数: formulaDice?.count,
+        全部伤害掷骰: formulaDice?.rolls,
+        伤害加值: formulaDice?.bonus ?? 0,
+        伤害总计: formulaDice?.total ?? 0,
       },
     };
   }
@@ -1687,6 +2034,12 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
         fxKind,
         effectKind: fxKind,
         id: now,
+        附带伤害骰: formulaDice ? true : false,
+        伤害骰面: formulaDice?.dieType,
+        伤害骰数: formulaDice?.count,
+        全部伤害掷骰: formulaDice?.rolls,
+        伤害加值: formulaDice?.bonus ?? 0,
+        伤害总计: formulaDice?.total ?? 0,
       },
     };
   }
@@ -1706,6 +2059,9 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
       属性: `${unit.name}：${skill.roll.label ?? skill.name}`,
       掷骰: `${dieType.toUpperCase()}=${rolls[0]}`,
       结果: rolls[0],
+      骰数: count,
+      骰面: dieType,
+      全部掷骰: rolls,
       加值: bonus,
       总计: total,
       描述: count > 1 ? `${count}${dieType} 合计 ${rolls.join(" + ")} = ${rawTotal}` : "结果已生成",
@@ -1874,8 +2230,15 @@ function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
   }
 }
 
-export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEffects = [] }: BattleTestScreenProps) {
-  const config = useMemo(() => getBattleConfig(mode), [mode]);
+export function BattleTestScreen({
+  onBack,
+  mode = "test",
+  onComplete,
+  onSkip,
+  openingEffects = [],
+  battleConfigOverride,
+}: BattleTestScreenProps) {
+  const config = useMemo(() => battleConfigOverride ?? getBattleConfig(mode), [battleConfigOverride, mode]);
   const battleBaseUnits = useMemo(() => applyOpeningEffectsToUnits(config.units, openingEffects), [config.units, openingEffects]);
   const openingLogLines = useMemo(() => openingEffects.map((effect) => effect.log), [openingEffects]);
   const [initiative, setInitiative] = useState(() => buildInitiative(battleBaseUnits));
@@ -1887,6 +2250,11 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
   const [actionUnitId, setActionUnitId] = useState<string | null>(null);
   const [targetSelection, setTargetSelection] = useState<TargetSelection | null>(null);
   const [activeDice, setActiveDice] = useState<DiceResult | null>(null);
+  const [attackPhase, setAttackPhase] = useState<"d20" | "damage" | null>(null);
+  const pendingAttackRef = useRef<{ unit: BattleUnit; target: BattleUnit; skill: BattleSkill; hit: boolean } | null>(null);
+  const [advantage, setAdvantage] = useState<{ type: "advantage" | "disadvantage"; reason: string } | null>(null);
+  const advantageRef = useRef(advantage);
+  advantageRef.current = advantage;
   const [lastEffect, setLastEffect] = useState<BattleEffect | null>(null);
   const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null);
   const [battleAnimation, setBattleAnimation] = useState<BattleAnimationCue | null>(null);
@@ -1987,6 +2355,9 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
     setLastEffect(null);
     setPendingSettlement(null);
     setEnemyTurnDone(false);
+    setAdvantage(null);
+    setAttackPhase(null);
+    pendingAttackRef.current = null;
     if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
     clearBattleAnimation();
     enemyActingKeyRef.current = null;
@@ -2039,13 +2410,63 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
   // 骰子关闭后的结算处理：延迟800ms执行伤害/治疗/特效/播报
   const settlementTimerRef = useRef<number | null>(null);
 
+  function inferOutcome(title: string): string {
+    if (title.includes("命中")) return "hit";
+    if (title.includes("擦伤")) return "graze";
+    if (title.includes("未命中")) return "miss";
+    if (title.includes("半效")) return "save-half";
+    if (title.includes("豁免失败")) return "save-full";
+    if (title.includes("豁免成功")) return "save-half";
+    if (title.includes("治疗")) return "heal";
+    if (title.includes("检定成功")) return "check";
+    if (title.includes("检定失败")) return "miss";
+    if (title.includes("触发")) return "trigger";
+    if (title.includes("击杀")) return "defeat";
+    return "hit";
+  }
+
+  function parseResultLine(resultLine: string): { d20Roll: number; d20Total: number; acDc: number } {
+    // "D20 14 + 5 = 19 / AC 16" or "D20 8 + 3 = 11 / DC 13"
+    const d20 = resultLine.match(/D20\s+(\d+)/);
+    const total = resultLine.match(/=\s*(\d+)/);
+    const acdc = resultLine.match(/[A-Z]+\s*(\d+)/);
+    return {
+      d20Roll: d20 ? Number(d20[1]) : 0,
+      d20Total: total ? Number(total[1]) : 0,
+      acDc: acdc ? Number(acdc[1]) : 0,
+    };
+  }
+
   function executeSettlement(settlement: PendingSettlement) {
     const { unit, target, skill, effect } = settlement;
     applyHpEffect(unit, target, skill, effect);
-    setLastEffect(effect);
+    // 暂存本地兜底文本，先用"KP记录中…"占位
+    const localNarration = effect.narration;
+    const placeholderEffect = { ...effect, narration: "KP记录中…" };
+    setLastEffect(placeholderEffect);
     triggerBattleAnimation(unit, skill, target);
     pushBattleLog(`${unit.name} 对 ${target.name} 使用 ${skill.name}：${effect.title}`);
-    pushBattleLog(effect.narration);
+    pushBattleLog("KP记录中…");
+
+    // 异步请求 LLM 播报
+    const outcome = inferOutcome(effect.title);
+    const diceInfo = parseResultLine(effect.resultLine);
+    fetchBattleNarration({
+      actor_name: unit.name,
+      target_name: target.name,
+      skill_name: skill.name,
+      outcome,
+      amount: effect.amount ?? 0,
+      d20_roll: diceInfo.d20Roll,
+      d20_total: diceInfo.d20Total,
+      damage_label: "",
+      tags: skill.tags,
+      ac_dc: diceInfo.acDc,
+    }).then(llmNarration => {
+      const finalNarration = llmNarration ? `KP：${llmNarration}` : localNarration;
+      setLastEffect(prev => prev ? { ...prev, narration: finalNarration } : null);
+      pushBattleLog(finalNarration);
+    });
 
     if (!settlement.isEnemy) {
       advanceTutorialStep(3);
@@ -2093,20 +2514,32 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
       },
     }));
 
-    // 阶段1：掷骰 → 只显示骰子动画，不结算
+    setTargetSelection(null);
+    setAdvantage(null); // 消耗优势/劣势
+
+    // 攻击技能：两阶段流程（D20命中 → 伤害骰）
+    if (skill.roll.kind === "attack") {
+      const dice = rollSkillDice(unit, skill, target, advantageRef.current?.type);
+      const hit = Boolean(dice?.data["命中"]);
+      setAttackPhase("d20");
+      pendingAttackRef.current = { unit, target, skill, hit };
+      setActiveDice(dice);
+      advanceTutorialStep(3);
+      showTutorialHint("⚔️ D20命中判定中！观察骰子和AC对比 → 命中则继续投伤害骰", 5000);
+      return;
+    }
+
+    // 非攻击技能：原有流程
     const dice = rollSkillDice(unit, skill, target);
     const effect = buildBattleEffect(unit, target, skill, dice);
-    setTargetSelection(null);
-    setActiveDice(dice);  // 弹出骰子界面
-
-    // 保存待结算数据，骰子关闭后执行
+    setActiveDice(dice);
     setPendingSettlement({ unit, target, skill, effect });
 
     advanceTutorialStep(3);
     if (skill.roll.kind === "healing") {
       showTutorialHint("💚 治疗骰已投出！观察骰子恢复量 → 点击任意处关闭 → 关闭后HP才会恢复", 5000);
     } else {
-      showTutorialHint("⚔️ 攻击骰已投出！观察 3D 骰子和判定结果 → 点击任意处关闭 → 关闭后结算伤害", 5000);
+      showTutorialHint("⚔️ 骰子已投出！观察结果 → 点击任意处关闭 → 关闭后结算", 5000);
     }
   }
 
@@ -2162,6 +2595,23 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
     showTutorialHint(`🎮 轮到${unit.name}了！点击下方技能面板选择一个技能：攻击（稳步斩击）、检定（盾牌压制）、治疗（回气）`, 6000);
   }, [activeUnitId, activeFaction, phase, tutorialStep]); // eslint-disable-line
 
+  // 优势/劣势判定：每个 ally 回合开始时调用 LLM
+  useEffect(() => {
+    if (phase !== "battle" || !activeUnitId || activeFaction !== "ally") { setAdvantage(null); return; }
+    const unit = unitMap.get(activeUnitId);
+    if (!unit) { setAdvantage(null); return; }
+    const ctxAllies = livingAllies.map(u => `${u.name} HP${u.hp}`).join("，");
+    const ctxEnemies = livingEnemies.map(u => `${u.name} HP${u.hp}`).join("，");
+    const context = `当前行动：${unit.name}。我方：${ctxAllies || "无"}。敌方：${ctxEnemies || "无"}。`;
+    fetchAdvantage(unit.name, context).then(({ advantage, flavor }) => {
+      if (advantage === "advantage" || advantage === "disadvantage") {
+        setAdvantage({ type: advantage, reason: flavor || `本回合${advantage === "advantage" ? "优势" : "劣势"}` });
+      } else {
+        setAdvantage(null);
+      }
+    }).catch(() => setAdvantage(null));
+  }, [activeUnitId, activeFaction, phase, livingAllies.length, livingEnemies.length]); // eslint-disable-line
+
   // 教学：检测友方受伤 — 提示治疗
   const prevAllyHpRef = useRef<Record<string, number>>({});
   useEffect(() => {
@@ -2214,7 +2664,7 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
       advanceTurn();
       return;
     }
-    const target = targetPool.reduce((lowest, candidate) => (candidate.hp < lowest.hp ? candidate : lowest), targetPool[0]);
+    const target = targetPool[Math.floor(Math.random() * targetPool.length)];
 
     const rollTimer = window.setTimeout(() => {
       const dice = rollSkillDice(actingUnit, skill, target);
@@ -2251,6 +2701,11 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
           <small>{config.subtitle}</small>
         </div>
         <div className="battle-hud-actions">
+          {mode === "tutorial" && onSkip && (
+            <button type="button" className="ghost-button" onClick={onSkip} style={{ borderColor: "rgba(211,99,99,0.4)", color: "#d36363" }}>
+              ⏭ 跳过教学战斗
+            </button>
+          )}
           {mode !== "tutorial" && (
             <button type="button" className="ghost-button" onClick={onBack}>
               {config.backLabel}
@@ -2329,8 +2784,8 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
               ? config.winText
               : config.loseText}
           </span>
-          {battleWon && config.completeLabel && onComplete && (
-            <button type="button" className="start-button" onClick={onComplete}>
+          {(battleWon || battleLost) && config.completeLabel && onComplete && (
+            <button type="button" className="start-button" onClick={() => onComplete({ outcome: battleWon ? "win" : "lose" })}>
               {config.completeLabel}
             </button>
           )}
@@ -2444,11 +2899,68 @@ export function BattleTestScreen({ onBack, mode = "test", onComplete, openingEff
               if (pendingSkill) resolveAction(actionUnit, pendingSkill, target);
             }}
             onCancelTarget={() => setTargetSelection(null)}
+            advantage={advantage}
           />
         )}
       </AnimatePresence>
 
-      <DiceRollOverlay dice={activeDice} dieType="d20" onClose={() => setActiveDice(null)} />
+      <DiceRollOverlay
+        dice={activeDice}
+        dieType="d20"
+        attackMode={attackPhase === "d20" || attackPhase === "damage"}
+        attackMissed={attackPhase === "d20" && pendingAttackRef.current?.hit === false}
+        targetAc={pendingAttackRef.current?.target.ac ?? 0}
+        diceKind={
+          attackPhase === "d20" ? "命中判定" :
+          attackPhase === "damage" ? "伤害掷骰" :
+          activeDice?.type === "skill_check" ?
+            (activeDice.data["成功"] !== undefined && activeDice.data["DC"] ? "豁免掷骰" : "检定掷骰") :
+          activeDice?.data["骰子"]?.includes("D") && Number(activeDice.data["总计"]) > 0 ?
+            (activeDice.data["属性"]?.includes("治疗") || activeDice.data["属性"]?.includes("恢复") ? "治疗掷骰" : "投骰结果") :
+          "投骰结果"
+        }
+        charSkill={
+          pendingAttackRef.current
+            ? `${pendingAttackRef.current.unit.name} · ${pendingAttackRef.current.skill.name}`
+            : activeDice?.data["武器"] || activeDice?.data["属性"] || ""
+        }
+        showD20Calc={attackPhase === "d20"}
+        onClose={() => {
+          // 攻击技能两阶段流程
+          if (attackPhase === "d20" && pendingAttackRef.current) {
+            const { unit, target, skill, hit } = pendingAttackRef.current;
+            if (hit) {
+              // 命中 → 进入伤害骰阶段
+              const dmgDice = rollDamageOnly(skill, unit.name);
+              setAttackPhase("damage");
+              setActiveDice(dmgDice);
+              pushBattleLog(`${unit.name} 对 ${target.name} 使用 ${skill.name}：D20命中 → 投掷伤害骰`);
+            } else {
+              // 未命中 → 直接结算
+              const effect = buildBattleEffect(unit, target, skill, activeDice);
+              setAttackPhase(null);
+              setActiveDice(null);
+              pendingAttackRef.current = null;
+              const settlement: PendingSettlement = { unit, target, skill, effect };
+              executeSettlement(settlement);
+            }
+          } else if (attackPhase === "damage" && pendingAttackRef.current) {
+            // 伤害骰关闭 → 完整结算
+            const { unit, target, skill } = pendingAttackRef.current;
+            const effect = buildBattleEffect(unit, target, skill, activeDice);
+            setAttackPhase(null);
+            setActiveDice(null);
+            pendingAttackRef.current = null;
+            const settlement: PendingSettlement = { unit, target, skill, effect };
+            executeSettlement(settlement);
+          } else {
+            // 非攻击技能
+            setAttackPhase(null);
+            setActiveDice(null);
+            pendingAttackRef.current = null;
+          }
+        }}
+      />
 
       {/* 教学步骤提示浮层 */}
       <AnimatePresence>
@@ -2942,8 +3454,8 @@ function SkillCard({ skill, compact = true }: { skill: BattleSkill; compact?: bo
         <b>{skill.name}</b>
         <em>{skill.cooldown}</em>
       </div>
-      <small>{skill.formula}</small>
-      {!compact && <p>{skill.effect}</p>}
+      <small>{boldifyDiceNotation(skill.formula)}</small>
+      {!compact && <p>{boldifyDiceNotation(skill.effect)}</p>}
       <div className="battle-skill-meta">
         <i>{skillNeedsRoll(skill) ? "需掷骰" : "无掷骰"}</i>
         <i>{skill.rule}</i>
@@ -2967,6 +3479,7 @@ function ActionPanel({
   onChooseSkill,
   onSelectTarget,
   onCancelTarget,
+  advantage,
 }: {
   unit: BattleUnit;
   usedResources: Partial<Record<BattleResource, boolean>>;
@@ -2978,6 +3491,7 @@ function ActionPanel({
   onChooseSkill: (skill: BattleSkill) => void;
   onSelectTarget: (target: BattleUnit) => void;
   onCancelTarget: () => void;
+  advantage?: { type: "advantage" | "disadvantage"; reason: string } | null;
 }) {
   return (
     <motion.section
@@ -2991,6 +3505,11 @@ function ActionPanel({
       <header>
         <div>
           <span>{unit.name} 的回合</span>
+          {advantage && (
+            <strong className={`battle-adv-badge ${advantage.type === "advantage" ? "is-adv" : "is-dis"}`}>
+              {advantage.type === "advantage" ? "⚔️ 优势" : "⚠️ 劣势"}：{advantage.reason}
+            </strong>
+          )}
           <small>先选技能，再指定释放对象，随后进入骰子判定与效果结算。</small>
         </div>
         <div className="battle-action-buttons">
@@ -3022,7 +3541,7 @@ function ActionPanel({
               >
                 <span>技能</span>
                 <b>{skill.name}</b>
-                <small>{skill.formula}</small>
+                <small>{boldifyDiceNotation(skill.formula)}</small>
                 <em>{skillTargetHint(skill)}</em>
               </button>
             );

@@ -1,23 +1,8 @@
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SceneVisual, StoryLine } from '../types/game';
+import { resolvePortraitPath, resolveSpeakerName } from '../data/characterRegistry';
 import { EventFeed, type EventFeedItem } from './EventFeed';
-
-/* 角色立绘映射 */
-const PORTRAIT_MAP: Record<string, string> = {
-  冒险者: '/assets/characters/adventurer/adventurer_idle.png',
-  瑟琳: '/assets/characters/selin/selin_idle.png',
-  森洛: '/assets/characters/senluo/senluo_idle.png',
-  莉亚瑟: '/assets/characters/liyase/liyase_idle.png',
-  艾琳: '/assets/characters/ailin/ailin_idle.png',
-  克莱娅: '/assets/characters/kelaiya/kelaiya_idle.png',
-  雷铎: '/assets/characters/leiduo/leiduo_idle.png',
-};
-
-function getPortrait(speaker: string): string | null {
-  const name = PORTRAIT_MAP[speaker];
-  return name || null;
-}
 
 interface VisualNovelStageProps {
   scene: SceneVisual;
@@ -29,6 +14,7 @@ interface VisualNovelStageProps {
   autoAdvance?: boolean;
   autoAdvanceDelay?: number;
   actionPanel?: ReactNode;
+  scriptedBgOverride?: string | null;  // 脚本场景直接指定的背景图，绕过文本匹配
   onAdvance: () => void;
 }
 
@@ -83,11 +69,30 @@ export function VisualNovelStage({
   autoAdvance = false,
   autoAdvanceDelay = 110,
   actionPanel,
+  scriptedBgOverride,
   onAdvance,
 }: VisualNovelStageProps) {
   const text = line?.text || '';
   const { visible, done, reveal } = useTypewriter(text, autoAdvance ? 0 : 20);
-  const speaker = line?.speaker || (isStreaming ? 'KP' : '');
+  const [showActionPrompt, setShowActionPrompt] = useState(false);
+  const actionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 进入行动阶段时显示"选择行动"提示，1秒后自动消失
+  useEffect(() => {
+    if (isActionPhase && actionPanel) {
+      setShowActionPrompt(true);
+      actionPromptTimerRef.current = setTimeout(() => setShowActionPrompt(false), 1000);
+    } else {
+      setShowActionPrompt(false);
+    }
+    return () => {
+      if (actionPromptTimerRef.current) clearTimeout(actionPromptTimerRef.current);
+    };
+  }, [isActionPhase, actionPanel]);
+  const speaker = useMemo(
+    () => resolveSpeakerName(line?.speaker || (isStreaming ? '主持人' : '')),
+    [isStreaming, line?.speaker],
+  );
   const buttonLabel = useMemo(() => {
     if (isActionPhase) return '行动';
     if (!line && isStreaming) return '等待KP';
@@ -96,17 +101,56 @@ export function VisualNovelStage({
     return '下一句';
   }, [canAdvance, done, isActionPhase, isStreaming, line]);
 
-  // 场景背景图渐进式浮现：当文本中出现城市倒挂描写时触发
-  const BG_TRIGGER = '一整座城市倒挂在巨大洞穴的穹顶之上';
+  // 场景背景图多阶段切换
+  const FALLBACK_TRIGGER = '倒挂在巨大洞穴';  // 子串匹配，兼容AI文本微小差异
   const [bgRevealed, setBgRevealed] = useState(false);
+  const [bgStageIndex, setBgStageIndex] = useState(-1);
+  const stages = scene.bgStages || [];
+  // 首触发词：始终用通用触发词展示主背景；后续由 bgStages 的 trigger 独立接管阶段切换
+  const firstTrigger = FALLBACK_TRIGGER;
+
+  // 场景切换时重置
   useEffect(() => {
-    if (!scene.backgroundImage) return;
+    if (!scene.backgroundImage) { setBgRevealed(false); setBgStageIndex(-1); return; }
     setBgRevealed(false);
-  }, [scene.id, scene.backgroundImage]);
+    setBgStageIndex(-1);
+  }, [scene.id, scene.backgroundImage, stages.length]);
+
+  // 第一阶段触发
   useEffect(() => {
     if (bgRevealed || !scene.backgroundImage) return;
-    if (text.includes(BG_TRIGGER)) setBgRevealed(true);
-  }, [bgRevealed, scene.backgroundImage, text]);
+    if (text.includes(firstTrigger)) { setBgRevealed(true); setBgStageIndex(0); }
+  }, [bgRevealed, scene.backgroundImage, text, firstTrigger]);
+
+  // 后续阶段触发：依次检测 bgStages 中的触发词（独立触发，不依赖 bgRevealed）
+  useEffect(() => {
+    if (!stages.length) return;
+    for (let i = 0; i < stages.length; i++) {
+      const stageIndex = i + 1;
+      if (bgStageIndex >= stageIndex) continue;
+      if (text.includes(stages[i].trigger)) {
+        setBgStageIndex(stageIndex);
+        setBgRevealed(true);
+        break;
+      }
+    }
+  }, [bgStageIndex, stages, text]);
+
+  // 脚本显式指定背景：同步 stage 到文本匹配体系
+  useEffect(() => {
+    if (scriptedBgOverride) {
+      setBgRevealed(true);
+      setBgStageIndex(0);
+    }
+  }, [scriptedBgOverride]);
+
+  // 生效背景图：override > stage > 主背景
+  const activeBgImage = useMemo(() => {
+    if (scriptedBgOverride) return scriptedBgOverride;
+    if (bgStageIndex > 0 && stages[bgStageIndex - 1]) return stages[bgStageIndex - 1].image;
+    if (bgRevealed && scene.backgroundImage) return scene.backgroundImage;
+    return null;
+  }, [scriptedBgOverride, bgStageIndex, bgRevealed, scene.backgroundImage, stages]);
 
   function advance() {
     if (isActionPhase) return;
@@ -140,24 +184,24 @@ export function VisualNovelStage({
     return () => window.removeEventListener('keydown', onKey);
   }, [isActionPhase, canAdvance, done, isStreaming, line]);
 
-  const portraitSrc = useMemo(() => (speaker ? getPortrait(speaker) : null), [speaker]);
+  const portraitSrc = useMemo(() => (speaker ? resolvePortraitPath(speaker) : null), [speaker]);
 
   return (
     <main className={`vn-canvas ${scene.themeClass}`} onClick={advance}>
       <div className="scene-layer" />
       <div className="scene-vignette" />
 
-      {/* 场景背景图 — 渐进式浮现 */}
+      {/* 场景背景图 — 多阶段切换，角色出场时保留但降低不透明度 */}
       <AnimatePresence>
-        {bgRevealed && scene.backgroundImage && (
+        {activeBgImage && (
           <motion.div
-            key={`bg-${scene.id}`}
+            key={`bg-${scene.id}-stage${bgStageIndex}`}
             className="scene-background-image"
-            style={{ backgroundImage: `url(${scene.backgroundImage})` }}
+            style={{ backgroundImage: `url(${activeBgImage})` }}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: portraitSrc ? 0.6 : 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.2, ease: 'easeInOut' }}
+            transition={{ duration: 0.8, ease: 'easeInOut' }}
           />
         )}
       </AnimatePresence>
@@ -193,7 +237,7 @@ export function VisualNovelStage({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="speaker-row">
-          <span>{speaker || 'KP'}</span>
+          <span>{speaker || '主持人'}</span>
           {isStreaming && <i>思考中</i>}
         </div>
         <p>{visible || (isStreaming ? '……' : '')}</p>
@@ -207,7 +251,42 @@ export function VisualNovelStage({
         </button>
       </motion.section>
 
-      {actionPanel}
+      {/* 行动阶段中央艺术字提示 + 屏幕变黑特效 */}
+      <AnimatePresence>
+        {showActionPrompt && (
+          <motion.div
+            className="action-prompt-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: 'easeInOut' }}
+          >
+            <motion.div
+              className="action-prompt-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.45 }}
+            />
+            <motion.span
+              className="action-prompt-text"
+              initial={{ opacity: 0, scale: 0.88 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.08 }}
+              transition={{ duration: 0.4, ease: 'easeOut' }}
+            >
+              选择行动
+            </motion.span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 行动面板 —— 中心垂直排列，视觉小说风格 */}
+      {actionPanel && (
+        <div className="vn-choices-wrapper">
+          {actionPanel}
+        </div>
+      )}
     </main>
   );
 }

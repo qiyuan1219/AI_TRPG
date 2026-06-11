@@ -27,11 +27,12 @@ const ATTRS: Array<{ key: keyof CharacterPreset['stats']; name: string }> = [
 // ============================================================
 // SVG 六维雷达图（增加边距防止标签被裁剪）
 // ============================================================
-const RADIUS = 80;          // 六角形半径
-const CENTER = 140;         // viewBox 280x280 中心
+const RADIUS = 68;          // 六角形半径（缩小）
+const VIEW = 230;           // viewBox
+const CENTER = 115;         // viewBox 中心
 const MAX_VAL = 20;         // 属性最大值（对应外圈）
 const LEVELS = 3;           // 网格层数
-const LABEL_R = RADIUS + 28; // 标签半径（外圈+边距，含数值行）
+const LABEL_R = RADIUS + 22; // 标签半径
 
 function polar(angle: number, r: number): { x: number; y: number } {
   return { x: CENTER + r * Math.cos(angle), y: CENTER + r * Math.sin(angle) };
@@ -58,7 +59,7 @@ function RadarChart({ stats }: { stats: Record<string, number> }) {
   }).join(' ') + 'Z';
 
   return (
-    <svg viewBox="0 0 280 280" className="radar-chart">
+    <svg viewBox={`0 0 ${VIEW} ${VIEW}`} className="radar-chart" style={{ width: VIEW, height: VIEW }}>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#5fb7a7" stopOpacity="0.6" />
@@ -159,6 +160,7 @@ export function StartDND({
   const [name, setName] = useState('冒险者');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showSaves, setShowSaves] = useState(false);
+  const [skipOpening, setSkipOpening] = useState(false);
   const currentClass = DND_CLASSES[selectedIndex];
 
   function submit() {
@@ -172,6 +174,7 @@ export function StartDND({
       attr_wis: currentClass.stats.wis,
       attr_cha: currentClass.stats.cha,
       level: 3,
+      skip_opening: skipOpening,
     });
   }
 
@@ -279,6 +282,21 @@ export function StartDND({
                 ))}
               </div>
             </div>
+
+            <label
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                padding: "6px 14px", border: "1px solid rgba(231,211,161,0.2)",
+                borderRadius: 8, background: "rgba(255,255,255,0.03)",
+                color: "var(--muted)", fontSize: "0.85rem", cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              <input type="checkbox" checked={skipOpening} onChange={(e) => setSkipOpening(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: "#5fb7a7", cursor: "pointer" }}
+              />
+              <span>⏭ 跳过初始剧情，直接进入行动</span>
+            </label>
 
             <button type="button" onClick={submit} className="start-button">
               深入地下城

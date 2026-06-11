@@ -1,0 +1,349 @@
+﻿.title-menu-screen {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    var(--title-bg-image, url('/assets/scenes/title-bg.webp')),
+    #0d1016;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  isolation: isolate;
+}
+
+.title-menu-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  /* 闈炲父杞荤殑姘涘洿閬僵锛屼笉閬尅缇庢湳鏈韩 */
+  background: radial-gradient(ellipse at 30% 50%, rgba(0,0,0,0.1) 0%, transparent 70%);
+}
+
+.title-menu-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  /* 宸︿晶娣辫壊娓愬彉纭繚鏂囧瓧鍙锛屽彸渚ч€忔槑灞曠ず缇庢湳 */
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.55)),
+    linear-gradient(105deg, rgba(5, 6, 12, 0.85) 0 28%, rgba(8, 10, 16, 0.35) 48%, rgba(5, 6, 12, 0.0) 65%);
+}
+
+.title-menu-layout {
+  display: grid;
+  align-content: center;
+  width: min(1120px, 100%);
+  min-height: 100vh;
+  padding: 48px 64px;
+  gap: 20px;
+}
+
+.title-brand {
+  max-width: 540px;
+}
+
+.title-brand .eyebrow {
+  margin: 0 0 10px;
+  color: rgba(231, 211, 161, 0.75);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.title-brand h1 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
+  font-size: 5rem;
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: 0;
+  text-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.65),
+    0 0 60px rgba(95, 183, 167, 0.18);
+}
+
+.title-rule {
+  width: 160px;
+  height: 1px;
+  margin: 22px 0 32px;
+  background: linear-gradient(90deg, var(--gold-soft), rgba(95, 183, 167, 0));
+}
+
+.title-menu-actions {
+  display: grid;
+  width: min(320px, 100%);
+  gap: 12px;
+}
+
+.title-menu-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 58px;
+  padding: 0 26px;
+  overflow: hidden;
+  font-size: 1.2rem;
+  border: 1px solid rgba(231, 211, 161, 0.28);
+  border-radius: 6px;
+  background: rgba(10, 12, 18, 0.55);
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 800;
+  text-align: left;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 180ms ease, color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.title-menu-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(212, 168, 67, 0.14), rgba(95, 183, 167, 0.04));
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.title-menu-button span {
+  position: relative;
+  letter-spacing: 0.04em;
+}
+
+.title-menu-button:hover:not(:disabled) {
+  border-color: rgba(239, 213, 140, 0.65);
+  color: var(--gold-soft);
+  background: rgba(18, 16, 28, 0.72);
+  transform: translateX(6px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 30px rgba(95, 183, 167, 0.12);
+}
+
+.title-menu-button:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.title-menu-button:disabled {
+  color: rgba(185, 179, 165, 0.55);
+  border-color: rgba(231, 211, 161, 0.10);
+  background: rgba(8, 10, 14, 0.35);
+  box-shadow: none;
+  backdrop-filter: blur(6px);
+}
+
+.load-game-screen {
+  padding: 32px 20px;
+}
+
+.load-game-layout {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.load-game-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.load-game-header h1 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
+  font-size: 2.4rem;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.load-game-panel {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(16, 19, 26, 0.82);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.24);
+}
+
+.test-screen {
+  padding: 32px 20px;
+}
+
+.test-layout {
+  width: min(820px, 100%);
+  margin: 0 auto;
+}
+
+.test-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.test-header h1 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
+  font-size: 2.4rem;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.test-menu-grid,
+.dice-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.test-mode-button,
+.dice-option-button,
+.dice-judge-board,
+.dice-history-list {
+  border: 1px solid rgba(231, 211, 161, 0.2);
+  border-radius: 8px;
+  background: rgba(16, 19, 26, 0.82);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.2);
+}
+
+.test-mode-button,
+.dice-option-button {
+  min-height: 116px;
+  padding: 18px;
+  color: var(--text);
+  text-align: left;
+}
+
+.test-mode-button:hover:not(:disabled),
+.dice-option-button:hover:not(:disabled) {
+  border-color: rgba(95, 183, 167, 0.72);
+  background: rgba(95, 183, 167, 0.12);
+}
+
+.test-mode-button span,
+.dice-option-button b,
+.test-section-title span {
+  display: block;
+  color: var(--gold-soft);
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.test-mode-button small,
+.test-section-title small,
+.dice-option-button span,
+.dice-judge-copy p,
+.dice-history-empty {
+  color: var(--muted);
+}
+
+.test-mode-button small {
+  display: block;
+  margin-top: 8px;
+  line-height: 1.45;
+}
+
+.dice-select-panel,
+.dice-judge-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.test-section-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dice-option-button {
+  min-height: 100px;
+}
+
+.dice-option-button b {
+  font-size: 1.7rem;
+  font-family: Consolas, monospace;
+}
+
+.dice-option-button span {
+  display: block;
+  margin-top: 6px;
+}
+
+.dice-judge-board {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+}
+
+.dice-judge-symbol {
+  display: grid;
+  width: 96px;
+  height: 96px;
+  place-items: center;
+  border: 1px solid rgba(239, 213, 140, 0.42);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(212, 168, 67, 0.16), rgba(95, 183, 167, 0.05));
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 1.7rem;
+  font-weight: 900;
+}
+
+.dice-judge-copy {
+  min-width: 0;
+}
+
+.dice-judge-copy strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.24rem;
+  overflow-wrap: anywhere;
+}
+
+.dice-judge-copy p {
+  margin: 6px 0 0;
+}
+
+.dice-history-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.dice-history-list p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.dice-history-list span {
+  color: var(--teal);
+  font-family: Consolas, monospace;
+  font-weight: 800;
+}
+
+.dice-history-list b {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 1.1rem;
+}
+

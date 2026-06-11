@@ -6,6 +6,7 @@ import { Dice3DView, DiceRollOverlay } from "./DiceRollOverlay";
 
 interface BargainTestScreenProps {
   onBack: () => void;
+  onComplete?: (result: BargainCompleteResult) => void;
 }
 
 interface BargainItem {
@@ -16,7 +17,7 @@ interface BargainItem {
   bossMood: string;
 }
 
-interface BargainRound {
+export interface BargainRound {
   id: number;
   attempt: number;
   roll: number;
@@ -27,14 +28,23 @@ interface BargainRound {
   priceBefore: number;
 }
 
+export interface BargainCompleteResult {
+  itemId: string;
+  itemName: string;
+  basePrice: number;
+  finalPrice: number;
+  attempts: number;
+  rounds: BargainRound[];
+}
+
 const MAX_ATTEMPTS = 5;
 const BARGAIN_BONUS = 3;
 const PHRASE_COUNT = 3;
 
 const BARGAIN_ITEMS: BargainItem[] = [
-  { id: "blackstone-knife", name: "黑石短匕", desc: "刀脊有微弱时间纹，刀身泛冷光。老板坚称只卖给懂行的人。", basePrice: 180, bossMood: "靠在柜台上打量你，手指敲着黑曜石算盘" },
-  { id: "spore-lamp", name: "冷光孢灯", desc: "无光孢海常用灯具，能压低小型魔物的攻击性。底部铭刻逆穹城匠炉区标记。", basePrice: 95, bossMood: "从货架高处取下孢灯，吹了吹灯罩上的灰" },
-  { id: "seal-map", name: "旧远征封蜡地图", desc: "标着孢海据点和黑暗之门，封蜡已碎了一半。真假难辨，但纸质显然很老。", basePrice: 260, bossMood: "把地图摊在柜台上，用镇纸压住卷角——然后抱臂站着，似乎不急着卖" },
+  { id: "anti-spore-mask", name: "抗孢面罩", desc: "孢海远征标配滤具，滤芯有逆穹悬城公会验印。奥兰说它能让你少咳半条命。", basePrice: 120, bossMood: "把面罩挂在指尖晃了晃，算盘珠子轻轻一拨" },
+  { id: "cold-spore-lamp", name: "冷光灯", desc: "低温荧光灯具，能照出孢尘密度，也能短暂压低小型魔物的攻击性。", basePrice: 95, bossMood: "从货架高处取下冷光灯，吹去灯罩边的灰" },
+  { id: "expedition-kit", name: "黑市远征工具包", desc: "绳索、止血粉、解毒剂、备用滤芯和一次性护符被塞进同一个防潮袋。", basePrice: 180, bossMood: "把防潮袋拍在柜台上，指节压住封口扣" },
 ];
 
 /* ---- 本地话术生成器：根据物品、报价、已用次数生成3句不同策略的话术 ---- */
@@ -60,12 +70,12 @@ function generatePhrases(item: BargainItem, currentPrice: number, attempt: numbe
   const bp = item.basePrice;
   const templates: Record<PhraseStrategy, string[]> = {
     flaw: [
-      `${n}是不错，但这刀鞘上的裂隙纹路一看就是受过暗影腐蚀。说实话，${p}金有点高了。`,
-      `老板，这${n}我上手掂了掂，重心偏左。锻造的时候淬火不匀吧？${p}金这个价不太对。`,
-      `${n}好是好，可你看这边缘，明显是二手转了好几道才到你柜台上。真按${p}金收，我亏了。`,
+      `${n}是不错，但这封口和滤芯看起来都压过库存。说实话，${p}金有点高了。`,
+      `奥兰老板，这${n}我上手看了看，防潮蜡有旧裂纹。${p}金这个价不太对。`,
+      `${n}好是好，可你看这边缘磨损，明显在柜台上转了好几轮。真按${p}金收，我亏了。`,
     ],
     rapport: [
-      `巴托克老板，我上次从你这里拿的解毒剂救了条命。${n}给我个老客价，以后还来。`,
+      `奥兰老板，我上次从你这里拿的解毒剂救了条命。${n}给我个老客价，以后还来。`,
       `老板，咱们别按外人的价谈。${n}你给我个实在数，我在孢海捞到好东西第一个送你柜上。`,
       `我知道你从匠炉区拿这批货也不容易。${n} ${p}金——你再让一步，我也不多磨。`,
     ],
@@ -76,8 +86,8 @@ function generatePhrases(item: BargainItem, currentPrice: number, attempt: numbe
     ],
     expert: [
       `我在无光孢海待过三个月。${n}的充能核心在这种湿度下最多撑四十个钟头。${p}金——按使用寿命折一下。`,
-      `老板，这种黑石矿是孢海深层才有的脉。最近地脉震动加剧，矿源断了好几处。${n} ${bp}金的标价我理解，但${p}金按现在的采掘成本已经不亏了。`,
-      `${n}的封蜡用的是旧纪元配方，防潮但脆。我刚才看了，已经有两条裂纹。${p}金你得再让一点。`,
+      `老板，最近孢海据点回收线不稳，货源确实紧。${n} ${bp}金的标价我理解，但${p}金按现在成本已经不亏了。`,
+      `${n}的封蜡防潮但脆。我刚才看了，已经有两条裂纹。${p}金你得再让一点。`,
     ],
     bundle: [
       `${n}我确实需要。这样：再加一瓶基础治疗药水，总共给你${Math.round(p * 1.3)}金。`,
@@ -135,7 +145,7 @@ function makeDiceResult(roll: number, total: number): DiceResult {
   };
 }
 
-export function BargainTestScreen({ onBack }: BargainTestScreenProps) {
+export function BargainTestScreen({ onBack, onComplete }: BargainTestScreenProps) {
   const [itemId, setItemId] = useState(BARGAIN_ITEMS[0].id);
   const selectedItem = useMemo(() => BARGAIN_ITEMS.find((item) => item.id === itemId) ?? BARGAIN_ITEMS[0], [itemId]);
   const [currentPrice, setCurrentPrice] = useState(selectedItem.basePrice);
@@ -193,7 +203,7 @@ export function BargainTestScreen({ onBack }: BargainTestScreenProps) {
       const priceBefore = currentPrice;
 
       setBusy(true);
-      setBossMessage("老板眯着眼看了看骰点，又看了看你……");
+      setBossMessage("奥兰眯着眼看了看骰点，又看了看你……");
 
       try {
         const result = await judgeBargain({
@@ -223,7 +233,7 @@ export function BargainTestScreen({ onBack }: BargainTestScreenProps) {
         ]);
         setBossMessage(result.boss_reply);
       } catch {
-        setBossMessage(`老板：「信号断了——但这轮我听到了。价钱不动，还是 ${currentPrice} 金。」`);
+        setBossMessage(`奥兰：「信号断了——但这轮我听到了。价钱不动，还是 ${currentPrice} 金。」`);
       } finally {
         setBusy(false);
         setDiceRolled(false);
@@ -253,7 +263,7 @@ export function BargainTestScreen({ onBack }: BargainTestScreenProps) {
 
       <header className="bargain-vn-header">
         <button type="button" className="ghost-button" onClick={onBack}>← 返回</button>
-        <span>黑市讲价 · 鼠巷</span>
+        <span>黑市讲价 · 奥兰的摊位</span>
         <div className="bargain-vn-currency">💰 {currentPrice}G</div>
       </header>
 
@@ -280,7 +290,7 @@ export function BargainTestScreen({ onBack }: BargainTestScreenProps) {
           <div className="bargain-vn-boss-portrait">
             <div className="bargain-vn-boss-face">
               <span>🧔‍♂️</span>
-              <small>巴托克</small>
+              <small>奥兰·爵</small>
             </div>
           </div>
           <AnimatePresence mode="wait">
@@ -327,9 +337,23 @@ export function BargainTestScreen({ onBack }: BargainTestScreenProps) {
       <section className="bargain-vn-actions">
         {patienceLost ? (
           <div className="bargain-vn-gameover">
-            <p>老板摆了摆手：「行了，就这个价。爱要不要。」</p>
+            <p>奥兰：「行了，第五轮到头。就这个价，爱要不要。」</p>
             <p className="muted">最终成交价：{currentPrice}G（共讲价 {attemptsUsed} 次）</p>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 8 }}>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => onComplete?.({
+                  itemId: selectedItem.id,
+                  itemName: selectedItem.name,
+                  basePrice: selectedItem.basePrice,
+                  finalPrice: currentPrice,
+                  attempts: attemptsUsed,
+                  rounds,
+                })}
+              >
+                确认采购
+              </button>
               <button type="button" className="ghost-button" onClick={onBack}>返回菜单</button>
             </div>
           </div>

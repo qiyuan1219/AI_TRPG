@@ -81,7 +81,7 @@ export function DialogueLog({ story, activeIndex, isStreaming, onClose, onJumpTo
                   {roleLabel(line.role) && (
                     <b className={`log-role-${line.role}`}>{roleLabel(line.role)}</b>
                   )}
-                  {line.speaker && line.speaker !== 'KP' && line.role === 'kp' && (
+                  {line.speaker && line.speaker !== '主持人' && line.role === 'kp' && (
                     <b className="log-role-speaker">{line.speaker}</b>
                   )}
                   {isActive && <i className="log-now-mark">当前</i>}

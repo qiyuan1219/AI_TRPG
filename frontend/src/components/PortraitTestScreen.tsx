@@ -1,16 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-
-/* ===== 角色立绘映射（与 VisualNovelStage.tsx 保持一致） ===== */
-const PORTRAIT_MAP: Record<string, string> = {
-  冒险者: '/assets/characters/adventurer/adventurer_idle.png',
-  瑟琳: '/assets/characters/selin/selin_idle.png',
-  森洛: '/assets/characters/senluo/senluo_idle.png',
-  莉亚瑟: '/assets/characters/liyase/liyase_idle.png',
-  艾琳: '/assets/characters/ailin/ailin_idle.png',
-  克莱娅: '/assets/characters/kelaiya/kelaiya_idle.png',
-  雷铎: '/assets/characters/leiduo/leiduo_idle.png',
-};
+import { PORTRAIT_TEST_CHARACTERS } from "../data/characterRegistry";
 
 /* ===== 角色模拟对话 ===== */
 interface PortraitCharacter {
@@ -21,57 +11,7 @@ interface PortraitCharacter {
   role: "player" | "system";
 }
 
-const CHARACTERS: PortraitCharacter[] = [
-  {
-    name: "冒险者",
-    subtitle: "战士 Lv.3 · 主角",
-    portrait: PORTRAIT_MAP["冒险者"],
-    dialogue: "我是来自地表的冒险者，接受了公会的委托前来逆穹城。前方的黑暗洞穴中似乎有什么在等待着我们……",
-    role: "player",
-  },
-  {
-    name: "瑟琳·逆钟",
-    subtitle: "魔族 · 时间魔法师",
-    portrait: PORTRAIT_MAP["瑟琳"],
-    dialogue: "小心，冒险者。我能感觉到时间线在这里变得异常紊乱。裂隙中的那些生物不是为了战斗而生，而是被扭曲的时间所召唤。",
-    role: "system",
-  },
-  {
-    name: "森洛·铁锅",
-    subtitle: "矮人 · 生存专家·厨师·战士",
-    portrait: PORTRAIT_MAP["森洛"],
-    dialogue: "哈！这孢海的气味还是这么熟悉。前方的菌林里有不少可食用品种——当然，还有不少会吃你的品种。跟紧我，别乱碰东西。",
-    role: "system",
-  },
-  {
-    name: "莉亚瑟·青弦",
-    subtitle: "精灵 · 游侠·弓箭手",
-    portrait: PORTRAIT_MAP["莉亚瑟"],
-    dialogue: "前方三格远处有动静……不是裂隙爬兽，体型更大。我建议从右侧绕过去，那边的菌柱可以遮蔽我们的行动。",
-    role: "system",
-  },
-  {
-    name: "艾琳·白枝",
-    subtitle: "精灵 · 修女·生命牧师",
-    portrait: PORTRAIT_MAP["艾琳"],
-    dialogue: "愿白枝之光护佑你们。如果有人在战斗中受伤，请立刻告诉我——在到达黑石根区之前，每一滴生命都弥足珍贵。",
-    role: "system",
-  },
-  {
-    name: "克莱娅·软爪",
-    subtitle: "兽族(猫人) · 盗贼·怪物猎人",
-    portrait: PORTRAIT_MAP["克莱娅"],
-    dialogue: "嘘——前面有个机关踏板，看到了吗？地底堡垒的陷阱设计还是老一套。给我三秒钟，我就能把它拆成零件。",
-    role: "system",
-  },
-  {
-    name: "雷铎·炉心",
-    subtitle: "机械人形 · 守卫者·前排大盾",
-    portrait: PORTRAIT_MAP["雷铎"],
-    dialogue: "分析完成：前方地形狭窄，适合单线防守。建议由我站在最前方承伤，瑟琳在后排提供法术支援。",
-    role: "system",
-  },
-];
+const CHARACTERS: PortraitCharacter[] = PORTRAIT_TEST_CHARACTERS;
 
 interface PortraitTestScreenProps {
   onBack: () => void;

@@ -24,16 +24,54 @@ ChangeHandler = Callable[[dict, dict], dict]
 
 
 NPC_TRUST_KEYS = {
-    "格鲁姆": "gm_trust",
-    "丽莎": "ls_trust",
-    "塔莉亚": "tl_trust",
-    "伊瑟拉": "ys_trust",
+    "瑟琳": "se_trust",
+    "银杖": "se_trust",
+    "银杖瑟琳": "se_trust",
+    "瑟琳·逆钟": "se_trust",
+    "布洛克": "sl_trust",
+    "布洛克·铁锅": "sl_trust",
+    "森洛": "sl_trust",
+    "森洛·铁锅": "sl_trust",
+    "莉娅": "ly_trust",
+    "精灵": "ly_trust",
+    "精灵莉娅": "ly_trust",
+    "莉亚瑟": "ly_trust",
+    "莉亚瑟·青弦": "ly_trust",
+    "艾琳": "al_trust",
+    "艾琳·白枝": "al_trust",
+    "白枝": "al_trust",
+    "凯娅": "kl_trust",
+    "软爪": "kl_trust",
+    "软爪凯娅": "kl_trust",
+    "克莱娅": "kl_trust",
+    "克莱娅·软爪": "kl_trust",
+    "雷铎": "ld_trust",
+    "雷铎·炉心": "ld_trust",
 }
 
 NPC_HP_KEYS = {
-    "格鲁姆": "gm_hp",
-    "丽莎": "ls_hp",
-    "塔莉亚": "tl_hp",
+    "瑟琳": "se_hp",
+    "银杖": "se_hp",
+    "银杖瑟琳": "se_hp",
+    "瑟琳·逆钟": "se_hp",
+    "布洛克": "sl_hp",
+    "布洛克·铁锅": "sl_hp",
+    "森洛": "sl_hp",
+    "森洛·铁锅": "sl_hp",
+    "莉娅": "ly_hp",
+    "精灵莉娅": "ly_hp",
+    "莉亚瑟": "ly_hp",
+    "莉亚瑟·青弦": "ly_hp",
+    "艾琳": "al_hp",
+    "艾琳·白枝": "al_hp",
+    "白枝": "al_hp",
+    "凯娅": "kl_hp",
+    "软爪": "kl_hp",
+    "软爪凯娅": "kl_hp",
+    "克莱娅": "kl_hp",
+    "克莱娅·软爪": "kl_hp",
+    "雷铎": "ld_hp",
+    "雷铎·炉心": "ld_hp",
 }
 
 
@@ -120,8 +158,9 @@ def _area(state: dict, data: dict) -> dict:
     if not area:
         return {"type": "unknown", "reason": "area 指令缺少 area"}
 
-    old = state.get("current_area", "王冠城")
+    old = state.get("current_area", "逆穹悬城")
     state["current_area"] = area
+    state["actions_in_area"] = 0  # 切区域重置行动计数
     return {"type": "area", "old": old, "new": area, "reason": data.get("reason", "")}
 
 

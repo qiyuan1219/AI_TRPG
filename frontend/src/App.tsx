@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ActionPanel } from './components/ActionPanel';
 import { BattleTestScreen } from './components/BattleTestScreen';
+import { BargainTestScreen, type BargainCompleteResult } from './components/BargainTestScreen';
 import { CharacterPanel } from './components/CharacterPanel';
 import { DicePokerGame } from './components/DicePokerGame';
 import { DiceRollOverlay } from './components/DiceRollOverlay';
@@ -14,8 +15,15 @@ import { TestScreen } from './components/TestScreen';
 import { TitleMenu } from './components/TitleMenu';
 import { VisualNovelStage } from './components/VisualNovelStage';
 import { DialogueLog } from './components/DialogueLog';
+import { DrinkingDiceGame } from './components/DrinkingDiceGame';
+import { LuckyBoxGame } from './components/LuckyBoxGame';
+import { CityMap } from './components/CityMap';
+import { TavernDicePoker } from './components/TavernDicePoker';
+import { findRegisteredSpeaker, resolveSpeakerName } from './data/characterRegistry';
 import { resolveDndScene } from './data/dndScenes';
-import { listSaves, loadGame, saveGame } from './services/api';
+import { getScriptedScene, matchScriptedScene, type ScriptedScene } from './data/scriptedScenes';
+import type { StoryTestCheckpoint } from './data/storyTestCheckpoints';
+import { listSaves, loadGame, patchGameState, saveGame } from './services/api';
 import { dndRuntime } from './services/dndRuntime';
 import type {
   ActionSuggestion,
@@ -147,34 +155,85 @@ function buildTutorialBattleSetup(dice: DiceResult | null): TutorialBattleSetup 
 
 function fallbackSuggestions(state: GameState): ActionSuggestion[] {
   const area = String(state.current_area || '');
-  if (area.includes('公会') || area.includes('酒馆')) {
-    return makeSuggestions(['查看远征档案【调查DC12】', '打听地底堡垒传闻【感知DC12】', '让瑟琳分析时间异常【奥秘DC13】']);
+  if (area.includes('酒馆')) {
+    if (state.brock_intro_seen && !state.brock_recruited) {
+      return makeSuggestions(['和布洛克玩喝酒骰子游戏', '询问布洛克需要采集哪种孢子样本【自然DC12】', '向萨洛确认布洛克的报酬行情【洞悉DC12】']);
+    }
+    if (state.tavern_dice_done && !state.salo_intel_done) {
+      return makeSuggestions(['听萨洛说明三名队友的位置', '向萨洛打听地底堡垒传闻【魅力DC12】', '和瑟琳讨论远征路线']);
+    }
+    return makeSuggestions(['和萨洛玩一局快艇骰子', '先在酒馆里转转再说']);
+  }
+  if (area.includes('公会')) {
+    return makeSuggestions(['查看远征档案【调查DC12】', '打听地底堡垒传闻【感知DC12】', '与米娜确认任务细节']);
   }
   if (area.includes('孢海') || area.includes('菌林') || area.includes('湿地')) {
-    return makeSuggestions(['谨慎探查周围【感知DC14】', '让克莱娅检查陷阱【巧手DC15】', '让森洛辨识真菌生态【自然DC13】']);
+    return makeSuggestions(['谨慎探查周围【感知DC14】', '让凯娅检查陷阱【巧手DC15】', '让布洛克辨识真菌生态【自然DC13】']);
   }
   if (area.includes('黑石') || area.includes('黑暗之门')) {
-    return makeSuggestions(['分析黑石结构【奥秘DC15】', '辨识三圈纹路【历史DC14】', '让瑟琳感知时间异常']);
+    return makeSuggestions(['分析黑石结构【奥秘DC15】', '辨识三圈纹路【历史DC14】', '请求瑟琳感知时间异常【魅力DC12】']);
   }
-  return makeSuggestions(['前往冒险者公会接取委托', '在逆穹城探索打听情报', '与瑟琳讨论远征计划']);
+  return makeSuggestions(['前往冒险者公会登记', '在逆穹悬城探索打听情报【感知DC12】', '与瑟琳讨论远征计划【魅力DC12】']);
 }
 
 function normalizeStoryLines(lines: StoryLine[]): StoryLine[] {
   let nextId = 1;
-  return (Array.isArray(lines) ? lines : [])
+  let lastDialogueSpeaker = '';
+  const normalized: StoryLine[] = [];
+
+  (Array.isArray(lines) ? lines : [])
     .filter((line) => line && typeof line.text === 'string' && line.text.trim())
-    .map((line) => {
+    .forEach((line) => {
       const rawId = Number(line.id);
       const id = Number.isFinite(rawId) && rawId > 0 ? rawId : nextId;
       nextId = Math.max(nextId, id + 1);
+      const role = line.role === 'player' || line.role === 'system' ? line.role : 'kp';
+      const text = line.text;
+      const previousLine = normalized[normalized.length - 1];
+      const previousText = previousLine?.text.trim() ?? '';
+      const isDialogue = /^["“「]/.test(text.trim());
+      let speaker = resolveSpeakerName(line.speaker || '主持人') || '主持人';
 
-      return {
+      if (role === 'kp' && isDialogue) {
+        const previousNamedSpeaker = findRegisteredSpeaker(previousText, true);
+        const pronounContinuesPrevious = Boolean(lastDialogueSpeaker && /^(他们|她们|它们|他|她|它)/.test(previousText));
+        const contextSpeaker = previousNamedSpeaker || (pronounContinuesPrevious ? lastDialogueSpeaker : '');
+        if (contextSpeaker && (speaker === '主持人')) {
+          speaker = contextSpeaker;
+        }
+      }
+
+      if (role === 'kp' && isDialogue && speaker !== '主持人') {
+        lastDialogueSpeaker = speaker;
+      }
+
+      normalized.push({
         id,
-        role: line.role === 'player' || line.role === 'system' ? line.role : 'kp',
-        speaker: line.speaker || 'KP',
-        text: line.text,
-      };
+        role,
+        speaker,
+        text,
+      });
     });
+
+  return normalized;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode; fallback?: string }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, color: "#f0a0a0", background: "#1a0a0a", minHeight: "100vh", fontFamily: "monospace" }}>
+          <h2 style={{ color: "#d36363" }}>⚠ 渲染崩溃</h2>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: 14, marginTop: 16 }}>{this.state.error.message}</pre>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, color: "#888", marginTop: 8 }}>{this.state.error.stack?.slice(0, 600)}</pre>
+          <button onClick={() => this.setState({ error: null })} style={{ marginTop: 20, padding: "8px 20px" }}>重试</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -196,12 +255,20 @@ export default function App() {
   const [showCharacterInfo, setShowCharacterInfo] = useState(false);
   const [showReturnTitleConfirm, setShowReturnTitleConfirm] = useState(false);
   const [showDicePoker, setShowDicePoker] = useState(false);
-  const [dicePokerNpc, setDicePokerNpc] = useState('莱因');
+  const [dicePokerNpc, setDicePokerNpc] = useState('萨洛');
+  const [showBargainGame, setShowBargainGame] = useState(false);
+  const [showDrinkingDiceGame, setShowDrinkingDiceGame] = useState(false);
+  const [showLuckyBoxGame, setShowLuckyBoxGame] = useState(false);
   const [showDialogueLog, setShowDialogueLog] = useState(false);
+  const [showCityMap, setShowCityMap] = useState(false);
+  const [showTavernDice, setShowTavernDice] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [saveMessageTone, setSaveMessageTone] = useState<'neutral' | 'success' | 'error'>('neutral');
   const [pendingTutorialBattleSetup, setPendingTutorialBattleSetup] = useState<TutorialBattleSetup | null>(null);
   const [openingFastForward, setOpeningFastForward] = useState(false);
+  const [fastForwardMode, setFastForwardMode] = useState(false);
+  const [scriptedBgOverride, setScriptedBgOverride] = useState<string | null>(null);
+  const [showActionPanel, setShowActionPanel] = useState(false); // 行动面板延迟显示
 
   const lineId = useRef(1);
   const eventId = useRef(1);
@@ -213,6 +280,9 @@ export default function App() {
   const diceFiredRef = useRef(false); // 防重复投骰
   const tutorialBattleIntentRef = useRef(false);
   const tutorialBattleDiceRef = useRef<DiceResult | null>(null);
+  const dicePokerPendingRef = useRef<string>(''); // 已进骰子游戏但尚未请求后端叙事
+  const dicePokerAutoTriggeredRef = useRef(false); // 防止自动触发骰子游戏多次
+  const scriptedBgSceneRef = useRef<string>('');    // 记录 override 对应的场景 id
 
   useEffect(() => {
     stateRef.current = gameState;
@@ -241,6 +311,10 @@ export default function App() {
       setSaves(result.saves);
       setSaveMessage('');
       setSaveMessageTone('neutral');
+      setShowDicePoker(false);
+      setShowBargainGame(false);
+      setShowDrinkingDiceGame(false);
+      setShowLuckyBoxGame(false);
     } catch (error: any) {
       setSaveMessage(error.message || '获取存档失败');
       setSaveMessageTone('error');
@@ -261,7 +335,7 @@ export default function App() {
           return [{ id: lineId.current++, role, speaker, text }];
         }
 
-        const parsed = parseNarrativeSegments(text, speaker || 'KP', kpSpeakerRef.current);
+        const parsed = parseNarrativeSegments(text, speaker || '主持人', kpSpeakerRef.current);
         kpSpeakerRef.current = parsed.lastSpeaker;
 
         return parsed.segments.map((segment) => ({
@@ -295,6 +369,59 @@ export default function App() {
     }, 5000);
     eventTimersRef.current.push(timer);
   }, []);
+
+  const playScriptedScene = useCallback(
+    (
+      scene: ScriptedScene,
+      options: { playerAction?: string; extraStatePatch?: Partial<GameState>; focus?: boolean; dynamicHints?: string[] } = {},
+    ) => {
+      const playerAction = options.playerAction?.trim();
+      if (playerAction) {
+        appendStoryLines([playerAction], 'player', gameState.player_name || '你', options.focus ?? true);
+      }
+
+      const statePatch: GameState = {
+        ...(scene.statePatch ?? {}),
+        ...(options.extraStatePatch ?? {}),
+        ...(scene.setArea ? { current_area: scene.setArea, actions_in_area: 0 } : {}),
+        last_event: options.extraStatePatch?.last_event || scene.lastEvent || playerAction || '固定剧情推进',
+      };
+
+      if (Object.keys(statePatch).length) {
+        setGameState((prev) => ({
+          ...prev,
+          ...statePatch,
+        }));
+        if (gameId) {
+          void patchGameState(gameId, statePatch).catch((error: any) => {
+            addEvent(error.message || '固定剧情状态同步失败', 'error');
+          });
+        }
+      }
+
+      setStory((prev) => {
+        const newLines: StoryLine[] = scene.lines.map((line) => ({
+          id: lineId.current++,
+          role: 'kp' as const,
+          speaker: line.speaker,
+          text: line.text,
+        }));
+        const next = [...prev, ...newLines];
+        if (options.focus !== false) {
+          setActiveIndex(prev.length);
+        }
+        return next;
+      });
+
+      scene.events?.forEach((eventText) => addEvent(eventText, 'state'));
+      const hints = options.dynamicHints ?? scene.hints;
+      setSuggestions(makeSuggestions(hints));
+      setScriptedBgOverride(scene.bgImage || null);
+      scriptedBgSceneRef.current = scene.setArea || '';
+      setPhase('narrating');
+    },
+    [addEvent, appendStoryLines, gameId, gameState.player_name],
+  );
 
   const saveCurrentGame = useCallback(
     async (slotKey: SaveSlotKey) => {
@@ -404,22 +531,50 @@ export default function App() {
       setSaveMessageTone('neutral');
       setPendingTutorialBattleSetup(null);
       setOpeningFastForward(false);
+      setScriptedBgOverride(null);
       tutorialBattleIntentRef.current = false;
       tutorialBattleDiceRef.current = null;
+      dicePokerAutoTriggeredRef.current = false;
       lineId.current = 1;
       eventId.current = 1;
       kpSpeakerRef.current = '';
 
       try {
         const result = await runtime.createGame(payload);
-        const parsedOpening = extractHints(result.opening || DEFAULT_OPENING);
-        const openingLines = splitNarrative(parsedOpening.text || DEFAULT_OPENING);
 
         setGameId(result.game_id);
         setGameState(result.state);
-        setSuggestions(parsedOpening.suggestions.length ? parsedOpening.suggestions : fallbackSuggestions(result.state));
-        appendStoryLines(openingLines.length ? openingLines : [DEFAULT_OPENING], 'kp', 'KP', true);
-        setOpeningFastForward(true);
+
+        // 🔴 优先使用固定脚本（speaker绝对正确），回退到AI文本解析
+        if (result.opening_script?.length) {
+          // 直接逐条加载：speaker/文本绝对不会出错
+          const scriptLines: StoryLine[] = result.opening_script.map((line) => ({
+            id: lineId.current++,
+            role: 'kp' as const,
+            speaker: line.speaker,
+            text: line.text,
+          }));
+          setStory(scriptLines);
+          setActiveIndex(0);  // 从第一句开始，逐条推进
+          setSuggestions(
+            result.opening_hints?.length
+              ? makeSuggestions(result.opening_hints)
+              : fallbackSuggestions(result.state),
+          );
+        } else {
+          // 回退：AI文本解析
+          const parsedOpening = extractHints(result.opening || DEFAULT_OPENING);
+          const openingLines = splitNarrative(parsedOpening.text || DEFAULT_OPENING);
+          setSuggestions(parsedOpening.suggestions.length ? parsedOpening.suggestions : fallbackSuggestions(result.state));
+          appendStoryLines(openingLines.length ? openingLines : [DEFAULT_OPENING], 'kp', '主持人', true);
+        }
+
+        if (payload.skip_opening) setOpeningFastForward(true);
+        // 安全网：开篇时确保逆穹城背景图显示，不依赖AI文本触发词匹配
+        if (String(result.state.current_area || '').includes('逆穹')) {
+          setScriptedBgOverride('/assets/scenes/01inverse-city-first-sight.webp');
+          scriptedBgSceneRef.current = '逆穹悬城·主缆街';
+        }
         setScreen('game');
       } catch (error: any) {
         setLoadError(error.message || '连接失败');
@@ -428,10 +583,200 @@ export default function App() {
     [appendStoryLines, clearEventTimers, runtime],
   );
 
+  const startStoryTest = useCallback(
+    async (checkpoint: StoryTestCheckpoint) => {
+      setScreen('loading');
+      setLoadError('');
+      setStory([]);
+      clearEventTimers();
+      setEvents([]);
+      setSuggestions([]);
+      setActiveIndex(0);
+      setPhase('narrating');
+      setSaveMessage('');
+      setSaveMessageTone('neutral');
+      setPendingTutorialBattleSetup(null);
+      setOpeningFastForward(false);
+      setFastForwardMode(false);
+      setScriptedBgOverride(null);
+      setShowDicePoker(false);
+      setShowBargainGame(false);
+      setShowDrinkingDiceGame(false);
+      setShowLuckyBoxGame(false);
+      setShowTavernDice(false);
+      setShowCityMap(false);
+      tutorialBattleIntentRef.current = false;
+      tutorialBattleDiceRef.current = null;
+      dicePokerAutoTriggeredRef.current = false;
+      dicePokerPendingRef.current = '';
+      scriptedBgSceneRef.current = '';
+      lineId.current = 1;
+      eventId.current = 1;
+      kpSpeakerRef.current = '';
+
+      try {
+        const result = await runtime.createGame({
+          player_name: checkpoint.statePatch.player_name || '剧情测试员',
+          char_class: checkpoint.statePatch.char_class || '战士',
+          attr_str: 16,
+          attr_dex: 13,
+          attr_con: 14,
+          attr_int: 10,
+          attr_wis: 12,
+          attr_cha: 8,
+          level: Number(checkpoint.statePatch.level ?? 3),
+          skip_opening: true,
+        });
+
+        const scene = checkpoint.sceneId ? getScriptedScene(checkpoint.sceneId) : null;
+        const scenePatch: GameState = {
+          ...(scene?.statePatch ?? {}),
+          ...(scene?.setArea ? { current_area: scene.setArea, actions_in_area: 0 } : {}),
+        };
+        const statePatch: GameState = {
+          ...checkpoint.statePatch,
+          ...scenePatch,
+          test_mode: true,
+          story_test_checkpoint: checkpoint.id,
+          last_event: checkpoint.statePatch.last_event || scene?.lastEvent || `剧情测试：${checkpoint.label}`,
+        };
+        const nextState = {
+          ...result.state,
+          ...statePatch,
+        };
+        const scriptLines = checkpoint.lines ?? scene?.lines ?? [
+          {
+            speaker: '系统',
+            text: `已进入剧情测试节点：${checkpoint.label}`,
+          },
+        ];
+
+        setGameId(result.game_id);
+        setGameState(nextState);
+        stateRef.current = nextState;
+        setStory(scriptLines.map((line) => ({
+          id: lineId.current++,
+          role: 'kp' as const,
+          speaker: line.speaker,
+          text: line.text,
+        })));
+        setSuggestions(makeSuggestions(checkpoint.hints ?? scene?.hints ?? fallbackSuggestions(nextState).map((item) => item.text)));
+        setScriptedBgOverride(scene?.bgImage || null);
+        scriptedBgSceneRef.current = scene?.setArea || '';
+        setActiveIndex(0);
+        setPhase('narrating');
+        addEvent(`剧情测试：${checkpoint.label}`, 'state');
+
+        void patchGameState(result.game_id, statePatch).catch((error: any) => {
+          addEvent(error.message || '剧情测试状态同步失败', 'error');
+        });
+        setScreen('game');
+      } catch (error: any) {
+        setLoadError(error.message || '剧情测试启动失败');
+      }
+    },
+    [addEvent, clearEventTimers, runtime],
+  );
+
   const submitAction = useCallback(
     (text: string) => {
       const action = text.trim();
       if (!action || !gameId || streaming) return;
+
+      const currentState = stateRef.current;
+      const blockRoute = (message: string, nextHints: string[]) => {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        appendStoryLines([message], 'kp', '瑟琳', true);
+        setSuggestions(makeSuggestions(nextHints));
+        setPhase('narrating');
+      };
+
+      if (/静默神殿|寻找艾琳|前往教堂|去教堂/.test(action) && !currentState.salo_intel_done) {
+        blockRoute('瑟琳：「先去回声酒馆找萨洛。我们还不知道艾琳今晚是否在神殿，也不知道另外两人的条件。」', [
+          '前往回声酒馆找萨洛打听三名队友',
+          '和瑟琳讨论队伍配置',
+        ]);
+        return;
+      }
+
+      if (/(?:寻找|找)布洛克|回到回声酒馆寻找布洛克|喝酒骰子|喝酒游戏/.test(action) && !currentState.al_recruited) {
+        blockRoute('瑟琳：「先去静默神殿找艾琳。她能保证队伍在后续招募和下潜前有足够的治疗与净化准备。」', [
+          '前往静默神殿寻找艾琳',
+          '询问萨洛布洛克的脾气【洞悉DC12】',
+        ]);
+        return;
+      }
+
+      if (/前往黑市|去黑市|(?:寻找|找)凯娅|幸运盲盒|购买奥兰|抽盲盒/.test(action) && !currentState.brock_recruited) {
+        blockRoute('瑟琳：「先回酒馆找布洛克。没有懂孢海生态的人，即使凯娅加入，我们也很难安全穿过第一层。」', [
+          '回到回声酒馆寻找布洛克',
+          '整理艾琳加入后的队伍分工',
+        ]);
+        return;
+      }
+
+      if (/降渊缆梯|缆梯|第一层/.test(action) && !currentState.expedition_registered) {
+        blockRoute('瑟琳：「队伍还没有在公会完成正式登记。先回去找赫尔曼，领取物资和下潜许可。」', [
+          '返回冒险者公会找赫尔曼正式登记小队',
+          '整理五人队伍分工',
+        ]);
+        return;
+      }
+
+      if (/前往冒险者公会|去公会/.test(action) && currentState.kaiya_recruited && !currentState.expedition_registered) {
+        const registration = getScriptedScene('guild-final-registration');
+        if (registration) {
+          playScriptedScene(registration, { playerAction: action });
+          return;
+        }
+      }
+
+      if (/前往回声酒馆|去酒馆|回声酒馆/.test(action) && currentState.al_recruited && !currentState.brock_recruited) {
+        const brockScene = getScriptedScene('brock-tavern-intro');
+        if (brockScene) {
+          playScriptedScene(brockScene, { playerAction: action });
+          return;
+        }
+      }
+
+      // 🔴 固定剧情脚本拦截：不需要AI生成，直接逐条显示
+      const scripted = matchScriptedScene(action);
+      if (scripted) {
+        playScriptedScene(scripted.scene, { playerAction: action });
+        return;
+      }
+
+      // 酒馆区域：选择玩骰子直接跳转游戏
+      const areaText = String(stateRef.current.current_area || '');
+      if (areaText.includes('酒馆') && /骰子|快艇|赌|玩一局|来一局|试试|接受/.test(action)) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        if (/布洛克|喝酒/.test(action)) {
+          setShowDrinkingDiceGame(true);
+          setPhase('action');
+          return;
+        }
+        // "接受骰子游戏" → 进入三局酒馆骰子
+        if (/接受/.test(action)) {
+          setShowTavernDice(true);
+          dicePokerPendingRef.current = action;
+          return;
+        }
+        // 原有触发词 → 进入旧版骰子游戏
+        setDicePokerNpc('萨洛');
+        setShowDicePoker(true);
+        dicePokerPendingRef.current = action;
+        setPhase('action');
+        return;
+      }
+
+      // 黑市区域：幸运盲盒抽钻石
+      const wantsLuckyBox = /(?:购买|抽|开启|买).*盲盒/.test(action) || action === '幸运盲盒';
+      if (/黑市|补给市场|市场|奥兰|凯娅/.test(areaText) && wantsLuckyBox) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        setShowLuckyBoxGame(true);
+        setPhase('action');
+        return;
+      }
 
       const firstChoice = isFirstPlayerChoice(story, stateRef.current);
       const retreatChoice = RETREAT_ACTION_RE.test(action);
@@ -460,7 +805,7 @@ export default function App() {
       abortRef.current = runtime.streamAction(gameId, resolvedAction, {
         onNarrative: (chunk) => {
           const parsed = parserRef.current.push(chunk);
-          if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', 'KP');
+          if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
           if (parsed.suggestions.length) setSuggestions(parsed.suggestions);
         },
         onSystem: (rawEvent) => {
@@ -480,14 +825,14 @@ export default function App() {
         },
         onDone: () => {
           const parsed = parserRef.current.flush();
-          if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', 'KP');
+          if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
           if (tutorialBattleIntentRef.current) {
             const setup = buildTutorialBattleSetup(tutorialBattleDiceRef.current);
             setPendingTutorialBattleSetup(setup);
             setGameState((prev) => ({
               ...prev,
               first_choice_resolved: true,
-              current_area: '逆穹城·补给平台',
+              current_area: '逆穹悬城·主缆街',
               last_event: '开局判定完成，等待进入教学战斗',
             }));
             setSuggestions(makeSuggestions(['进入教学战斗']));
@@ -495,13 +840,28 @@ export default function App() {
           } else {
             setSuggestions(parsed.suggestions.length ? parsed.suggestions : fallbackSuggestions(stateRef.current));
           }
+
+          // 酒馆区域：瑟琳提示后，显示唯一选项"接受骰子游戏"
+          const areaText = String(stateRef.current.current_area || '');
+          if (
+            areaText.includes('酒馆') &&
+            !dicePokerAutoTriggeredRef.current &&
+            !streaming
+          ) {
+            const recentText = story.slice(-6).map((l) => l.text).join('') + parsed.lines.join('');
+            if (/瑟琳.*偷看|偷看.*骰|偷看.*牌|悄悄.*告诉|我能看到.*骰|透视.*骰|看穿.*骰|窥看/.test(recentText)) {
+              dicePokerAutoTriggeredRef.current = true;
+              setSuggestions(makeSuggestions(['接受骰子游戏']));
+            }
+          }
+
           setStreaming(false);
         },
         onError: (error) => {
           const rawMessage = String(error || '').trim();
           const message = /connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|timeout|timed\s*out|econn|socket/i.test(rawMessage)
-            ? 'KP暂时没有回应，已为本轮处理启用兜底。'
-            : rawMessage || 'KP暂时没有回应，已为本轮处理启用兜底。';
+            ? '主持人暂时没有回应，已为本轮处理启用兜底。'
+            : rawMessage || '主持人暂时没有回应，已为本轮处理启用兜底。';
           setStreaming(false);
           addEvent(message, 'state');
           appendStoryLines([message], 'system', '系统');
@@ -510,8 +870,8 @@ export default function App() {
             setGameState((prev) => ({
               ...prev,
               first_choice_resolved: true,
-              current_area: '逆穹城·补给平台',
-              last_event: 'KP兜底后进入教学战斗',
+              current_area: '逆穹悬城·主缆街',
+              last_event: '主持人兜底后进入教学战斗',
             }));
             setSuggestions(makeSuggestions(['进入教学战斗']));
           } else {
@@ -520,13 +880,131 @@ export default function App() {
         },
       });
     },
-    [addEvent, appendStoryLines, gameId, gameState.player_name, runtime, story, streaming],
+    [appendStoryLines, gameId, gameState.player_name, playScriptedScene, runtime, story, streaming],
+  );
+
+  const handleBargainComplete = useCallback(
+    (result: BargainCompleteResult) => {
+      setShowBargainGame(false);
+
+      const current = stateRef.current;
+      const currentGold = Number(current.gold ?? 200);
+      const inventoryText = String(current.inventory || '长剑,冒险者工具包');
+      const nextInventory = inventoryText.includes(result.itemName)
+        ? inventoryText
+        : `${inventoryText},${result.itemName}`;
+      const nextGold = Math.max(0, currentGold - result.finalPrice);
+      const purchasePatch: GameState = {
+        gold: nextGold,
+        inventory: nextInventory,
+        blackmarket_done: true,
+        blackmarket_purchase_item: result.itemName,
+        blackmarket_purchase_price: result.finalPrice,
+        last_event: `完成黑市采购：${result.itemName}，成交价${result.finalPrice}金`,
+      };
+
+      addEvent(`获得 ${result.itemName}`, 'state');
+      addEvent(`金币 -${result.finalPrice}`, 'state');
+
+      const completeScene = getScriptedScene('blackmarket-complete');
+      if (completeScene) {
+        playScriptedScene(completeScene, {
+          playerAction: '确认购买后前往降渊缆梯',
+          extraStatePatch: purchasePatch,
+        });
+        return;
+      }
+
+      setGameState((prev) => ({ ...prev, ...purchasePatch }));
+      if (gameId) {
+        void patchGameState(gameId, purchasePatch).catch((error: any) => {
+          addEvent(error.message || '黑市采购状态同步失败', 'error');
+        });
+      }
+    },
+    [addEvent, gameId, playScriptedScene],
+  );
+
+  const handleDrinkingDiceComplete = useCallback(
+    (result: { playerTotal: number; brockTotal: number; rounds: number }) => {
+      setShowDrinkingDiceGame(false);
+      const scene = getScriptedScene('brock-recruited');
+      const patch: GameState = {
+        brock_drinking_done: true,
+        brock_drinking_player_total: result.playerTotal,
+        brock_drinking_brock_total: result.brockTotal,
+        last_event: `与布洛克完成喝酒骰子：你${result.playerTotal}点，布洛克${result.brockTotal}点`,
+      };
+      if (scene) {
+        playScriptedScene(scene, { extraStatePatch: patch });
+        return;
+      }
+      setGameState((prev) => ({ ...prev, ...patch }));
+      if (gameId) {
+        void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || '布洛克入队状态同步失败', 'error'));
+      }
+    },
+    [addEvent, gameId, playScriptedScene],
+  );
+
+  const handleLuckyBoxComplete = useCallback(
+    (result: { attempts: number; spent: number; finalRoll: number; guaranteed: boolean }) => {
+      setShowLuckyBoxGame(false);
+      const current = stateRef.current;
+      const currentGold = Number(current.gold ?? 200);
+      const inventoryText = String(current.inventory || '长剑,冒险者工具包');
+      const nextInventory = inventoryText.includes('钻石') ? inventoryText : `${inventoryText},钻石`;
+      const patch: GameState = {
+        gold: Math.max(0, currentGold - result.spent),
+        inventory: nextInventory,
+        lucky_box_done: true,
+        lucky_box_attempts: result.attempts,
+        lucky_box_spent: result.spent,
+        lucky_box_final_roll: result.finalRoll,
+        lucky_box_guaranteed: result.guaranteed,
+        last_event: `奥兰幸运盲盒抽到钻石，共${result.attempts}次，花费${result.spent}金`,
+      };
+      addEvent(`获得 钻石`, 'state');
+      addEvent(`金币 -${result.spent}`, 'state');
+
+      const scene = getScriptedScene('kaiya-recruited');
+      if (scene) {
+        playScriptedScene(scene, { extraStatePatch: patch });
+        return;
+      }
+      setGameState((prev) => ({ ...prev, ...patch }));
+      if (gameId) {
+        void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || '凯娅入队状态同步失败', 'error'));
+      }
+    },
+    [addEvent, gameId, playScriptedScene],
   );
 
   const scene = useMemo(() => resolveDndScene(gameState), [gameState]);
+
+  // 场景区域变更时清除脚本背景覆盖（仅当不在同一区域）
+  useEffect(() => {
+    const area = String(gameState.current_area || '');
+    const refArea = scriptedBgSceneRef.current;
+    if (refArea && area && !area.includes(refArea.replace('逆穹悬城·', ''))) {
+      setScriptedBgOverride(null);
+      scriptedBgSceneRef.current = '';
+    }
+  }, [gameState.current_area]);
+
   const currentLine = story[activeIndex];
   const canAdvance = Boolean(currentLine) && (activeIndex < story.length - 1 || !streaming);
   const visibleSuggestions = suggestions.length ? suggestions : fallbackSuggestions(gameState);
+  const areaText = String(gameState.current_area || '');
+  const showLuckyBoxEntry = /黑市|补给市场|市场|奥兰|凯娅/.test(areaText) && Boolean(gameState.kaiya_intro_seen && !gameState.kaiya_recruited);
+  const cityAreaVisited = /冒险者公会|回声酒馆|酒馆|黑市|补给市场|市场|静默神殿|神殿|降渊缆梯|缆梯/.test(areaText);
+  const canUseCityMap = Boolean(gameState.city_map_unlocked || gameState.guild_registered || cityAreaVisited);
+
+  useEffect(() => {
+    if (!canUseCityMap && showCityMap) {
+      setShowCityMap(false);
+    }
+  }, [canUseCityMap, showCityMap]);
 
   useEffect(() => {
     if (!openingFastForward) return;
@@ -535,6 +1013,33 @@ export default function App() {
       setOpeningFastForward(false);
     }
   }, [openingFastForward, phase, screen, story]);
+
+  // Ctrl+L 剧情加速快捷键
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.key === 'l' && screen === 'game' && !streaming && phase === 'narrating') {
+        e.preventDefault();
+        setFastForwardMode((prev) => !prev);
+      }
+      // 加速模式下点击或按空格也会自动推进，但按 Ctrl+L 可随时关闭
+      if (fastForwardMode && phase === 'action') {
+        setFastForwardMode(false);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [screen, streaming, phase, fastForwardMode]);
+
+  // 行动面板延迟显示：底部文本全部输出完 1 秒后才可以显示
+  useEffect(() => {
+    if (phase === 'action' && !showActionPanel) {
+      const timer = window.setTimeout(() => setShowActionPanel(true), 1000);
+      return () => window.clearTimeout(timer);
+    }
+    if (phase !== 'action') {
+      setShowActionPanel(false);
+    }
+  }, [phase, showActionPanel]);
 
   const advanceLine = useCallback(() => {
     if (activeIndex < story.length - 1) {
@@ -568,10 +1073,15 @@ export default function App() {
     setShowGameSaves(false);
     setShowCharacterInfo(false);
     setShowReturnTitleConfirm(false);
+    setShowDicePoker(false);
+    setShowBargainGame(false);
+    setShowDrinkingDiceGame(false);
+    setShowLuckyBoxGame(false);
     setDiceRoll(null);
     setEvents([]);
     setPendingTutorialBattleSetup(null);
     setOpeningFastForward(false);
+    setScriptedBgOverride(null);
     tutorialBattleIntentRef.current = false;
     tutorialBattleDiceRef.current = null;
     setSaveMessage('');
@@ -580,37 +1090,48 @@ export default function App() {
   }, [clearEventTimers]);
 
   const completeTutorialBattle = useCallback(() => {
-    if (stateRef.current.tutorial_battle_done) {
-      setScreen('game');
-      return;
-    }
+    // 防止重复触发
+    if (stateRef.current.tutorial_battle_done) return;
+
+    const tutorialStatePatch: GameState = {
+      first_choice_resolved: true,
+      tutorial_battle_done: true,
+      current_area: '逆穹悬城·主缆街',
+      last_event: '击退补给吊箱中的裂隙爬兽',
+    };
 
     setGameState((prev) => ({
       ...prev,
-      first_choice_resolved: true,
-      tutorial_battle_done: true,
-      current_area: '逆穹城·补给平台',
-      last_event: '击退补给吊箱中的裂隙爬兽',
+      ...tutorialStatePatch,
     }));
+    if (gameId) {
+      void patchGameState(gameId, tutorialStatePatch).catch((error: any) => {
+        addEvent(error.message || '教学战斗状态同步失败', 'error');
+      });
+    }
     setPhase('narrating');
     setSuggestions(makeSuggestions([
       '查看吊箱封条【调查DC12】',
       '询问瑟琳这些魔物为什么怕光【奥秘DC13】',
-      '前往冒险者公会接任务',
+      '前往冒险者公会登记',
     ]));
     setPendingTutorialBattleSetup(null);
     setOpeningFastForward(false);
     tutorialBattleIntentRef.current = false;
     tutorialBattleDiceRef.current = null;
     appendStoryLines([
-      '最后一只裂隙爬兽被银白色光芒逼退，撞在吊箱边缘，蜷缩着失去了攻击性。瑟琳收起指尖的光，视线仍停在那些蓝绿色孢尘上。',
-      '瑟琳：「它们不是主动潜进来的。箱壁内侧有拖痕，像是被什么东西赶进去的。」',
-      '守卫翻看吊箱封条，脸色忽然变了。守卫：「这是从孢海据点回收的空箱。按理说，它不该带回活物。」',
-      '补给平台短暂安静下来，远处城市主缆发出低沉震响。你已经掌握了这场战斗的基本流程，而真正的问题刚刚露出第一道裂口。',
-    ], 'kp', 'KP', true);
+      '最后一只裂隙爬兽被银白色光芒逼退，撞在吊箱边缘，蜷缩着失去了攻击性。',
+      '瑟琳快步走到你身边，短银杖的微光扫过你的肩膀。瑟琳：「没有重伤。很好，你的反应速度比大部分第一次进悬城的人快。」',
+      '黑缆守卫翻看着碎裂吊箱的封条，脸色渐渐沉了下来。守卫：「这是从孢海据点回收的空箱。最近三个月，类似事件发生了四次。」',
+      '守卫收起手弩，语气严肃。守卫：「感谢你们出手。如果让它们冲进吊桥区，今天的通行记录上就要多几行红字了。」',
+      '瑟琳的视线仍停在那些蓝绿色孢尘上。瑟琳：「四次不是偶然。它们不是主动潜进来的——箱壁内侧有拖痕，像是被什么东西赶上去的。」',
+      '主缆街短暂安静下来，远处城市缆索发出低沉震响。守卫指了指公会方向。「冒险者公会在倒挂塔楼区，顺着主缆走到底。你们的委托应该需要先登记。」',
+      '瑟琳将银杖收回腰间，对你微微点头。瑟琳：「先过去吧。米娜应该已经在等你了。」',
+    ], 'kp', '主持人', true);
     addEvent('教学战斗完成', 'state');
+    // 直接跳回游戏画面，不需要二次点击
     setScreen('game');
-  }, [addEvent, appendStoryLines]);
+  }, [addEvent, appendStoryLines, gameId]);
 
   if (screen === 'main-menu') {
     return <TitleMenu onNewGame={() => setScreen('new-game')} onLoadGame={openLoadGame} onTest={() => setScreen('test')} />;
@@ -640,21 +1161,42 @@ export default function App() {
   }
 
   if (screen === 'test') {
-    return <TestScreen onBack={() => setScreen('main-menu')} />;
+    return <ErrorBoundary><TestScreen onBack={() => setScreen('main-menu')} onStoryTest={startStoryTest} /></ErrorBoundary>;
   }
 
   if (screen === 'loading') return <LoadingScreen error={loadError} onRetry={() => setScreen('new-game')} />;
 
   if (screen === 'tutorial-battle') {
     return (
-      <BattleTestScreen
-        mode="tutorial"
-        openingEffects={pendingTutorialBattleSetup?.openingEffects ?? []}
-        onBack={() => {
-          setPendingTutorialBattleSetup(null);
-          setScreen('game');
-        }}
-        onComplete={completeTutorialBattle}
+      <ErrorBoundary>
+        <BattleTestScreen
+          mode="tutorial"
+          openingEffects={pendingTutorialBattleSetup?.openingEffects ?? []}
+          onBack={() => {
+            setPendingTutorialBattleSetup(null);
+            setScreen('game');
+          }}
+          onComplete={completeTutorialBattle}
+          onSkip={completeTutorialBattle}
+        />
+      </ErrorBoundary>
+    );
+  }
+
+  if (showBargainGame) {
+    return <BargainTestScreen onBack={() => setShowBargainGame(false)} onComplete={handleBargainComplete} />;
+  }
+
+  if (showDrinkingDiceGame) {
+    return <DrinkingDiceGame onBack={() => setShowDrinkingDiceGame(false)} onComplete={handleDrinkingDiceComplete} />;
+  }
+
+  if (showLuckyBoxGame) {
+    return (
+      <LuckyBoxGame
+        gold={Number(gameState.gold ?? 200)}
+        onBack={() => setShowLuckyBoxGame(false)}
+        onComplete={handleLuckyBoxComplete}
       />
     );
   }
@@ -668,11 +1210,17 @@ export default function App() {
         isStreaming={streaming}
         isActionPhase={phase === 'action'}
         canAdvance={phase !== 'action' && canAdvance}
-        autoAdvance={openingFastForward && phase === 'narrating' && !streaming && !story.some((line) => line.role === 'player')}
-        autoAdvanceDelay={90}
+        autoAdvance={
+          (openingFastForward || fastForwardMode) &&
+          phase === 'narrating' &&
+          !streaming &&
+          !story.some((line) => line.role === 'player')
+        }
+        autoAdvanceDelay={fastForwardMode ? 60 : 90}
+        scriptedBgOverride={scriptedBgOverride}
         onAdvance={advanceLine}
         actionPanel={
-          phase === 'action' ? (
+          showActionPanel ? (
             <ActionPanel suggestions={visibleSuggestions} disabled={streaming} onSubmit={submitAction} />
           ) : undefined
         }
@@ -681,14 +1229,13 @@ export default function App() {
       {/* 骰子检定动画覆盖层 */}
       <DiceRollOverlay dice={diceRoll} dieType="d20" onClose={() => setDiceRoll(null)} />
 
-      {/* 快艇骰子入口：进入酒馆场景时显示 */}
-      {String(gameState.current_area || '').includes('酒馆') && (
+      {showLuckyBoxEntry && (
         <button
           type="button"
-          className="game-dice-poker-btn"
-          onClick={() => { setDicePokerNpc('莱因'); setShowDicePoker(true); }}
+          className="game-dice-poker-btn game-bargain-btn"
+          onClick={() => setShowLuckyBoxGame(true)}
         >
-          🎲 快艇骰子
+          幸运盲盒
         </button>
       )}
 
@@ -702,10 +1249,26 @@ export default function App() {
         角色信息
       </button>
 
+      {/* 剧情加速状态指示器 */}
+      {fastForwardMode && (
+        <div className="fast-forward-indicator">
+          ⏩ 剧情加速中 · Ctrl+L 关闭
+        </div>
+      )}
+
       <div className="game-top-actions">
         <button type="button" className="game-log-btn" onClick={() => setShowDialogueLog(true)}>
           📜 对话日志
         </button>
+        {canUseCityMap && (
+          <button
+            type="button"
+            className="game-map-btn"
+            onClick={() => setShowCityMap(true)}
+          >
+            🗺️ 城市地图
+          </button>
+        )}
         <button type="button" className="game-title-btn" onClick={() => setShowReturnTitleConfirm(true)}>
           回到标题界面
         </button>
@@ -812,13 +1375,157 @@ export default function App() {
           <DicePokerGame
             gameId={gameId}
             npcName={dicePokerNpc}
-            npcTrustKey="ly"
+            npcTrustKey=""
             onClose={() => setShowDicePoker(false)}
             onTrustChange={(npc, key, change) => {
               addEvent(`${npc}信任 ${change > 0 ? '+' : ''}${change}`, 'state');
             }}
             onGetClue={(info) => {
               addEvent(`获得情报：${info}`, 'dice');
+            }}
+            onComplete={(resultData) => {
+              // 骰子游戏结束后，关闭弹窗并立即推进剧情
+              setShowDicePoker(false);
+              dicePokerAutoTriggeredRef.current = false;
+              const pendingAction = dicePokerPendingRef.current;
+              dicePokerPendingRef.current = '';
+
+              // 把骰子游戏结果作为叙事追加到故事中
+              const resultLines: string[] = [];
+              if (resultData.ai_narration) resultLines.push(resultData.ai_narration.trim());
+              if (resultData.npc_reaction) resultLines.push(resultData.npc_reaction.trim());
+              if (resultLines.length) {
+                appendStoryLines(resultLines, 'kp', dicePokerNpc);
+              }
+
+              // 向主持人后端提交行动，让主持人对骰子结果做出回应，推进剧情
+              if (pendingAction && gameId) {
+                setPhase('narrating');
+                setStreaming(true);
+                setSuggestions([]);
+                abortRef.current?.abort();
+                parserRef.current = createNarrativeStreamParser();
+                diceFiredRef.current = false;
+                tutorialBattleIntentRef.current = false;
+                tutorialBattleDiceRef.current = null;
+
+                // 构造带结果上下文的行动文本
+                const resultContext = resultData.result === 'win'
+                  ? '（骰子游戏获胜）'
+                  : resultData.result === 'tie'
+                    ? '（骰子游戏平局）'
+                    : '（骰子游戏落败）';
+                const contextualAction = `${pendingAction}${resultContext}`;
+
+                abortRef.current = runtime.streamAction(gameId, contextualAction, {
+                  onNarrative: (chunk) => {
+                    const parsed = parserRef.current.push(chunk);
+                    if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
+                    if (parsed.suggestions.length) setSuggestions(parsed.suggestions);
+                  },
+                  onSystem: (rawEvent) => {
+                    const parsed = runtime.parseSystemEvent(rawEvent);
+                    if (!parsed) return;
+                    addEvent(runtime.formatSystemEvent(parsed), parsed.type === 'error' ? 'error' : 'dice');
+                  },
+                  onStateUpdate: (change) => {
+                    setGameState((prev) => runtime.applyStateChange(prev, change));
+                    addEvent(runtime.formatStateChange(change), 'state');
+                  },
+                  onDone: () => {
+                    const parsed = parserRef.current.flush();
+                    if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
+                    setSuggestions(parsed.suggestions.length ? parsed.suggestions : fallbackSuggestions(stateRef.current));
+                    setStreaming(false);
+                  },
+                  onError: (error) => {
+                    const rawMessage = String(error || '').trim();
+                    const message = /connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|timeout|timed\s*out|econn|socket/i.test(rawMessage)
+                      ? '主持人暂时没有回应，已为本轮处理启用兜底。'
+                      : rawMessage || '主持人暂时没有回应';
+                    setStreaming(false);
+                    addEvent(message, 'state');
+                    appendStoryLines([message], 'system', '系统');
+                    setSuggestions(fallbackSuggestions(stateRef.current));
+                  },
+                });
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 逆穹城地图 */}
+      <CityMap
+        visible={showCityMap && canUseCityMap}
+        onClose={() => setShowCityMap(false)}
+        onNavigate={(actionText) => {
+          setShowCityMap(false);
+          submitAction(actionText);
+        }}
+      />
+
+      {/* 酒馆三局骰子游戏 */}
+      <AnimatePresence>
+        {showTavernDice && (
+          <TavernDicePoker
+            onClose={() => setShowTavernDice(false)}
+            onComplete={(result: any) => {
+              // 骰子结束后，推进剧情
+              const pendingAction = dicePokerPendingRef.current;
+              dicePokerPendingRef.current = '';
+              dicePokerAutoTriggeredRef.current = false;
+
+              // 关闭弹窗 + 标记完成
+              setShowTavernDice(false);
+              const wins = result?.wins ?? 0;
+              const updatedState = {
+                ...stateRef.current,
+                tavern_dice_done: true,
+                last_event: `酒馆快艇骰子结束（${wins}胜）`,
+              };
+              setGameState(updatedState);
+              if (gameId) {
+                void patchGameState(gameId, {
+                  tavern_dice_done: true,
+                  last_event: `酒馆快艇骰子结束（${wins}胜）`,
+                }).catch((error: any) => addEvent(error.message || '酒馆骰子状态同步失败', 'error'));
+              }
+
+              // 🔴 固定骰子后剧情，不依赖 AI（防止 AI 跑偏生成战斗内容）
+              const postDiceLines: StoryLine[] = wins >= 2
+                ? [
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「啧。两胜。你这手气不像第一次玩。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「愿赌服输。我会把艾琳、布洛克、凯娅的位置和脾气都说清楚。你们最好记牢，找人比找路麻烦。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「萨洛很少这么干脆。看来他确实认为这三个人缺一不可。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '主持人', text: '瑟琳将银杖收回袖口，对你微微点头。酒馆里的喧嚣重新漫上来，但萨洛的情报像一块石头坠入水面，散开的波纹还没停。' },
+                  ]
+                : wins === 1
+                ? [
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「一胜一负，不亏。冒险者的手气就是这样——从来不会让你空手回去。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「行，我说。艾琳、布洛克、凯娅，各有本事，也各有麻烦。你们想凑齐五人队，就得按他们的规矩来。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「够用了。先听完情报，再规划路线。」' },
+                  ]
+                : [
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「输了也正常。悬城里每年有上百个冒险者从我这张桌子上爬走，最后活下来的从不靠骰子。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「情报还是给你——看在你们真要下孢海的份上。三个人都不好请，但都值得请。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「先听他讲完。队伍凑齐之前，我们不能急着下缆梯。」' },
+                  ];
+              setStory((prev) => {
+                setActiveIndex(prev.length);
+                return [...prev, ...postDiceLines];
+              });
+
+              const saloIntel = getScriptedScene('salo-companion-intel');
+              if (saloIntel) {
+                playScriptedScene(saloIntel, { focus: false });
+              } else {
+                setPhase('action');
+                setSuggestions(makeSuggestions([
+                  '前往静默神殿寻找艾琳',
+                  '和瑟琳讨论远征路线',
+                ]));
+              }
             }}
           />
         )}

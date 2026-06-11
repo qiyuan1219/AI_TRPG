@@ -2,16 +2,20 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { BargainTestScreen } from "./BargainTestScreen";
 import { BattleTestScreen } from "./BattleTestScreen";
+import { CompanionEventTestScreen } from "./CompanionEventTestScreen";
 import { DiceRollOverlay, type DieType } from "./DiceRollOverlay";
 import { PortraitTestScreen } from "./PortraitTestScreen";
+import { SceneBgTestScreen } from "./SceneBgTestScreen";
 import { YachtDiceTestScreen } from "./YachtDiceTestScreen";
+import { STORY_TEST_CHECKPOINTS, type StoryTestCheckpoint } from "../data/storyTestCheckpoints";
 import type { DiceResult } from "../types/game";
 
 interface TestScreenProps {
   onBack: () => void;
+  onStoryTest: (checkpoint: StoryTestCheckpoint) => void;
 }
 
-type TestMode = "menu" | "dice-select" | "dice-roll" | "battle" | "yacht" | "bargain" | "portrait";
+type TestMode = "menu" | "story" | "dice-select" | "dice-roll" | "battle" | "yacht" | "bargain" | "portrait" | "companion-event" | "scene-bg";
 
 const DICE_OPTIONS: Array<{ type: DieType; label: string; sides: number }> = [
   { type: "d4", label: "四面骰", sides: 4 },
@@ -19,12 +23,14 @@ const DICE_OPTIONS: Array<{ type: DieType; label: string; sides: number }> = [
   { type: "d8", label: "八面骰", sides: 8 },
   { type: "d12", label: "十二面骰", sides: 12 },
   { type: "d20", label: "二十面骰", sides: 20 },
+  { type: "d20", label: "命中 D20（暗红）", sides: 20 },
 ];
 
-export function TestScreen({ onBack }: TestScreenProps) {
+export function TestScreen({ onBack, onStoryTest }: TestScreenProps) {
   const [mode, setMode] = useState<TestMode>("menu");
   const [selectedDie, setSelectedDie] = useState<DieType>("d20");
   const [activeDice, setActiveDice] = useState<DiceResult | null>(null);
+  const [isAttackD20, setIsAttackD20] = useState(false);
   const [history, setHistory] = useState<Array<{ id: number; die: DieType; value: number }>>([]);
 
   const currentDie = useMemo(
@@ -39,6 +45,7 @@ export function TestScreen({ onBack }: TestScreenProps) {
     }
     if (mode === "dice-select") {
       setMode("menu");
+      setIsAttackD20(false);
       return;
     }
     if (mode === "battle") {
@@ -53,15 +60,16 @@ export function TestScreen({ onBack }: TestScreenProps) {
       setMode("menu");
       return;
     }
-    if (mode === "portrait") {
+    if (mode === "story" || mode === "portrait" || mode === "companion-event" || mode === "scene-bg") {
       setMode("menu");
       return;
     }
     onBack();
   }
 
-  function selectDie(dieType: DieType) {
+  function selectDie(dieType: DieType, attackVariant = false) {
     setSelectedDie(dieType);
+    setIsAttackD20(attackVariant);
     setMode("dice-roll");
     setActiveDice(null);
   }
@@ -100,6 +108,14 @@ export function TestScreen({ onBack }: TestScreenProps) {
     return <PortraitTestScreen onBack={() => setMode("menu")} />;
   }
 
+  if (mode === "companion-event") {
+    return <CompanionEventTestScreen onBack={() => setMode("menu")} />;
+  }
+
+  if (mode === "scene-bg") {
+    return <SceneBgTestScreen onBack={() => setMode("menu")} />;
+  }
+
   return (
     <main className="test-screen">
       <motion.section
@@ -120,6 +136,10 @@ export function TestScreen({ onBack }: TestScreenProps) {
 
         {mode === "menu" && (
           <section className="test-menu-grid" aria-label="测试类型">
+            <button type="button" className="test-mode-button" onClick={() => setMode("story")}>
+              <span>剧情节点</span>
+              <small>直接跳到公会、酒馆、同伴选择、黑市、缆梯、孢海据点等主线片段</small>
+            </button>
             <button type="button" className="test-mode-button" onClick={() => setMode("dice-select")}>
               <span>测试骰子</span>
               <small>验证 D4、D6、D8、D12、D20 是否能正常投出结果</small>
@@ -138,8 +158,32 @@ export function TestScreen({ onBack }: TestScreenProps) {
             </button>
             <button type="button" className="test-mode-button" onClick={() => setMode("portrait")}>
               <span>🧑 角色立绘</span>
-              <small>加载全部7位角色的正比立绘，模拟视觉小说对话，验证立绘资源完整性</small>
+              <small>加载同伴与剧情 NPC 立绘，模拟视觉小说对话，验证资源完整性</small>
             </button>
+            <button type="button" className="test-mode-button" onClick={() => setMode("companion-event")}>
+              <span>同伴支线事件</span>
+              <small>布洛克"回声菌林"：触发顺序、危机战斗、信任奖励与 AI 自由对话</small>
+            </button>
+            <button type="button" className="test-mode-button" onClick={() => setMode("scene-bg")}>
+              <span>🖼 场景背景</span>
+              <small>验证多阶段背景切换（初见逆穹城 → 教学战斗），测试立绘叠加透明度效果</small>
+            </button>
+          </section>
+        )}
+
+        {mode === "story" && (
+          <section className="test-menu-grid" aria-label="剧情测试节点">
+            {STORY_TEST_CHECKPOINTS.map((checkpoint) => (
+              <button
+                key={checkpoint.id}
+                type="button"
+                className="test-mode-button"
+                onClick={() => onStoryTest(checkpoint)}
+              >
+                <span>{checkpoint.label}</span>
+                <small>{checkpoint.desc}</small>
+              </button>
+            ))}
           </section>
         )}
 
@@ -150,8 +194,8 @@ export function TestScreen({ onBack }: TestScreenProps) {
               <small>选择后进入判定界面</small>
             </div>
             <div className="dice-option-grid">
-              {DICE_OPTIONS.map((item) => (
-                <button key={item.type} type="button" className="dice-option-button" onClick={() => selectDie(item.type)}>
+              {DICE_OPTIONS.map((item, idx) => (
+                <button key={`${item.type}-${idx}`} type="button" className="dice-option-button" onClick={() => selectDie(item.type, idx === 5)}>
                   <b>D{item.sides}</b>
                   <span>{item.label}</span>
                 </button>
@@ -163,8 +207,8 @@ export function TestScreen({ onBack }: TestScreenProps) {
         {mode === "dice-roll" && (
           <section className="dice-judge-panel">
             <div className="test-section-title">
-              <span>{currentDie.label}判定</span>
-              <small>点击投骰，确认 {`D${currentDie.sides}`} 可以生成结果</small>
+              <span>{currentDie.label}判定{isAttackD20 ? " · 攻击模式" : ""}</span>
+              <small>点击投骰，确认 {`D${currentDie.sides}`}{isAttackD20 ? " 暗红金配色" : ""} 可以生成结果</small>
             </div>
 
             <div className="dice-judge-board">
@@ -194,7 +238,14 @@ export function TestScreen({ onBack }: TestScreenProps) {
         )}
       </motion.section>
 
-      <DiceRollOverlay dice={activeDice} dieType={selectedDie} onClose={() => setActiveDice(null)} />
+      <DiceRollOverlay
+        dice={activeDice}
+        dieType={selectedDie}
+        attackMode={isAttackD20}
+        diceKind={isAttackD20 ? "命中判定" : `D${currentDie.sides} 测试`}
+        showD20Calc={isAttackD20}
+        onClose={() => setActiveDice(null)}
+      />
     </main>
   );
 }

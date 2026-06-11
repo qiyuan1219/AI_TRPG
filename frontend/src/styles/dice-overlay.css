@@ -1,0 +1,319 @@
+﻿/* ============================================================
+   楠板瓙妫€瀹氳鐩栧眰 (娣辩传閹忛噾 3D)
+   ============================================================ */
+.dice-continue-hint {
+  z-index: 63;
+  pointer-events: none;
+  text-align: center;
+}
+
+.dice-continue-hint span {
+  display: inline-block;
+  padding: 10px 28px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(231, 211, 161, 0.35);
+  color: rgba(231, 211, 161, 0.9);
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  animation: diceHintPulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes diceHintPulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+.dice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.dice-modal-3d {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 36px 48px 44px;
+  border: 1px solid rgba(212, 168, 67, 0.25);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(28, 20, 48, 0.95), rgba(14, 10, 28, 0.95));
+  box-shadow:
+    0 0 60px rgba(72, 30, 120, 0.2),
+    0 30px 80px rgba(0, 0, 0, 0.55);
+  min-width: 320px;
+}
+
+/* 3D 楠板瓙鐢诲竷 */
+.dice-canvas-wrap {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #0a0a12;
+}
+.dice-canvas-wrap canvas { display: block; }
+
+/* 缁撴灉寰界珷 (缁濆瀹氫綅鍦ㄧ敾甯冧腑澶? */
+.dice-result-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(55,37,84,0.94), rgba(30,18,52,0.94));
+  border: 3px solid rgba(212,168,67,0.75);
+  box-shadow: 0 0 30px rgba(212,168,67,0.35), 0 0 60px rgba(120,60,180,0.25), inset 0 0 14px rgba(180,140,220,0.15);
+  pointer-events: none;
+}
+
+.badge-num {
+  font-size: 40px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #e8c547;
+  text-shadow: 0 0 10px rgba(232,197,71,0.5), 0 1px 2px rgba(0,0,0,0.4);
+  line-height: 1;
+}
+
+.badge-crit {
+  background: linear-gradient(135deg, rgba(60,35,100,0.96), rgba(35,15,65,0.96));
+  border-color: rgba(255,215,0,0.85);
+  box-shadow:
+    0 0 45px rgba(255,215,0,0.55),
+    0 0 90px rgba(255,180,0,0.3),
+    0 0 120px rgba(150,60,255,0.2);
+  animation: badge-glow 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes badge-glow {
+  from {
+    box-shadow: 0 0 45px rgba(255,215,0,0.5), 0 0 90px rgba(255,180,0,0.25), 0 0 120px rgba(150,60,255,0.15);
+  }
+  to {
+    box-shadow: 0 0 60px rgba(255,215,0,0.7), 0 0 110px rgba(255,200,50,0.35), 0 0 140px rgba(180,80,255,0.3);
+  }
+}
+
+.badge-fumble {
+  background: linear-gradient(135deg, rgba(50,20,40,0.96), rgba(30,8,20,0.96));
+  border-color: rgba(255,100,100,0.65);
+  box-shadow:
+    0 0 30px rgba(211,99,99,0.45),
+    0 0 60px rgba(150,40,80,0.25);
+}
+
+/* 鈹€鈹€ 妫€瀹氫俊鎭?鈹€鈹€ */
+.dice-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dice-attr {
+  font-size: 0.85rem;
+  color: #a898c0;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+/* 骰子定位标签 */
+.dice-kind-tag {
+  display: inline-block;
+  padding: 3px 14px;
+  border: 1px solid rgba(232, 197, 71, 0.4);
+  border-radius: 999px;
+  background: rgba(232, 197, 71, 0.08);
+  color: #f0d060;
+  font-size: 0.85rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+/* 角色 · 技能名 */
+.dice-char-skill {
+  font-size: 0.92rem;
+  color: #c8b8e0;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+/* 新版计算式 */
+.dice-calc-v2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  font-size: 1.2rem;
+  color: #a898c0;
+}
+
+.dice-eq-total {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: #e8c547;
+  text-shadow: 0 0 12px rgba(232, 197, 71, 0.35);
+}
+
+.dice-eq-sep {
+  color: #6b6b7b;
+  font-size: 1rem;
+  margin: 0 2px;
+}
+
+.dice-eq-roll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(10, 10, 18, 0.6);
+  border: 1px solid rgba(232, 197, 71, 0.25);
+  color: #e8c547;
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dice-eq-bonus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(95, 183, 167, 0.1);
+  border: 1px solid rgba(95, 183, 167, 0.3);
+  color: #5fb7a7;
+  font-size: 1.05rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dice-calc {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 1.15rem;
+  color: #a898c0;
+}
+
+.dice-roll-val {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.text-teal { color: #5fb7a7 !important; }
+.text-danger { color: #d36363 !important; }
+
+.dice-total {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #e8c547;
+  text-shadow: 0 0 10px rgba(232,197,71,0.3);
+}
+
+.dice-dc {
+  font-size: 0.95rem;
+  color: #a898c0;
+  letter-spacing: 0.03em;
+}
+
+/* 鎴愬姛/澶辫触鍒ゅ畾 */
+.dice-verdict {
+  margin-top: 12px;
+  padding: 8px 28px;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.verdict-success {
+  background: rgba(115, 198, 157, 0.12);
+  border: 1px solid rgba(115, 198, 157, 0.4);
+  color: #73c69d;
+  text-shadow: 0 0 14px rgba(115, 198, 157, 0.35);
+}
+
+.verdict-fail {
+  background: rgba(211, 99, 99, 0.1);
+  border: 1px solid rgba(211, 99, 99, 0.4);
+  color: #d36363;
+  text-shadow: 0 0 14px rgba(211, 99, 99, 0.3);
+}
+
+.verdict-neutral {
+  background: rgba(95, 183, 167, 0.1);
+  border: 1px solid rgba(95, 183, 167, 0.36);
+  color: #5fb7a7;
+  text-shadow: 0 0 14px rgba(95, 183, 167, 0.28);
+}
+
+/* 多骰子并排布局 */
+.dice-multi-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.dice-multi-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.dice-multi-num {
+  font-size: 1.4rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #e8c547;
+  text-shadow: 0 0 10px rgba(232, 197, 71, 0.45);
+  line-height: 1;
+}
+
+.dice-multi-num.text-teal { color: #5fb7a7 !important; }
+.dice-multi-num.text-danger { color: #d36363 !important; }
+
+.dice-plus-sep {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #d4a843;
+  text-shadow: 0 0 8px rgba(212, 168, 67, 0.35);
+  margin: 0 2px;
+}
+
+.dice-adv-picked {
+  color: #f0d060 !important;
+  text-shadow: 0 0 12px rgba(240, 208, 96, 0.6);
+  font-weight: 900;
+}
+
+.dice-adv-unused {
+  color: #6b6b7b !important;
+  text-shadow: none;
+  opacity: 0.5;
+}
+

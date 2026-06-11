@@ -202,7 +202,7 @@ export const DND_COMPANIONS: CompanionPreset[] = [
   {
     id: 'selin',
     name: '瑟琳',
-    title: '瑟琳·逆钟',
+    title: '“银杖”瑟琳',
     role: '时间魔法师 / 固定同行',
     hp: 34,
     ac: 14,
@@ -249,8 +249,8 @@ export const DND_COMPANIONS: CompanionPreset[] = [
   },
   {
     id: 'senluo',
-    name: '森洛',
-    title: '森洛·铁锅',
+    name: '布洛克',
+    title: '布洛克·铁锅',
     role: '矮人战士 / 孢海向导',
     hp: 46,
     ac: 16,
@@ -297,8 +297,8 @@ export const DND_COMPANIONS: CompanionPreset[] = [
   },
   {
     id: 'liyase',
-    name: '莉亚瑟',
-    title: '莉亚瑟·青弦',
+    name: '莉娅',
+    title: '“精灵”莉娅',
     role: '精灵游侠 / 弓箭手',
     hp: 34,
     ac: 15,
@@ -399,8 +399,8 @@ export const DND_COMPANIONS: CompanionPreset[] = [
   },
   {
     id: 'kelaiya',
-    name: '克莱娅',
-    title: '克莱娅·软爪',
+    name: '凯娅',
+    title: '“软爪”凯娅',
     role: '兽族盗贼 / 怪物猎人',
     hp: 36,
     ac: 16,

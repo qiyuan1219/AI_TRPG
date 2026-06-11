@@ -1,0 +1,393 @@
+﻿/* ============================================================
+   蹇墖楠板瓙娓告垙 (Dice Poker)
+   ============================================================ */
+.dice-poker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.dice-poker-modal {
+  width: min(760px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(22, 18, 38, 0.97), rgba(10, 8, 18, 0.97));
+  box-shadow: 0 0 80px rgba(72, 30, 120, 0.25), 0 40px 100px rgba(0, 0, 0, 0.6);
+}
+
+.dice-poker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(231, 211, 161, 0.2);
+}
+
+.dice-poker-header span {
+  color: var(--gold-soft);
+  font-size: 1.18rem;
+  font-weight: 900;
+}
+
+.dice-poker-header button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid rgba(231,211,161,0.22);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.045);
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.dice-poker-header button:hover {
+  color: var(--text);
+  border-color: rgba(239,213,140,0.5);
+}
+
+/* 楠板瓙灞曠ず鍖?*/
+.dice-poker-dice-area {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 0;
+}
+
+.dice-poker-die {
+  position: relative;
+  width: 98px;
+  height: 98px;
+  border: 2px solid rgba(231,211,161,0.24);
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1c182e, #121022);
+  cursor: pointer;
+  transition: all 180ms ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+.dice-poker-die:hover {
+  border-color: rgba(239,213,140,0.6);
+  transform: translateY(-6px);
+}
+
+.dice-poker-die.selected {
+  border-color: var(--teal) !important;
+  border-width: 3px;
+  background: linear-gradient(135deg, #1a2e2e, #0f2222);
+  box-shadow: 0 0 28px rgba(95,183,167,0.4);
+}
+
+.dice-poker-die.locked {
+  cursor: default;
+  opacity: 0.8;
+}
+
+.dice-kept-mark {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--teal);
+  color: #101217;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+/* 楠板瓙闈?*/
+.dice-face {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  gap: 4px;
+}
+
+.dice-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.dice-dot {
+  border-radius: 50%;
+}
+
+.dice-dot.filled {
+  background: radial-gradient(circle at 40% 40%, #efd58c, #d4a843);
+  box-shadow: 0 0 6px rgba(239,213,140,0.4);
+}
+
+/* 鎿嶄綔鎸夐挳 */
+.dice-poker-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0 16px;
+  flex-wrap: wrap;
+}
+
+.poker-btn {
+  min-height: 40px;
+  padding: 8px 18px;
+  border: 1px solid rgba(231,211,161,0.22);
+  border-radius: 8px;
+  font-size: 0.93rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.poker-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.poker-btn-primary {
+  background: rgba(212,168,67,0.16);
+  border-color: rgba(239,213,140,0.42);
+  color: var(--gold-soft);
+}
+
+.poker-btn-primary:hover:not(:disabled) {
+  background: rgba(212,168,67,0.26);
+}
+
+.poker-btn-secondary {
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+}
+
+.poker-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(231,211,161,0.5);
+  color: var(--text);
+}
+
+.poker-btn-accent {
+  background: rgba(95,183,167,0.12);
+  border-color: rgba(95,183,167,0.36);
+  color: var(--teal);
+}
+
+.poker-btn-accent:hover:not(:disabled) {
+  background: rgba(95,183,167,0.22);
+}
+
+/* AI绛栫暐鎻愮ず */
+.dice-poker-hint {
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid rgba(95,183,167,0.36);
+  border-radius: 8px;
+  background: rgba(95,183,167,0.08);
+}
+
+.hint-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.dice-poker-hint pre {
+  margin: 0;
+  color: #c8e8e2;
+  font-family: "Crimson Text", Georgia, "Noto Serif SC", serif;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* 璁″垎闈㈡澘 */
+.dice-poker-score-panel {
+  margin-bottom: 14px;
+}
+
+.dice-poker-score-panel h3 {
+  margin: 0 0 10px;
+  color: var(--gold-soft);
+  font-size: 1rem;
+}
+
+.score-categories {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.score-category-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid rgba(231,211,161,0.16);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.score-category-btn:hover:not(:disabled) {
+  border-color: rgba(239,213,140,0.5);
+}
+
+.score-category-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.score-category-btn.high {
+  border-left: 3px solid var(--success);
+}
+.score-category-btn.mid {
+  border-left: 3px solid var(--teal);
+}
+.score-category-btn.low {
+  border-left: 3px solid var(--muted);
+}
+
+.cat-name { font-weight: 700; }
+.cat-score {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-weight: 900;
+}
+
+/* 鍙欎簨鍖?*/
+.dice-poker-narrative {
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid rgba(231,211,161,0.14);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.24);
+}
+
+.dice-poker-narrative p {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* 缁撴灉闈㈡澘 */
+.dice-poker-result {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(231,211,161,0.18);
+}
+
+.result-banner {
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.result-win {
+  background: rgba(115,198,157,0.12);
+  border: 1px solid rgba(115,198,157,0.4);
+  color: var(--success);
+}
+
+.result-tie {
+  background: rgba(95,183,167,0.1);
+  border: 1px solid rgba(95,183,167,0.3);
+  color: var(--teal);
+}
+
+.result-lose {
+  background: rgba(211,99,99,0.1);
+  border: 1px solid rgba(211,99,99,0.3);
+  color: var(--danger);
+}
+
+.result-scores {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  color: var(--muted);
+  font-family: Consolas, monospace;
+}
+
+.result-trust {
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.result-trust.positive { color: var(--success); }
+.result-trust.negative { color: var(--danger); }
+
+@media (max-width: 640px) {
+  .dice-poker-dice-area {
+    gap: 6px;
+    padding: 12px 0;
+  }
+  .dice-poker-die {
+    width: 60px;
+    height: 60px;
+  }
+  .score-categories {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 蹇墖楠板瓙鍏ュ彛鎸夐挳锛堥厭棣嗗満鏅笅鏄剧ず鍦ㄦ父鎴忕敾闈笂锛?*/
+.game-dice-poker-btn {
+  position: absolute;
+  top: 64px;
+  left: 140px;
+  z-index: 8;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 2px solid rgba(95,183,167,0.48);
+  border-radius: 8px;
+  background: rgba(13,22,26,0.72);
+  color: var(--teal);
+  font-weight: 900;
+  font-size: 0.92rem;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  animation: dice-btn-pulse 2.4s ease-in-out infinite;
+}
+.game-dice-poker-btn:hover {
+  border-color: rgba(95,183,167,0.85);
+  background: rgba(95,183,167,0.15);
+  animation: none;
+}
+.game-bargain-btn {
+  left: 260px;
+  border-color: rgba(226,177,89,0.5);
+  color: #e2b159;
+}
+.game-bargain-btn:hover {
+  border-color: rgba(226,177,89,0.9);
+  background: rgba(226,177,89,0.16);
+}
+@keyframes dice-btn-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(95,183,167,0.15); }
+  50% { box-shadow: 0 0 22px rgba(95,183,167,0.4); }
+}
+

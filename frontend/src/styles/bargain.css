@@ -1,0 +1,302 @@
+﻿/* ============================================================
+   璁蹭环娓告垙 鈥?瑙嗚灏忚椋庢牸  V2
+   ============================================================ */
+.bargain-vn-screen {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  position: relative;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+.bargain-vn-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(9, 12, 15, 0.65), rgba(6, 8, 11, 0.94)),
+    repeating-linear-gradient(0deg, rgba(95, 183, 167, 0.04) 0 3px, transparent 3px 64px),
+    repeating-linear-gradient(90deg, rgba(212, 168, 67, 0.05) 0 1px, transparent 1px 88px),
+    #12151b;
+}
+
+.bargain-vn-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 35%, transparent 40%, rgba(0,0,0,0.55));
+}
+
+.bargain-vn-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: rgba(8, 10, 14, 0.72);
+  border-bottom: 1px solid rgba(231, 211, 161, 0.12);
+  color: var(--teal);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.bargain-vn-currency {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 1.05rem;
+}
+
+/* 鑸炲彴锛氳€佹澘鍖哄煙 */
+.bargain-vn-stage {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 20px;
+}
+
+.bargain-vn-items {
+  display: flex;
+  gap: 8px;
+}
+
+.bargain-vn-items button {
+  padding: 6px 16px;
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bargain-vn-items button.is-active {
+  border-color: rgba(95, 183, 167, 0.7);
+  background: rgba(95, 183, 167, 0.12);
+  color: var(--teal);
+}
+
+.bargain-vn-items button em {
+  margin-left: 6px;
+  color: var(--gold-soft);
+  font-style: normal;
+}
+
+/* 鑰佹澘绔嬬粯 + 姘旀场 */
+.bargain-vn-boss-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 720px;
+  width: 100%;
+  position: relative;
+}
+
+.bargain-vn-dice-spin {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 14px;
+  border-radius: 12px;
+  background: rgba(212, 168, 67, 0.2);
+  color: var(--gold-soft);
+  font-size: 0.88rem;
+  animation: bargainPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes bargainPulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+.bargain-vn-boss-portrait {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bargain-vn-boss-face {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(212, 168, 67, 0.35);
+  border-radius: 50%;
+  background: rgba(16, 19, 26, 0.82);
+  box-shadow: 0 0 28px rgba(212, 168, 67, 0.1);
+}
+
+.bargain-vn-boss-face span {
+  font-size: 2rem;
+}
+
+.bargain-vn-boss-face small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.bargain-vn-boss-bubble {
+  flex: 1;
+  min-height: 54px;
+  padding: 14px 18px;
+  border-radius: 12px 12px 12px 2px;
+  background: rgba(20, 24, 33, 0.88);
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  color: var(--text);
+  line-height: 1.6;
+  position: relative;
+}
+
+.bargain-vn-boss-bubble p {
+  margin: 0;
+}
+
+.bargain-vn-boss-bubble .muted {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.bargain-vn-tag {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.bargain-vn-tag.agree {
+  background: rgba(95, 183, 167, 0.16);
+  color: #5fb7a7;
+}
+
+.bargain-vn-tag.reject {
+  background: rgba(239, 130, 130, 0.14);
+  color: #ef8282;
+}
+
+/* 璁蹭环鏃堕棿绾?*/
+.bargain-vn-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 720px;
+  width: 100%;
+  justify-content: center;
+}
+
+.bargain-vn-timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.76rem;
+  border-left: 3px solid transparent;
+}
+
+.bargain-vn-timeline-item.agree { border-left-color: #5fb7a7; }
+.bargain-vn-timeline-item.reject { border-left-color: #ef8282; }
+
+.bargain-vn-timeline-num { color: var(--muted); font-weight: 900; }
+.bargain-vn-timeline-dice { color: var(--teal); }
+.bargain-vn-timeline-words { color: var(--text); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bargain-vn-timeline-price { color: var(--gold-soft); font-family: Consolas, monospace; margin-left: auto; }
+
+/* 搴曢儴锛氳瘽鏈€夋嫨 */
+.bargain-vn-actions {
+  position: relative;
+  z-index: 10;
+  padding: 12px 20px 18px;
+  background: rgba(8, 10, 14, 0.78);
+  border-top: 1px solid rgba(231, 211, 161, 0.12);
+}
+
+.bargain-vn-prompt {
+  text-align: center;
+  margin: 0 0 10px;
+  color: var(--gold-soft);
+  font-weight: 900;
+  font-size: 0.92rem;
+}
+
+.bargain-vn-prompt small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.bargain-vn-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.bargain-vn-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(231, 211, 161, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  text-align: left;
+  line-height: 1.55;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.88rem;
+}
+
+.bargain-vn-choice:hover:not(:disabled) {
+  border-color: rgba(95, 183, 167, 0.5);
+  background: rgba(95, 183, 167, 0.08);
+}
+
+.bargain-vn-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bargain-vn-choice-tag {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: rgba(212, 168, 67, 0.18);
+  color: var(--gold-soft);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+/* 绛夊緟 / 缁撴潫鐘舵€?*/
+.bargain-vn-waiting,
+.bargain-vn-gameover {
+  text-align: center;
+  color: var(--text);
+}
+
+.bargain-vn-waiting p,
+.bargain-vn-gameover p {
+  margin: 0 0 6px;
+}
+
+.bargain-vn-gameover .muted {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+

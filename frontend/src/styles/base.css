@@ -1,0 +1,148 @@
+﻿:root {
+  color-scheme: dark;
+  --ink: #111318;
+  --panel: rgba(17, 19, 24, 0.78);
+  --panel-solid: #171a21;
+  --line: rgba(231, 211, 161, 0.28);
+  --line-strong: rgba(231, 211, 161, 0.54);
+  --text: #f5ecd8;
+  --muted: #b9b3a5;
+  --gold: #d4a843;
+  --gold-soft: #efd58c;
+  --teal: #5fb7a7;
+  --wine: #9c3f57;
+  --danger: #d36363;
+  --success: #73c69d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #101217;
+  color: var(--text);
+  font-family: "Crimson Text", Georgia, "Noto Serif SC", serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.loading-screen,
+.start-screen,
+.load-game-screen,
+.test-screen {
+  min-height: 100vh;
+  overflow: auto;
+  background:
+    linear-gradient(180deg, rgba(10, 17, 23, 0.5), rgba(10, 11, 15, 0.94)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 96px),
+    #151a21;
+}
+
+.loading-screen {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.loading-panel {
+  width: min(420px, 100%);
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(14, 17, 23, 0.82);
+  text-align: center;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.loading-panel h1,
+.start-header h1 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+.loading-sigil {
+  display: grid;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 18px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--gold-soft);
+  font-weight: 700;
+}
+
+.loading-rule {
+  width: 76px;
+  height: 1px;
+  margin: 18px auto 24px;
+  background: var(--line-strong);
+}
+
+.loading-panel p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.loading-error {
+  color: var(--danger) !important;
+}
+
+.loading-detail {
+  margin: 8px 0 18px !important;
+  font-size: 0.92rem;
+}
+
+.primary-button,
+.start-button,
+.custom-action button {
+  border: 1px solid rgba(239, 213, 140, 0.5);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #c99a37, #8f6723);
+  color: #fff7df;
+  font-weight: 700;
+}
+
+.ghost-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(231, 211, 161, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--gold-soft);
+  font-weight: 700;
+}
+
+.ghost-button:hover:not(:disabled) {
+  border-color: rgba(95, 183, 167, 0.72);
+  background: rgba(95, 183, 167, 0.12);
+}
+

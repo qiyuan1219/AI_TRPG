@@ -15,6 +15,12 @@ export interface DiceRollOverlayProps {
   dice: DiceResult | null;
   dieType?: DieType;
   onClose: () => void;
+  attackMode?: boolean;
+  attackMissed?: boolean;
+  targetAc?: number;
+  diceKind?: string;        // "命中判定" / "伤害掷骰" / "治疗掷骰" / "检定" 等
+  charSkill?: string;        // "雷铎 · 盾墙格挡"
+  showD20Calc?: boolean;    // 命中骰时显示 D20+加值=总计 vs AC
 }
 
 export interface Dice3DViewProps {
@@ -26,6 +32,7 @@ export interface Dice3DViewProps {
   className?: string;
   faceStyle?: "numbers" | "pips";
   showResultBadge?: boolean;
+  variant?: "attack" | "default";
 }
 
 const DIE_SIDES: Record<DieType, number> = {
@@ -37,6 +44,13 @@ const DIE_SIDES: Record<DieType, number> = {
   d20: 20,
 };
 
+function diceSizeForCount(count: number): number {
+  if (count <= 1) return 220;
+  if (count === 2) return 170;
+  if (count === 3) return 140;
+  return 120;
+}
+
 interface FormattedDiceResult {
   dieLabel: string;
   roll: string;
@@ -45,6 +59,12 @@ interface FormattedDiceResult {
   success?: boolean;
   attr?: string;
   verdict?: string;
+  /** 纯伤害/治疗骰多骰子（dice_test类型） */
+  multiDice?: { count: number; dieType: DieType; rolls: number[] };
+  /** attack_roll / skill_check 附带的伤害骰 */
+  damageDice?: { count: number; dieType: DieType; rolls: number[]; bonus: number; total: number };
+  /** 优势/劣势双 D20 */
+  advDice?: { type: "advantage" | "disadvantage"; rolls: [number, number] };
 }
 
 function dieTypeFromDice(dice: DiceResult, fallback: DieType): DieType {
@@ -58,6 +78,38 @@ function dieTypeFromDice(dice: DiceResult, fallback: DieType): DieType {
   return fallback;
 }
 
+function extractAdvDice(d: Record<string, any>): FormattedDiceResult["advDice"] {
+  const type = d["优势掷骰"];
+  const rolls = d["优势骰"];
+  if (!type || !rolls || rolls.length !== 2) return undefined;
+  return { type: type as "advantage" | "disadvantage", rolls: rolls as [number, number] };
+}
+
+function extractDamageDice(d: Record<string, any>): FormattedDiceResult["damageDice"] {
+  if (!d["附带伤害骰"]) return undefined;
+  const rolls: number[] = d["全部伤害掷骰"];
+  const dieType = dieTypeFromRaw(String(d["伤害骰面"] ?? "d6")) ?? "d6";
+  if (!rolls || rolls.length === 0) return undefined;
+  return {
+    count: rolls.length,
+    dieType,
+    rolls,
+    bonus: Number(d["伤害加值"] ?? 0),
+    total: Number(d["伤害总计"] ?? 0),
+  };
+}
+
+function dieTypeFromRaw(raw: string): DieType | null {
+  const lower = raw.toLowerCase();
+  if (lower.includes("d4")) return "d4";
+  if (lower.includes("d6")) return "d6";
+  if (lower.includes("d8")) return "d8";
+  if (lower.includes("d10")) return "d10";
+  if (lower.includes("d12")) return "d12";
+  if (lower.includes("d20")) return "d20";
+  return null;
+}
+
 function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDiceResult {
   const d = dice.data;
   const resolvedDieType = dieTypeFromDice(dice, fallbackDieType);
@@ -65,17 +117,24 @@ function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDice
 
   if (dice.type === "dice_test") {
     const raw = String(d["结果"] ?? d.roll ?? d["掷骰"]?.match(/D\d+=(\d+)/)?.[1] ?? "?");
+    const allRolls: number[] | undefined = d["全部掷骰"];
+    const multiDice = allRolls && allRolls.length > 1
+      ? { count: allRolls.length, dieType: dieTypeFromDice(dice, fallbackDieType), rolls: allRolls }
+      : undefined;
     return {
       dieLabel,
       roll: raw,
       total: String(d["总计"] ?? raw),
       attr: String(d["属性"] ?? "骰子测试"),
       verdict: String(d["描述"] ?? "结果已生成"),
+      multiDice,
     };
   }
 
   if (dice.type === "skill_check") {
     const raw = d["掷骰"]?.replace("D20=", "") || "?";
+    const damageDice = extractDamageDice(d);
+    const advDice = extractAdvDice(d);
     return {
       dieLabel: "D20",
       roll: raw,
@@ -83,9 +142,13 @@ function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDice
       dc: String(d["DC"] ?? "?"),
       success: Boolean(d["成功"]),
       attr: String(d["属性"] ?? ""),
+      damageDice,
+      advDice,
     };
   }
   const raw = d["攻击掷骰"]?.match(/D20=(\d+)/)?.[1] || "?";
+  const damageDice = extractDamageDice(d);
+  const advDice = extractAdvDice(d);
   return {
     dieLabel: "D20",
     roll: raw,
@@ -93,21 +156,23 @@ function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDice
     dc: "AC" + String(d["目标AC"] ?? "?"),
     success: Boolean(d["命中"]),
     attr: String(d["武器"] ?? ""),
+    damageDice,
+    advDice,
   };
 }
 
 function createDieGeometry(dieType: DieType, radius: number) {
   switch (dieType) {
     case "d4":
-      return new THREE.TetrahedronGeometry(radius, 0);
+      return new THREE.TetrahedronGeometry(radius * 1.15, 0);
     case "d6":
-      return new THREE.BoxGeometry(radius * 2, radius * 2, radius * 2);
+      return new THREE.BoxGeometry(radius * 1.15, radius * 1.15, radius * 1.15);
     case "d8":
-      return new THREE.OctahedronGeometry(radius, 0);
+      return new THREE.OctahedronGeometry(radius * 1.1, 0);
     case "d10":
-      return new THREE.CylinderGeometry(radius * 0.82, radius * 0.82, radius * 1.95, 10, 1, false);
+      return new THREE.CylinderGeometry(radius * 0.9, radius * 0.9, radius * 1.95, 10, 1, false);
     case "d12":
-      return new THREE.DodecahedronGeometry(radius, 0);
+      return new THREE.DodecahedronGeometry(radius * 0.98, 0);
     case "d20":
     default:
       return new THREE.IcosahedronGeometry(radius, 0);
@@ -175,12 +240,12 @@ function polyFaceData(geo: THREE.BufferGeometry, sides: number) {
   return result;
 }
 
-function makeNumTex(num: number): THREE.CanvasTexture {
+function makeNumTex(num: number, isAttack: boolean = false): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = 72;
   c.height = 72;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#d4a843";
+  ctx.fillStyle = isAttack ? "#f0d060" : "#d4a843";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = "bold 70px Georgia, serif";
@@ -221,7 +286,7 @@ function makePipTex(num: number): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
-export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOverlayProps) {
+export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = false, attackMissed = false, targetAc = 0, diceKind, charSkill, showD20Calc }: DiceRollOverlayProps) {
   const [show, setShow] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -317,13 +382,115 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
         animate={{ scale: show ? 1 : 0.6, opacity: show ? 1 : 0 }}
         transition={{ type: "spring", stiffness: 260, damping: 22 }}
       >
-        <Dice3DView
-          key={dice ? (dice.data["id"] ?? "roll") : "idle"}
-          dieType={resultDieType}
-          roll={Number(result?.roll)}
-          rolling={rolling}
-          revealed={revealed}
-        />
+        {result?.damageDice && !attackMode ? (
+          /* 非攻击模式：D20 + 伤害骰组合显示 */
+          <div className="dice-multi-row">
+            <div className="dice-multi-item">
+              <Dice3DView
+                key={`${dice?.data["id"] ?? "roll"}-d20`}
+                dieType={resultDieType}
+                roll={Number(result?.roll)}
+                rolling={rolling}
+                revealed={revealed}
+                size={200}
+              />
+            </div>
+            <span className="dice-plus-sep">+</span>
+            {result.damageDice.rolls.map((rollValue, idx) => (
+              <div className="dice-multi-item" key={`dmg-${idx}`}>
+                <Dice3DView
+                  key={`${dice?.data["id"] ?? "roll"}-dmg-${idx}`}
+                  dieType={result.damageDice!.dieType}
+                  roll={rollValue}
+                  rolling={rolling}
+                  revealed={revealed}
+                  size={diceSizeForCount(result.damageDice!.count)}
+                  showResultBadge={false}
+                />
+                {revealed && (
+                  <motion.span
+                    className={`dice-multi-num ${rollValue === DIE_SIDES[result.damageDice!.dieType] ? "text-teal" : ""} ${rollValue === 1 ? "text-danger" : ""}`}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.3, type: "spring", stiffness: 360 }}
+                  >
+                    {rollValue}
+                  </motion.span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : result?.multiDice ? (
+          /* 纯伤害/治疗多骰子 */
+          <div className="dice-multi-row">
+            {result.multiDice.rolls.map((rollValue, idx) => (
+              <div className="dice-multi-item" key={idx}>
+                <Dice3DView
+                  key={`${dice?.data["id"] ?? "roll"}-${idx}`}
+                  dieType={result.multiDice!.dieType}
+                  roll={rollValue}
+                  rolling={rolling}
+                  revealed={revealed}
+                  size={diceSizeForCount(result.multiDice!.count)}
+                  showResultBadge={false}
+                />
+                {revealed && (
+                  <motion.span
+                    className={`dice-multi-num ${rollValue === DIE_SIDES[result.multiDice!.dieType] ? "text-teal" : ""} ${rollValue === 1 ? "text-danger" : ""}`}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.25, type: "spring", stiffness: 360 }}
+                  >
+                    {rollValue}
+                  </motion.span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : result?.advDice ? (
+          /* 优势/劣势双 D20 */
+          <div className="dice-multi-row">
+            {result.advDice.rolls.map((rollValue, idx) => {
+              const isPicked = result.advDice!.type === "advantage"
+                ? rollValue === Math.max(...result.advDice!.rolls)
+                : rollValue === Math.min(...result.advDice!.rolls);
+              return (
+                <div className="dice-multi-item" key={`adv-${idx}`}>
+                  <Dice3DView
+                    key={`${dice?.data["id"] ?? "roll"}-adv-${idx}`}
+                    dieType="d20"
+                    roll={rollValue}
+                    rolling={rolling}
+                    revealed={revealed}
+                    size={160}
+                    showResultBadge={false}
+                    variant="attack"
+                  />
+                  {revealed && (
+                    <motion.span
+                      className={`dice-multi-num ${isPicked ? "dice-adv-picked" : "dice-adv-unused"} ${rollValue === 20 ? "text-teal" : ""} ${rollValue === 1 ? "text-danger" : ""}`}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.25, type: "spring", stiffness: 360 }}
+                    >
+                      {rollValue}
+                      {isPicked ? " ✓" : ""}
+                    </motion.span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <Dice3DView
+            key={dice ? (dice.data["id"] ?? "roll") : "idle"}
+            dieType={resultDieType}
+            roll={Number(result?.roll)}
+            rolling={rolling}
+            revealed={revealed}
+            variant={attackMode ? "attack" : "default"}
+          />
+        )}
 
         {revealed && result && (
           <motion.div
@@ -332,27 +499,81 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            {result.attr && <div className="dice-attr">{result.attr}</div>}
-            <div className="dice-calc">
-              <span>{result.dieLabel}</span>
-              <span
-                className={`dice-roll-val ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}
-              >
-                {result.roll}
-              </span>
-              {bonus !== 0 && (
+            {/* 第一行：骰子定位标签 */}
+            {diceKind && <div className="dice-kind-tag">{diceKind}</div>}
+
+            {/* 第二行：角色 · 技能名（命中骰可跳过） */}
+            {charSkill && !showD20Calc && <div className="dice-char-skill">{charSkill}</div>}
+
+            {/* 第三行：计算式 */}
+            <div className="dice-calc dice-calc-v2">
+              {result.multiDice ? (
                 <>
-                  <span>{bonus > 0 ? "+" : ""}</span>
-                  <span>{bonus}</span>
+                  {/* 多骰子：总计 = 骰1 + 骰2 + 加成 */}
+                  <span className="dice-total dice-eq-total">{result.total}</span>
+                  <span className="dice-eq-sep">=</span>
+                  {result.multiDice.rolls.map((rv, idx) => (
+                    <span key={idx} className="dice-eq-roll">{rv}</span>
+                  ))}
+                  {bonus > 0 && (
+                    <>
+                      <span className="dice-eq-sep">+</span>
+                      <span className="dice-eq-bonus">{bonus}</span>
+                    </>
+                  )}
+                  {bonus < 0 && (
+                    <span className="dice-eq-bonus">{bonus}</span>
+                  )}
                 </>
-              )}
-              {(bonus !== 0 || result.total !== result.roll) && (
+              ) : result.damageDice ? (
                 <>
-                  <span>=</span>
-                  <span className="dice-total">{result.total}</span>
+                  {/* D20 + 伤害骰 */}
+                  <span className="dice-total dice-eq-total">
+                    {Number(result.roll) + result.damageDice.total}
+                  </span>
+                  <span className="dice-eq-sep">=</span>
+                  <span className="dice-eq-roll">{result.roll}</span>
+                  <span className="dice-eq-sep">+</span>
+                  {result.damageDice.rolls.map((rv, idx) => (
+                    <span key={idx} className="dice-eq-roll">{rv}</span>
+                  ))}
+                  {result.damageDice.bonus > 0 && (
+                    <>
+                      <span className="dice-eq-sep">+</span>
+                      <span className="dice-eq-bonus">{result.damageDice.bonus}</span>
+                    </>
+                  )}
+                </>
+              ) : showD20Calc ? (
+                <>
+                  {/* 命中 D20：显示 D20+加值=总计，vs AC */}
+                  <span className="dice-total dice-eq-total">{result.total}</span>
+                  <span className="dice-eq-sep">=</span>
+                  <span className={`dice-eq-roll ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}>{result.roll}</span>
+                  {bonus !== 0 && (
+                    <>
+                      <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
+                      <span className="dice-eq-bonus">{bonus}</span>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* 单骰子 */}
+                  <span className="dice-total dice-eq-total">{result.total}</span>
+                  <span className="dice-eq-sep">=</span>
+                  <span className={`dice-eq-roll ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}>{result.roll}</span>
+                  {bonus !== 0 && (
+                    <>
+                      <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
+                      <span className="dice-eq-bonus">{bonus}</span>
+                    </>
+                  )}
                 </>
               )}
             </div>
+
+            {/* 第四行：AC/DC 对比 */}
             {result.dc && (
               <div className="dice-dc">
                 <span>/</span>
@@ -372,7 +593,9 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose }: DiceRollOver
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.05, type: "spring", stiffness: 360, damping: 14 }}
               >
-                {result.verdict ||
+                {attackMissed
+                  ? `未命中 (AC ${targetAc}) ✗`
+                  : result.verdict ||
                   (isNatMax
                     ? "🎉 大成功!"
                     : isNat1
@@ -413,6 +636,7 @@ export function Dice3DView({
   className = "",
   faceStyle = "numbers",
   showResultBadge = true,
+  variant = "default",
 }: Dice3DViewProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
@@ -455,11 +679,12 @@ export function Dice3DView({
     const diceGroup = new THREE.Group();
     const dieSides = DIE_SIDES[dieType];
     const bodyGeo = createDieGeometry(dieType, 1.5);
+    const isAttackD20 = variant === "attack" && dieType === "d20";
     diceGroup.add(
       new THREE.Mesh(
         bodyGeo,
         new THREE.MeshStandardMaterial({
-          color: 0x4a2080,
+          color: isAttackD20 ? 0x6b1a1a : 0x4a2080,
           metalness: 0.45,
           roughness: 0.25,
         }),
@@ -472,7 +697,7 @@ export function Dice3DView({
       new LineSegments2(
         eg,
         new LineMaterial({
-          color: 0xd4a843,
+          color: isAttackD20 ? 0xe8c547 : 0xd4a843,
           linewidth: 0.03,
           worldUnits: true,
         }),
@@ -481,17 +706,17 @@ export function Dice3DView({
 
     const faceData =
       dieType === "d6"
-        ? d6FaceData(1.5)
+        ? d6FaceData(1.5 * 1.15 / 2)
         : dieType === "d10"
-          ? d10FaceData(1.5)
+          ? d10FaceData(1.5 * 0.9)
         : polyFaceData(bodyGeo, dieSides);
-    const planeSize = dieType === "d6" ? 1.2 : dieType === "d10" ? 0.72 : 0.55;
+    const planeSize = dieType === "d6" ? 1.2 * 0.58 : dieType === "d10" ? 0.72 : 0.55;
     const usePips = dieType === "d6" && faceStyle === "pips";
     faceData.forEach(({ center, normal }, i) => {
       const plane = new THREE.Mesh(
         new THREE.PlaneGeometry(planeSize, planeSize),
         new THREE.MeshBasicMaterial({
-          map: usePips ? makePipTex(i + 1) : makeNumTex(i + 1),
+          map: usePips ? makePipTex(i + 1) : makeNumTex(i + 1, isAttackD20),
           transparent: true,
           side: THREE.DoubleSide,
         }),
@@ -556,7 +781,7 @@ export function Dice3DView({
       }
       sceneRef.current = null;
     };
-  }, [dieType, faceStyle, size]);
+  }, [dieType, faceStyle, size, variant]);
 
   useEffect(() => {
     const rollNumber = Number(roll);

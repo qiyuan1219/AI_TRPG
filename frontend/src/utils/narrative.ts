@@ -1,4 +1,10 @@
 import type { ActionSuggestion } from '../types/game';
+import {
+  SPEAKER_ALIASES,
+  SPEAKER_ALIASES_SORTED,
+  findRegisteredSpeaker,
+  resolveSpeakerName,
+} from '../data/characterRegistry';
 
 const HINT_RE = /\[HINTS:([\s\S]*?)\]/g;
 const SENTENCE_END_CHARS = new Set(['。', '！', '？', '!', '?']);
@@ -14,60 +20,6 @@ export interface NarrativeParseResult {
   lastSpeaker: string;
 }
 
-const SPEAKER_ALIASES: Record<string, string> = {
-  // 核心同伴 - 瑟琳
-  '瑟琳·逆钟': '瑟琳',
-  '瑟琳': '瑟琳',
-  '逆钟': '瑟琳',
-  // 可选同伴
-  '森洛·铁锅': '森洛',
-  '森洛': '森洛',
-  '铁锅': '森洛',
-  '莉亚瑟·青弦': '莉亚瑟',
-  '莉亚瑟': '莉亚瑟',
-  '青弦': '莉亚瑟',
-  '艾琳·白枝': '艾琳',
-  '艾琳': '艾琳',
-  '白枝': '艾琳',
-  '克莱娅·软爪': '克莱娅',
-  '克莱娅': '克莱娅',
-  '软爪': '克莱娅',
-  '雷铎·炉心': '雷铎',
-  '雷铎': '雷铎',
-  '炉心': '雷铎',
-  // 剧情NPC
-  '米蕾娜·白契': '米蕾娜',
-  '米蕾娜': '米蕾娜',
-  '白契': '米蕾娜',
-  '赫尔曼·断缆': '赫尔曼',
-  '赫尔曼': '赫尔曼',
-  '断缆': '赫尔曼',
-  '温妮娅·铜铃': '温妮娅',
-  '温妮娅': '温妮娅',
-  '铜铃': '温妮娅',
-  '莱因·铁脊': '莱因',
-  '莱因': '莱因',
-  '铁脊': '莱因',
-  // 纯粹NPC
-  '萨洛·杯底': '萨洛',
-  '萨洛': '萨洛',
-  '海伦特·灰杯': '海伦特',
-  '海伦特': '海伦特',
-  '奥布兰·晨爵': '奥布兰',
-  '奥布兰': '奥布兰',
-  '赛因·镜页': '赛因',
-  '赛因': '赛因',
-  '铁砧玛尔加': '玛尔加',
-  '玛尔加': '玛尔加',
-  '蓝伞尼布': '尼布',
-  '尼布': '尼布',
-  '烛账帕维': '帕维',
-  '帕维': '帕维',
-  '静默修女埃拉': '埃拉',
-  '埃拉': '埃拉',
-};
-
-const SPEAKER_ALIASES_SORTED = Object.keys(SPEAKER_ALIASES).sort((a, b) => b.length - a.length);
 const SPEECH_VERBS = [
   '说',
   '说道',
@@ -99,8 +51,7 @@ function normalizeModelText(text: string) {
   return text
     .replace(/「/g, '"')
     .replace(/」/g, '"')
-    .replace(/"/g, '"')   // 弯左引号 → 直引号
-    .replace(/"/g, '"')   // 弯右引号 → 直引号
+    .replace(/[“”]/g, '"')   // 弯引号 → 直引号
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\[SCENE:[^\]]*\]\n?/g, '')
     .replace(/[\r\n]+/g, '')   // 去掉所有换行，防止LLM分行导致逗号误断句
@@ -128,7 +79,7 @@ export function makeSuggestions(hints: string[]): ActionSuggestion[] {
   return hints
     .map((hint) => hint.trim())
     .filter(Boolean)
-    .slice(0, 4)
+    .slice(0, 8)
     .map((hint, index) => ({
       id: `${index}-${hint}`,
       label: hint,
@@ -166,22 +117,7 @@ function stripOuterSquareBrackets(text: string) {
 }
 
 function findSpeaker(text: string, reverse = false): string {
-  const normalized = text.replace(/[【】]/g, '');
-  const aliases = reverse ? [...SPEAKER_ALIASES_SORTED].reverse() : SPEAKER_ALIASES_SORTED;
-  let bestIndex = reverse ? -1 : Number.POSITIVE_INFINITY;
-  let bestSpeaker = '';
-
-  for (const alias of aliases) {
-    const index = reverse ? normalized.lastIndexOf(alias) : normalized.indexOf(alias);
-    if (index < 0) continue;
-
-    if (reverse ? index >= bestIndex : index <= bestIndex) {
-      bestIndex = index;
-      bestSpeaker = SPEAKER_ALIASES[alias];
-    }
-  }
-
-  return bestSpeaker;
+  return findRegisteredSpeaker(text, reverse);
 }
 
 function findSpeakerNearQuote(before: string, after: string) {
@@ -198,6 +134,21 @@ function findSpeakerNearQuote(before: string, after: string) {
   if (afterSpeaker) return afterSpeaker;
 
   return '';
+}
+
+function findExplicitSpeakerMarker(before: string): string {
+  const suffix = before.trimEnd().split(/[。！？.!?]/).pop()?.trim() ?? '';
+  if (!suffix || /[，,、；;]/.test(suffix)) return '';
+
+  const verbPattern = SPEECH_VERBS
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .join('|');
+  const match = suffix.match(new RegExp(`^([^「」"“”【】\\[\\]：:\\s]{1,16})(?:${verbPattern})?[：:]$`));
+  const candidate = match?.[1]?.trim() ?? '';
+  if (!candidate || /^(他|她|它|他们|她们|对方|那人)$/.test(candidate)) return '';
+
+  return resolveSpeakerName(candidate);
 }
 
 // 引号前模式匹配：检测「名字说」「名字：」「【名字】」等常见发言人标记
@@ -219,7 +170,43 @@ function findSpeakerBySpeechPattern(before: string): string {
       return speaker;
     }
   }
-  return '';
+  return findExplicitSpeakerMarker(before);
+}
+
+function stripTrailingSpeakerMarker(text: string) {
+  let trimmed = text.trimEnd();
+
+  for (const alias of SPEAKER_ALIASES_SORTED) {
+    const speaker = SPEAKER_ALIASES[alias];
+    if (!speaker) continue;
+
+    for (const verb of ['', ...SPEECH_VERBS]) {
+      const candidates = [
+        `${alias}${verb}：`,
+        `${speaker}${verb}：`,
+        `${alias}${verb}:`,
+        `${speaker}${verb}:`,
+      ];
+      const marker = candidates.find((item) => trimmed.endsWith(item));
+      if (marker) {
+        trimmed = trimmed.slice(0, -marker.length);
+        return trimmed;
+      }
+    }
+  }
+
+  const suffix = trimmed.split(/[。！？.!?]/).pop()?.trim() ?? '';
+  const explicitSpeaker = findExplicitSpeakerMarker(trimmed);
+  if (explicitSpeaker && suffix && !/[，,、；;]/.test(suffix)) {
+    return trimmed.slice(0, trimmed.length - suffix.length);
+  }
+
+  return text;
+}
+
+function isNonSpeechQuoteContext(before: string) {
+  const suffix = before.trimEnd().slice(-32);
+  return /(标出|标注|写着|写有|刻着|刻有|贴着|显示|列着|列出|名为|题为|写作|称为|画着|注明|备注为|标签是|位置是|代号是|名字是)[：:]?$/.test(suffix);
 }
 
 // 在整个块中查找最近出现过的说话人（用于处理引号和名字不在同一行的情况）
@@ -277,7 +264,7 @@ function mergeShortSegments(segments: NarrativeSegment[]) {
     const current = merged[index];
     const middle = merged[index + 1];
     const next = merged[index + 2];
-    const sameSpeakerAroundNarration = current.speaker !== 'KP' && middle.speaker === 'KP' && next.speaker === current.speaker;
+    const sameSpeakerAroundNarration = current.speaker !== '主持人' && middle.speaker === '主持人' && next.speaker === current.speaker;
     const shortBridge = isShortText(current.text) || isShortText(middle.text);
 
     if (sameSpeakerAroundNarration && shortBridge) {
@@ -292,6 +279,7 @@ function mergeShortSegments(segments: NarrativeSegment[]) {
   for (let index = 0; index < merged.length; index += 1) {
     const current = merged[index];
     if (!current || !isShortText(current.text) || merged.length <= 1) continue;
+    if (current.speaker !== '主持人') continue;
 
     const previous = merged[index - 1];
     const next = merged[index + 1];
@@ -367,7 +355,7 @@ function mergeShortLines(lines: string[]) {
 
 export function parseNarrativeSegments(
   input: string,
-  defaultSpeaker = 'KP',
+  defaultSpeaker = '主持人',
   fallbackSpeaker = '',
 ): NarrativeParseResult {
   const { text } = extractHints(input);
@@ -393,7 +381,15 @@ export function parseNarrativeSegments(
       if (actor) lastSpeaker = actor;
       // 舞台提示用人物名作为speaker，而非KP
       const narrationSpeaker = before.includes('【') && actor ? actor : defaultSpeaker;
-      pushNarration(segments, before, narrationSpeaker);
+      const narrationText = stripTrailingSpeakerMarker(before);
+
+      if (isNonSpeechQuoteContext(before)) {
+        pushNarration(segments, `${narrationText}"${match[1]}"`, narrationSpeaker);
+        cursor = match.index + match[0].length;
+        continue;
+      }
+
+      pushNarration(segments, narrationText, narrationSpeaker);
 
       // 三层回退搜索说话人
       let speaker = findSpeakerNearQuote(before, after);
@@ -410,11 +406,13 @@ export function parseNarrativeSegments(
     const tailActor = findSpeaker(tail);
     const tailSpeaker = tail.includes('【') && tailActor ? tailActor : defaultSpeaker;
     pushNarration(segments, tail, tailSpeaker);
-    if (tailActor) lastSpeaker = tailActor;
+    // 仅在叙述末尾有明确说话人标记（如"XX："）时才更新 lastSpeaker，避免常见词误匹配
+    const tailHasExplicitMarker = findSpeakerBySpeechPattern(tail);
+    if (tailHasExplicitMarker) lastSpeaker = tailHasExplicitMarker;
 
     if (!hasQuote) {
-      const actor = findSpeaker(block);
-      if (actor) lastSpeaker = actor;
+      const explicitMarker = findSpeakerBySpeechPattern(block);
+      if (explicitMarker) lastSpeaker = explicitMarker;
     }
   }
 

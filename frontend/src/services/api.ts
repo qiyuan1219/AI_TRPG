@@ -1,6 +1,7 @@
 import type {
   CreateGamePayload,
   CreateGameResult,
+  GameState,
   LoadGameResult,
   SaveGamePayload,
   SaveSlotKey,
@@ -8,7 +9,7 @@ import type {
 } from '../types/game';
 
 const BASE = '/api/dnd';
-const SAFE_SERVICE_MESSAGE = 'KP暂时没有回应，已为本轮处理启用兜底。';
+const SAFE_SERVICE_MESSAGE = '主持人暂时没有回应，已为本轮处理启用兜底。';
 const CONNECTION_ERROR_PATTERN =
   /(connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|load\s*failed|timeout|timed\s*out|econn|socket|fetch|body\s*stream|terminated|aborted)/i;
 
@@ -32,6 +33,75 @@ export interface BargainJudgeResult {
   mood: string;
   reason: string;
   boss_reply: string;
+}
+
+export interface CompanionSideEventChoice {
+  id: string;
+  label: string;
+  text: string;
+  trust: number;
+  check?: {
+    label: string;
+    dc: number;
+    bonus: number;
+  } | null;
+}
+
+export interface CompanionSideEventState {
+  phase: 'opening' | 'crisis' | 'battle_pending' | 'dialogue';
+  trust: number;
+  trust_band: string;
+  threat: number;
+  max_threat: number;
+  contamination: number;
+  round: number;
+  flags: string[];
+  rewards: string[];
+  completed: boolean;
+  result_title: string;
+  result_text: string;
+  last_choice?: CompanionSideEventChoice | null;
+  last_roll?: Record<string, any> | null;
+  battle_log: Array<Record<string, any>>;
+  pending_battle?: string | null;
+  battle_result?: string | null;
+  choices: CompanionSideEventChoice[];
+}
+
+export interface CompanionSideEventInfo {
+  id: string;
+  companion: {
+    id: string;
+    name: string;
+    trust_key: string;
+    portrait: string;
+  };
+  title: string;
+  location: string;
+  eyebrow: string;
+  summary: string;
+  opening: string;
+  objectives: string[];
+  free_chat_prompt: string;
+  chat_topics: string[];
+}
+
+export interface CompanionSideEventStartResult {
+  session_id: string;
+  event: CompanionSideEventInfo;
+  state: CompanionSideEventState;
+}
+
+export interface CompanionSideEventChoiceResult {
+  event: CompanionSideEventInfo;
+  state: CompanionSideEventState;
+  outcome: {
+    choice: CompanionSideEventChoice;
+    roll?: Record<string, any> | null;
+    success?: boolean | null;
+    phase_note: string;
+  };
+  feedback: string;
 }
 
 function toSafeMessage(value: unknown, fallback: string) {
@@ -71,6 +141,17 @@ export async function createGame(payload: CreateGamePayload): Promise<CreateGame
 export async function getState(gameId: string) {
   const response = await apiFetch(`${BASE}/game/${gameId}/state`, undefined, '获取状态失败');
   if (!response.ok) throw new Error(await readErrorMessage(response, '获取状态失败'));
+  return response.json();
+}
+
+export async function patchGameState(gameId: string, patch: Record<string, any>): Promise<{ game_id: string; state: GameState }> {
+  const response = await apiFetch(`${BASE}/game/${gameId}/state/patch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ patch }),
+  }, '同步状态失败');
+
+  if (!response.ok) throw new Error(await readErrorMessage(response, '同步状态失败'));
   return response.json();
 }
 
@@ -116,6 +197,136 @@ export async function judgeBargain(payload: BargainJudgePayload): Promise<Bargai
   }
 
   return response.json();
+}
+
+export async function startCompanionSideEvent(
+  eventId = 'block_echo_forest',
+  initialTrust = 55,
+): Promise<CompanionSideEventStartResult> {
+  const response = await apiFetch(`${BASE}/side-events/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_id: eventId, initial_trust: initialTrust }),
+  }, '支线事件启动失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线事件启动失败'));
+  }
+
+  return response.json();
+}
+
+export async function chooseCompanionSideEvent(
+  sessionId: string,
+  choiceId: string,
+  includeFeedback = true,
+): Promise<CompanionSideEventChoiceResult> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/choose`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ choice_id: choiceId, include_feedback: includeFeedback }),
+  }, '支线选择结算失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线选择结算失败'));
+  }
+
+  return response.json();
+}
+
+export async function getCompanionSideEventFeedback(
+  sessionId: string,
+): Promise<CompanionSideEventChoiceResult> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/feedback`, {
+    method: 'POST',
+  }, '支线反馈生成失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线反馈生成失败'));
+  }
+
+  return response.json();
+}
+
+export async function completeCompanionSideEventBattle(
+  sessionId: string,
+  result: 'win' | 'lose',
+): Promise<{
+  event: CompanionSideEventInfo;
+  state: CompanionSideEventState;
+  battle_result: Record<string, any>;
+  feedback: string;
+}> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/battle-result`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ result }),
+  }, '支线战斗结算失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线战斗结算失败'));
+  }
+
+  return response.json();
+}
+
+export async function chatCompanionSideEvent(
+  sessionId: string,
+  message: string,
+): Promise<{ reply: string; history: Array<Record<string, string>>; state: CompanionSideEventState }> {
+  const response = await apiFetch(`${BASE}/side-events/${sessionId}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  }, '支线自由对话失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '支线自由对话失败'));
+  }
+
+  return response.json();
+}
+
+export interface BattleNarratePayload {
+  actor_name: string;
+  target_name: string;
+  skill_name: string;
+  outcome: string;
+  amount: number;
+  d20_roll: number;
+  d20_total: number;
+  damage_label: string;
+  tags: string[];
+  ac_dc: number;
+}
+
+export async function fetchAdvantage(unitName: string, context: string): Promise<{ advantage: string; flavor: string }> {
+  try {
+    const response = await apiFetch(`${BASE}/battle/advantage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unit_name: unitName, context }),
+    }, '战术优势判定失败');
+    if (!response.ok) return { advantage: "none", flavor: "" };
+    return response.json();
+  } catch {
+    return { advantage: "none", flavor: "" };
+  }
+}
+
+export async function fetchBattleNarration(payload: BattleNarratePayload): Promise<string> {
+  try {
+    const response = await apiFetch(`${BASE}/battle/narrate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }, '战斗叙述生成失败');
+    if (!response.ok) return '';
+    const data = await response.json();
+    return data.narration || '';
+  } catch {
+    return '';
+  }
 }
 
 export function chatStream(

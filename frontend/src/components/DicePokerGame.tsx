@@ -25,6 +25,8 @@ interface DicePokerProps {
   onClose: () => void;
   onTrustChange?: (npc: string, key: string, change: number) => void;
   onGetClue?: (betInfo: string) => void;
+  /** 游戏结束时的回调，传递完整结果数据，用于触发剧情推进 */
+  onComplete?: (result: any) => void;
 }
 
 // ============================================================
@@ -82,7 +84,7 @@ const API = {
 // ============================================================
 // DicePokerGame 组件
 // ============================================================
-export function DicePokerGame({ gameId: hostGameId, npcName, npcTrustKey, onClose, onTrustChange, onGetClue }: DicePokerProps) {
+export function DicePokerGame({ gameId: hostGameId, npcName, npcTrustKey, onClose, onTrustChange, onGetClue, onComplete }: DicePokerProps) {
   const [pokerId, setPokerId] = useState('');
   const [summary, setSummary] = useState<DicePokerSummary | null>(null);
   const [selectedDice, setSelectedDice] = useState<Set<number>>(new Set());
@@ -290,7 +292,14 @@ export function DicePokerGame({ gameId: hostGameId, npcName, npcTrustKey, onClos
                 {npcName}信任 {resultData.trust_change > 0 ? '+' : ''}{resultData.trust_change}
               </div>
             )}
-            <button onClick={onClose} className="poker-btn poker-btn-primary" style={{ marginTop: 12 }}>
+            <button
+              onClick={() => {
+                if (onComplete) onComplete(resultData);
+                onClose();
+              }}
+              className="poker-btn poker-btn-primary"
+              style={{ marginTop: 12 }}
+            >
               {resultData.result === 'win' ? '获得情报，继续冒险' : '回到酒馆'}
             </button>
           </div>
