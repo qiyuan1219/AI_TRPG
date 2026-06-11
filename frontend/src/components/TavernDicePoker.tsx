@@ -1,436 +1,444 @@
-import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import type { DiceResult } from '../types/game';
 
-// ── 类型 ──
-interface TavernState {
-  phase: 'intro' | 'skill' | 'playing' | 'round_end' | 'plead' | 'game_over';
-  current_round: number;
-  wins: number;
-  peek_used: boolean;
-  persuade_used: boolean;
-  plead_available: boolean;
-  reroll_bonus: number;
-  peek_revealed_dice: number[];
-  npc_text: string;
-  dice: number[];
-  rerolls_left: number;
-  available_categories: Record<string, number>;
-  round_history: RoundRecord[];
+type Phase = 'prep' | 'skill_result' | 'rolling' | 'play' | 'round_result' | 'plead' | 'final';
+type SkillChoice = 'peek' | 'persuade' | 'none';
+type RoundOutcome = 'win' | 'tie' | 'lose';
+
+interface HandScore {
+  rank: number;
+  points: number;
+  label: string;
 }
 
 interface RoundRecord {
   round: number;
-  player_score: number;
-  npc_score: number;
-  result: 'win' | 'tie' | 'lose';
-  category: string;
-  player_dice: number[];
-  npc_dice: number[];
+  stake: number;
+  result: RoundOutcome;
+  playerDice: number[];
+  saloDice: number[];
+  playerScore: HandScore;
+  saloScore: HandScore;
 }
 
-interface SkillResult {
-  skill_id: string;
-  roll: number;
-  bonus: number;
-  total: number;
-  dc: number;
-  success: boolean;
-  narrative?: string;
-  revealed_count?: number;
-  reroll_bonus?: number;
-}
-
-interface GameResult {
-  game_over: boolean;
+export interface TavernDicePokerResult {
   wins: number;
-  losses: number;
-  title: string;
-  info: string;
-  items: string[];
-  round_history: RoundRecord[];
+  effectiveWins: number;
+  spent: number;
+  earnings: number;
+  gift: number;
+  yunlingUnlocked: boolean;
+  paidInfo?: boolean;
+  records: RoundRecord[];
 }
 
 interface TavernDicePokerProps {
   onClose: () => void;
-  onComplete?: (result: GameResult) => void;
+  onComplete?: (result: TavernDicePokerResult) => void;
 }
 
-const API = {
-  start: () =>
-    fetch('/api/tavern-dice/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json()),
+const SELIN_INT = 4;
+const SELIN_CHA = 3;
+const BASE_REROLLS = 3;
+const STARTING_STAKE = 50;
+const DIE_PIPS = [
+  [],
+  [4],
+  [0, 8],
+  [0, 4, 8],
+  [0, 2, 6, 8],
+  [0, 2, 4, 6, 8],
+  [0, 2, 3, 5, 6, 8],
+];
 
-  getState: (id: string) =>
-    fetch(`/api/tavern-dice/${id}/state`).then(r => r.json()),
+function rollDie(sides = 6) {
+  return Math.floor(Math.random() * sides) + 1;
+}
 
-  useSkill: (id: string, skillId: string, bonus = 0) =>
-    fetch(`/api/tavern-dice/${id}/use-skill`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skill_id: skillId, bonus }),
-    }).then(r => r.json()),
+function rollDice(count: number) {
+  return Array.from({ length: count }, () => rollDie());
+}
 
-  startRound: (id: string) =>
-    fetch(`/api/tavern-dice/${id}/start-round`, { method: 'POST' }).then(r => r.json()),
+function countDice(dice: number[]) {
+  const counts = new Map<number, number>();
+  dice.forEach((die) => counts.set(die, (counts.get(die) || 0) + 1));
+  return counts;
+}
 
-  roll: (id: string) =>
-    fetch('/api/tavern-dice/roll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game_id: id }) }).then(r => r.json()),
+function scoreHand(dice: number[]): HandScore {
+  const counts = [...countDice(dice).values()].sort((a, b) => b - a);
+  const sorted = [...dice].sort((a, b) => a - b).join('');
+  const sum = dice.reduce((total, die) => total + die, 0);
+  if (counts[0] === 5) return { rank: 8, points: 800 + sum, label: '五骰同点' };
+  if (sorted === '12345' || sorted === '23456') return { rank: 7, points: 700 + sum, label: '大顺' };
+  if (counts[0] === 4) return { rank: 6, points: 600 + sum, label: '四骰同点' };
+  if (counts[0] === 3 && counts[1] === 2) return { rank: 5, points: 500 + sum, label: '葫芦' };
+  if (counts[0] === 3) return { rank: 4, points: 400 + sum, label: '三骰同点' };
+  if (counts[0] === 2 && counts[1] === 2) return { rank: 3, points: 300 + sum, label: '两对' };
+  if (counts[0] === 2) return { rank: 2, points: 200 + sum, label: '一对' };
+  return { rank: 1, points: sum, label: '散点' };
+}
 
-  keep: (id: string, indices: number[]) =>
-    fetch('/api/tavern-dice/keep', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game_id: id, keep_indices: indices }) }).then(r => r.json()),
+function compareHands(a: number[], b: number[]): RoundOutcome {
+  const player = scoreHand(a);
+  const salo = scoreHand(b);
+  if (player.points > salo.points) return 'win';
+  if (player.points < salo.points) return 'lose';
+  return 'tie';
+}
 
-  score: (id: string, category: string) =>
-    fetch('/api/tavern-dice/score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ game_id: id, category }) }).then(r => r.json()),
+function chooseAdvice(playerDice: number[], visibleSaloDice: Array<number | null>) {
+  const counts = countDice(playerDice);
+  const bestGroup = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+  const visible = visibleSaloDice.filter((die): die is number => die !== null);
+  const visibleText = visible.length ? `已看见萨洛 ${visible.length} 枚骰：${visible.join('、')}。` : '萨洛的骰面仍然藏着。';
+  if (bestGroup?.[1] >= 3) {
+    return `${visibleText} 瑟琳建议保留所有 ${bestGroup[0]}，只重掷散骰，争取四同或葫芦。`;
+  }
+  if (bestGroup?.[1] === 2) {
+    return `${visibleText} 瑟琳建议保留对子和高点骰，别为了小顺拆掉已经成形的点数。`;
+  }
+  const keep = playerDice.map((die, index) => ({ die, index })).filter(({ die }) => die >= 5).map(({ index }) => index + 1);
+  return `${visibleText} 你手里还没成型，瑟琳建议先留 ${keep.length ? `第 ${keep.join('、')} 枚高点骰` : '一到两枚最高点'}，其余重掷。`;
+}
 
-  plead: (id: string, bonus = 0) =>
-    fetch(`/api/tavern-dice/${id}/plead`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bonus }) }).then(r => r.json()),
+function improveOpponentHand(dice: number[]) {
+  const counts = countDice(dice);
+  const best = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] ?? 6;
+  return dice.map((die) => {
+    if (die === best || die >= 5) return die;
+    return Math.random() < 0.65 ? rollDie() : die;
+  });
+}
 
-  nextRound: (id: string) =>
-    fetch(`/api/tavern-dice/${id}/next-round`, { method: 'POST' }).then(r => r.json()),
-};
+function PipDie({ value, hidden = false, selected = false, onClick }: { value: number; hidden?: boolean; selected?: boolean; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`tavern-die ${selected ? 'selected' : ''} ${hidden ? 'hidden' : ''}`}
+      onClick={onClick}
+      disabled={hidden || !onClick}
+      aria-label={hidden ? '隐藏骰子' : `${value}点`}
+    >
+      {hidden ? (
+        <span className="die-dots">?</span>
+      ) : (
+        <span className="die-dots" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, width: 46, height: 46 }}>
+          {Array.from({ length: 9 }, (_, i) => (
+            <span key={i} style={{ width: 8, height: 8, borderRadius: 999, background: DIE_PIPS[value].includes(i) ? 'currentColor' : 'transparent', alignSelf: 'center', justifySelf: 'center' }} />
+          ))}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export function TavernDicePoker({ onClose, onComplete }: TavernDicePokerProps) {
-  const [gameId, setGameId] = useState('');
-  const [state, setState] = useState<TavernState | null>(null);
-  const [finalResult, setFinalResult] = useState<GameResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [narrative, setNarrative] = useState('');
-  const [selectedDice, setSelectedDice] = useState<Set<number>>(new Set());
-  const [skillResult, setSkillResult] = useState<SkillResult | null>(null);
-  const [skillDice, setSkillDice] = useState<DiceResult | null>(null); // 技能判定骰子动画
-  const skillPendingRef = useRef<'round' | 'plead_result' | null>(null); // 骰子动画结束后该干什么
-  const pleadResultRef = useRef<{ success: boolean; narrative: string } | null>(null);
-  const initRef = useRef(false);
+  const [phase, setPhase] = useState<Phase>('prep');
+  const [round, setRound] = useState(1);
+  const [stake, setStake] = useState(STARTING_STAKE);
+  const [spent, setSpent] = useState(0);
+  const [wins, setWins] = useState(0);
+  const [peekUsed, setPeekUsed] = useState(false);
+  const [persuadeUsed, setPersuadeUsed] = useState(false);
+  const [peekCount, setPeekCount] = useState(0);
+  const [persuadeBonus, setPersuadeBonus] = useState(0);
+  const [rerollsLeft, setRerollsLeft] = useState(BASE_REROLLS);
+  const [playerDice, setPlayerDice] = useState<number[]>([]);
+  const [saloDice, setSaloDice] = useState<number[]>([]);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [records, setRecords] = useState<RoundRecord[]>([]);
+  const [message, setMessage] = useState('萨洛把五颗骨白色骰子推到桌面中央。每局押金50G，赢下一局就能拿到完整情报；赢两局以上，他还会额外给你们一份黑市药剂商的线索。');
+  const [canStart, setCanStart] = useState(true);
+  const [skillDice, setSkillDice] = useState<DiceResult | null>(null);
+  const [rolling, setRolling] = useState(false);
+  const [final, setFinal] = useState<TavernDicePokerResult | null>(null);
 
-  // 启动
-  useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const data = await API.start();
-        setGameId(data.game_id);
-        setState(data);
-        setNarrative(`📋 第 1/3 局 —— 对阵 ${data.npc_name}\n\n${data.skill_hint}`);
-      } catch (e: any) {
-        setNarrative('启动骰子游戏失败：' + (e.message || '网络错误'));
-      } finally { setLoading(false); }
-    })();
-  }, []);
+  const visibleSaloDice = useMemo(
+    () => saloDice.map((die, index) => (index < peekCount ? die : null)),
+    [saloDice, peekCount],
+  );
+  const advice = useMemo(() => (playerDice.length ? chooseAdvice(playerDice, visibleSaloDice) : ''), [playerDice, visibleSaloDice]);
+  const lastRecord = records[records.length - 1];
 
-  // ── 技能阶段操作 ──
-  async function handleUseSkill(skillId: string) {
-    if (!gameId || loading) return;
-    setLoading(true);
-    try {
-      const result = await API.useSkill(gameId, skillId);
-      setSkillResult(result);
-      setNarrative(result.narrative || '');
-      setState(prev => prev ? { ...prev, peek_used: result.peek_used!, persuade_used: result.persuade_used! } : prev);
-      // 显示骰子动画
-      skillPendingRef.current = 'round';
-      setSkillDice({
-        type: 'skill_check',
-        data: {
-          骰子: 'D20',
-          掷骰: `D20=${result.roll}`,
-          加值: result.bonus || 0,
-          总计: result.total,
-          DC: result.dc,
-          成功: result.success,
-          属性: skillId === 'peek' ? '瑟琳·时间之眼' : '瑟琳·银杖说服',
-        },
-      });
-    } catch (e: any) {
-      setNarrative('技能使用失败：' + (e.message || ''));
-    } finally { setLoading(false); }
+  function showSkillRoll(label: string, roll: number, bonus: number, dc: number, success: boolean) {
+    setSkillDice({
+      type: 'skill_check',
+      data: {
+        骰子: 'D20',
+        掷骰: `D20=${roll}`,
+        加值: bonus,
+        总计: roll + bonus,
+        DC: dc,
+        成功: success,
+        属性: label,
+      },
+    });
   }
 
-  async function handleSkipSkill() {
-    if (!gameId || loading) return;
-    setLoading(true);
-    setSkillResult(null);
-    try {
-      const data = await API.startRound(gameId);
-      setState(prev => prev ? { ...prev, ...data, phase: data.phase } : prev);
-      setNarrative(`🎲 第 ${data.round}/3 局开始！骰面：${data.dice.join(' ')}（重投 ${data.rerolls_left} 次）`);
-    } catch (e: any) {
-      setNarrative('开局失败：' + (e.message || ''));
-    } finally { setLoading(false); }
-  }
-
-  // 骰子动画关闭后的回调
-  function handleSkillDiceClose() {
-    setSkillDice(null);
-    const pending = skillPendingRef.current;
-    skillPendingRef.current = null;
-    if (pending === 'round') {
-      // 技能判定结束 → 自动开始本局
-      setLoading(true);
-      API.startRound(gameId).then(data => {
-        setState(prev => prev ? { ...prev, ...data, phase: data.phase } : prev);
-        setNarrative(`🎲 第 ${data.round}/3 局开始！骰面：${data.dice.join(' ')}（重投 ${data.rerolls_left} 次）`);
-        setLoading(false);
-      }).catch(e => {
-        setNarrative('开局失败：' + (e.message || ''));
-        setLoading(false);
-      });
-    } else if (pending === 'plead_result') {
-      // 求情判定结束 → 显示结果
-      const result = pleadResultRef.current;
-      pleadResultRef.current = null;
-      if (result) {
-        setNarrative(result.narrative);
-        setLoading(false);
-      }
+  function prepareSkill(choice: SkillChoice) {
+    setCanStart(false);
+    if (choice === 'none') {
+      setPeekCount(0);
+      setPersuadeBonus(0);
+      setMessage(`第${round}局准备开始。瑟琳收回银杖，让骰杯里的声音保持原样。`);
+      setPhase('skill_result');
+      window.setTimeout(() => setCanStart(true), 1000);
+      return;
     }
+
+    const roll = rollDie(20);
+    if (choice === 'peek') {
+      const total = roll + SELIN_INT;
+      const revealed = total < 10 ? 0 : total <= 12 ? 1 : total <= 15 ? 2 : total <= 18 ? 3 : total <= 20 ? 4 : 5;
+      setPeekUsed(true);
+      setPeekCount(revealed);
+      setMessage(revealed === 0
+        ? `D20=${roll}+${SELIN_INT}=${total}。银杖的光被酒馆铜铃反射打散，瑟琳没能看清萨洛的骰面。`
+        : `D20=${roll}+${SELIN_INT}=${total}。瑟琳的银杖微微发亮，本局开始后可看见萨洛 ${revealed} 枚骰。`);
+      showSkillRoll('瑟琳·透视骰面', roll, SELIN_INT, 10, revealed > 0);
+    } else {
+      const total = roll + SELIN_CHA;
+      const bonus = total < 13 ? 0 : total <= 16 ? 1 : 2;
+      setPersuadeUsed(true);
+      setPersuadeBonus(bonus);
+      setMessage(bonus === 0
+        ? `D20=${roll}+${SELIN_CHA}=${total}。萨洛笑着敲了敲杯沿：「规矩就是规矩，小姑娘。」本局没有额外重掷。`
+        : `D20=${roll}+${SELIN_CHA}=${total}。萨洛被瑟琳说得挑了挑眉，本局额外获得 ${bonus} 次重掷机会。`);
+      showSkillRoll('瑟琳·银杖说服', roll, SELIN_CHA, 13, bonus > 0);
+    }
+    setPhase('skill_result');
+    window.setTimeout(() => setCanStart(true), 1000);
   }
 
-  // ── 骰子操作 ──
-  const toggleDice = (i: number) => {
-    setSelectedDice(prev => {
+  function startRound() {
+    setSpent((value) => value + stake);
+    setRerollsLeft(BASE_REROLLS + persuadeBonus);
+    setSelected(new Set());
+    setPlayerDice([]);
+    setSaloDice([]);
+    setRolling(true);
+    setPhase('rolling');
+    setMessage(`第${round}局押下 ${stake}G。骰杯同时扣下，桌边的铜铃轻轻一响。`);
+    window.setTimeout(() => {
+      setPlayerDice(rollDice(5));
+      setSaloDice(rollDice(5));
+      setRolling(false);
+      setPhase('play');
+    }, 850);
+  }
+
+  function toggleDie(index: number) {
+    setSelected((prev) => {
       const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
       return next;
     });
-  };
-
-  async function handleRoll() {
-    if (!gameId || loading) return;
-    setLoading(true);
-    try {
-      const data = await API.roll(gameId);
-      setState(prev => prev ? { ...prev, dice: data.dice, rerolls_left: data.rerolls_left, available_categories: data.available_categories } : prev);
-      setNarrative(data.narrative || '');
-      setSelectedDice(new Set());
-    } catch (e: any) { setNarrative('掷骰失败：' + (e.message || '')); }
-    finally { setLoading(false); }
   }
 
-  async function handleKeep() {
-    if (!gameId || loading || selectedDice.size === 0) return;
-    setLoading(true);
-    try {
-      const data = await API.keep(gameId, Array.from(selectedDice));
-      setState(prev => prev ? { ...prev, dice: data.dice, rerolls_left: data.rerolls_left, available_categories: data.available_categories } : prev);
-      setNarrative(data.narrative || '');
-      setSelectedDice(new Set());
-    } catch (e: any) { setNarrative('保留失败：' + (e.message || '')); }
-    finally { setLoading(false); }
+  function rerollUnselected() {
+    if (rerollsLeft <= 0 || rolling) return;
+    setRolling(true);
+    setMessage('骰子在杯底乱撞。萨洛也扣住自己的骰杯，像是在和某个坏习惯谈判。');
+    window.setTimeout(() => {
+      setPlayerDice((dice) => dice.map((die, index) => (selected.has(index) ? die : rollDie())));
+      setSaloDice((dice) => improveOpponentHand(dice));
+      setRerollsLeft((value) => value - 1);
+      setSelected(new Set());
+      setRolling(false);
+    }, 700);
   }
 
-  async function handleScore(category: string) {
-    if (!gameId || loading) return;
-    setLoading(true);
-    try {
-      const data = await API.score(gameId, category);
-      setState(prev => prev ? { ...prev, phase: data.phase, round_history: [...(prev.round_history || []), data] } : prev);
-      if (data.result === 'win') {
-        setNarrative(`🎉 第 ${data.round} 局获胜！你的 ${category}：${data.player_score} vs 萨洛：${data.npc_score}`);
-      } else if (data.result === 'tie') {
-        setNarrative(`🤝 第 ${data.round} 局平局！你的 ${category}：${data.player_score} vs 萨洛：${data.npc_score}`);
-      } else {
-        setNarrative(`😔 第 ${data.round} 局落败。你的 ${category}：${data.player_score} vs 萨洛：${data.npc_score}\n\n瑟琳靠近你：「要我去求情吗？或许还能再给一次机会。」`);
-      }
-      setSkillResult(null);
-    } catch (e: any) { setNarrative('计分失败：' + (e.message || '')); }
-    finally { setLoading(false); }
+  function submitRound() {
+    const result = compareHands(playerDice, saloDice);
+    const playerScore = scoreHand(playerDice);
+    const saloScore = scoreHand(saloDice);
+    const nextWins = result === 'win' ? wins + 1 : wins;
+    const record: RoundRecord = { round, stake, result, playerDice, saloDice, playerScore, saloScore };
+    setRecords((prev) => [...prev, record]);
+    setWins(nextWins);
+    setPhase('round_result');
+    setMessage(result === 'win'
+      ? `你以「${playerScore.label}」压过萨洛的「${saloScore.label}」。萨洛吹了声短哨，把酒杯推远了一点。`
+      : result === 'tie'
+        ? `你和萨洛同为「${playerScore.label}」。萨洛摊开手：「平局不算赢，但也不算难看。」`
+        : `你的「${playerScore.label}」输给萨洛的「${saloScore.label}」。他把骰子一颗颗排齐，笑得很慢。`);
   }
 
-  // ── 求情 ──
-  async function handlePlead() {
-    if (!gameId || loading) return;
-    setLoading(true);
-    try {
-      const data = await API.plead(gameId);
-      pleadResultRef.current = {
-        success: data.plead_success,
-        narrative: data.narrative || '',
-      };
-      if (data.roll_detail) {
-        skillPendingRef.current = 'plead_result';
-        setSkillDice({
-          type: 'skill_check',
-          data: {
-            骰子: 'D20',
-            掷骰: `D20=${data.roll_detail.roll}`,
-            加值: data.roll_detail.bonus || 0,
-            总计: data.roll_detail.total,
-            DC: data.roll_detail.dc,
-            成功: data.roll_detail.success,
-            属性: '瑟琳·低声求情',
-          },
-        });
-      }
-    } catch (e: any) {
-      setNarrative('求情失败：' + (e.message || ''));
-      setLoading(false);
+  function completeGame(rawWins: number, extraSpent = 0, paidInfo = false, earnings = 0) {
+    const effectiveWins = Math.max(rawWins, paidInfo ? 1 : 0);
+    const gift = rawWins >= 2 ? 100 : 0;
+    const result: TavernDicePokerResult = {
+      wins: rawWins,
+      effectiveWins,
+      spent: spent + extraSpent,
+      earnings,
+      gift,
+      paidInfo,
+      yunlingUnlocked: rawWins >= 2,
+      records,
+    };
+    setFinal(result);
+    setPhase('final');
+    setMessage(rawWins >= 2
+      ? '萨洛承认你们赢得漂亮，除了三名队友的情报，还额外给出黑市药剂商云苓的线索，并拍出100G作为彩头。'
+      : '萨洛收起骰子。无论输赢，情报都会给，只是这张桌子会记住你们今晚的手气。');
+    onComplete?.(result);
+  }
+
+  function nextRound(doubleStake: boolean) {
+    if (round >= 3) {
+      if (wins > 0) completeGame(wins);
+      else setPhase('plead');
+      return;
+    }
+    setRound((value) => value + 1);
+    setStake(doubleStake ? stake * 2 : STARTING_STAKE);
+    setPeekCount(0);
+    setPersuadeBonus(0);
+    setPlayerDice([]);
+    setSaloDice([]);
+    setSelected(new Set());
+    setCanStart(true);
+    setPhase('prep');
+    setMessage(doubleStake
+      ? `萨洛把筹码推高到 ${stake * 2}G。「翻倍，胆子不错。下一局别眨眼。」`
+      : '你暂时收住筹码，继续下一局。瑟琳站在你身侧，银杖光芒压得很低。');
+  }
+
+  function plead() {
+    const roll = rollDie(20);
+    const total = roll + SELIN_CHA;
+    showSkillRoll('瑟琳·低声求情', roll, SELIN_CHA, 15, total > 15);
+    if (total > 15) {
+      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。瑟琳没有替你们找借口，只是提醒萨洛：下孢海的人少一个都可能回不来。萨洛沉默片刻，算你们取得一次有效情报胜利。`);
+      window.setTimeout(() => completeGame(1, 0, false), 900);
+    } else {
+      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛摇头：「规矩不能每次都软。」你们必须支付50G买下情报。`);
     }
   }
 
-  async function handleAcceptLoss() {
-    setState(prev => prev ? { ...prev, phase: 'round_end' } : prev);
-  }
-
-  // ── 进入下一局 ──
-  async function handleNextRound() {
-    if (!gameId || loading) return;
-    setLoading(true);
-    setSkillResult(null);
-    try {
-      const data = await API.nextRound(gameId);
-      if (data.game_over) {
-        setFinalResult(data);
-        setState(prev => prev ? { ...prev, phase: 'game_over' } : prev);
-        setNarrative(`🏆 三局结束！战绩：${data.wins} 胜 ${data.total_rounds - data.wins} 败\n\n${data.info}`);
-        if (onComplete) onComplete(data);
-      } else {
-        setState(prev => prev ? { ...prev, ...data, phase: data.phase } : prev);
-        setNarrative(`📋 第 ${data.round}/3 局 —— 当前战绩 ${state?.wins} 胜\n\n${state?.npc_text}`);
-      }
-    } catch (e: any) { setNarrative('操作失败：' + (e.message || '')); }
-    finally { setLoading(false); }
-  }
-
-  // ── 渲染 ──
   return (
     <motion.div
       className="tavern-dice-backdrop"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={state?.phase === 'game_over' ? onClose : undefined}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={phase === 'final' ? onClose : undefined}
     >
       <motion.div
         className="tavern-dice-modal"
-        initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }}
-        onClick={e => e.stopPropagation()}
+        initial={{ opacity: 0, scale: 0.92 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.92 }}
+        onClick={(event) => event.stopPropagation()}
       >
-        {/* 标题 */}
         <div className="tavern-dice-header">
-          <span>🎲 快艇骰子 · 酒馆赌局</span>
-          {state && (
-            <small>第 {state.current_round}/3 局 · {state.wins} 胜</small>
-          )}
-          <button onClick={onClose} className="tavern-dice-close">✕</button>
+          <span>快艇骰子 · 萨洛的情报桌</span>
+          <small>第{round}/3局 · {wins}胜 · 押金{stake}G</small>
+          <button type="button" onClick={onClose} className="tavern-dice-close">x</button>
         </div>
 
-        {/* 叙事区 */}
-        <div className="tavern-dice-narrative">{narrative || (loading ? '……' : '')}</div>
+        <div className="tavern-dice-narrative">{message}</div>
 
-        {/* ── 技能阶段 ── */}
-        {state?.phase === 'skill' && (
+        {phase === 'prep' && (
           <div className="tavern-skill-zone">
-            <p>瑟琳站在你身旁，银杖微光。使用技能后再开始本局？</p>
+            <p>瑟琳看向你，等你决定这一局是否动用她的帮助。透视和说服各只能使用一次。</p>
             <div className="tavern-skill-buttons">
-              <button disabled={state.peek_used || loading} onClick={() => handleUseSkill('peek')} className="tavern-skill-btn peek-btn">
-                👁️ 偷窥对手骰子 (DC12)
-                {state.peek_used && ' ✓已使用'}
+              <button type="button" disabled={peekUsed} onClick={() => prepareSkill('peek')} className="tavern-skill-btn peek-btn">
+                使用透视
+                {peekUsed && '（已用）'}
               </button>
-              <button disabled={state.persuade_used || loading} onClick={() => handleUseSkill('persuade')} className="tavern-skill-btn persuade-btn">
-                💬 说服萨洛加重投 (DC14)
-                {state.persuade_used && ' ✓已使用'}
+              <button type="button" disabled={persuadeUsed} onClick={() => prepareSkill('persuade')} className="tavern-skill-btn persuade-btn">
+                说服萨洛
+                {persuadeUsed && '（已用）'}
               </button>
-              <button disabled={loading} onClick={handleSkipSkill} className="tavern-skill-btn skip-btn">
-                ⏩ 不使用技能，直接开始
-              </button>
+              <button type="button" onClick={() => prepareSkill('none')} className="tavern-skill-btn skip-btn">不用技能</button>
             </div>
           </div>
         )}
 
-        {/* ── 游戏阶段 ── */}
-        {state?.phase === 'playing' && (
-          <div className="tavern-game-zone">
-            {/* 对手信息 */}
-            <div className="tavern-opponent-info">{state.npc_text}</div>
-
-            {/* 骰子展示 */}
-            <div className="tavern-dice-row">
-              {state.dice.map((d, i) => (
-                <button
-                  key={i}
-                  className={`tavern-die ${selectedDice.has(i) ? 'selected' : ''}`}
-                  onClick={() => toggleDice(i)}
-                  disabled={state.rerolls_left <= 0 || loading}
-                >
-                  <span className="die-dots">{'⚀⚁⚂⚃⚄⚅'[d - 1]}</span>
-                  <small>{d}</small>
-                </button>
-              ))}
-            </div>
-
-            {/* 重投按钮 */}
-            {state.rerolls_left > 0 && (
-              <div className="tavern-reroll-buttons">
-                <button disabled={loading} onClick={handleRoll} className="tavern-btn">
-                  🎲 全部重投 ({state.rerolls_left})
-                </button>
-                <button disabled={loading || selectedDice.size === 0} onClick={handleKeep} className="tavern-btn tavern-btn-gold">
-                  📌 保留选中并重投 ({state.rerolls_left})
-                </button>
-              </div>
-            )}
-
-            {/* 计分项 */}
-            <div className="tavern-categories">
-              <p className="tavern-cat-title">选择计分项：</p>
-              <div className="tavern-cat-grid">
-                {Object.entries(state.available_categories).map(([cat, score]) => (
-                  <button key={cat} disabled={loading} onClick={() => handleScore(cat)} className="tavern-cat-btn">
-                    {cat}: {score}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── 求情阶段 ── */}
-        {state?.phase === 'plead' && (
-          <div className="tavern-plead-zone">
-            <p>本局落败。瑟琳靠近你，低声道：「要我向萨洛求个情吗？或许还能再给一次机会。」</p>
-            <div className="tavern-plead-buttons">
-              <button disabled={!state.plead_available || loading} onClick={handlePlead} className="tavern-btn tavern-btn-gold">
-                🙏 瑟琳低声求情 (DC15)
-              </button>
-              <button disabled={loading} onClick={handleAcceptLoss} className="tavern-btn">
-                😔 认了，进入下一局
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── 局末阶段 ── */}
-        {state?.phase === 'round_end' && (
+        {phase === 'skill_result' && (
           <div className="tavern-round-end">
-            <p>当前战绩：{state.wins} 胜</p>
-            <button disabled={loading} onClick={handleNextRound} className="tavern-btn tavern-btn-gold">
-              {state.current_round >= 3 ? '查看最终结果' : '进入下一局 ▶'}
+            <button type="button" disabled={!canStart} onClick={startRound} className="tavern-btn tavern-btn-gold">
+              开始本局
             </button>
           </div>
         )}
 
-        {/* ── 最终结果 ── */}
-        {(state?.phase === 'game_over' || finalResult) && (
-          <div className="tavern-final-result">
-            <h2>{finalResult?.title || '结束'}</h2>
-            <p className="tavern-final-score">最终战绩：{finalResult?.wins || 0} 胜 {finalResult?.losses || 0} 败</p>
-            <p className="tavern-final-info">{finalResult?.info}</p>
-            {finalResult?.items && (
-              <div className="tavern-final-items">
-                {finalResult.items.map((item, i) => <span key={i}>🎁 {item}</span>)}
+        {(phase === 'rolling' || phase === 'play') && (
+          <div className="tavern-game-zone">
+            <div className="tavern-opponent-info">{phase === 'rolling' || rolling ? '骰杯正在震动...' : advice}</div>
+            <div className="tavern-dice-row">
+              <strong>你</strong>
+              {playerDice.length === 0
+                ? Array.from({ length: 5 }, (_, i) => <PipDie key={i} value={1} hidden />)
+                : playerDice.map((die, index) => (
+                    <PipDie key={index} value={die} selected={selected.has(index)} onClick={() => toggleDie(index)} />
+                  ))}
+            </div>
+            <div className="tavern-dice-row">
+              <strong>萨洛</strong>
+              {saloDice.length === 0
+                ? Array.from({ length: 5 }, (_, i) => <PipDie key={i} value={1} hidden />)
+                : saloDice.map((die, index) => (
+                    <PipDie key={index} value={die} hidden={visibleSaloDice[index] === null} />
+                  ))}
+            </div>
+            <div className="tavern-reroll-buttons">
+              <button type="button" disabled={rolling || rerollsLeft <= 0} onClick={rerollUnselected} className="tavern-btn">
+                重掷未保留骰（{rerollsLeft}）
+              </button>
+              <button type="button" disabled={rolling || playerDice.length === 0} onClick={submitRound} className="tavern-btn tavern-btn-gold">
+                提交本局
+              </button>
+            </div>
+          </div>
+        )}
+
+        {phase === 'round_result' && lastRecord && (
+          <div className="tavern-round-end">
+            <p>
+              你：{lastRecord.playerDice.join(' ')}（{lastRecord.playerScore.label}）
+              {' '}vs 萨洛：{lastRecord.saloDice.join(' ')}（{lastRecord.saloScore.label}）
+            </p>
+            {lastRecord.result === 'win' ? (
+              <div className="tavern-plead-buttons">
+                <button type="button" onClick={() => completeGame(wins, 0, false, stake * 2)} className="tavern-btn tavern-btn-gold">收下筹码并结束游戏</button>
+                {round < 3 && <button type="button" onClick={() => nextRound(true)} className="tavern-btn">翻倍进入下一局</button>}
               </div>
+            ) : (
+              <button type="button" onClick={() => nextRound(false)} className="tavern-btn tavern-btn-gold">
+                {round >= 3 ? '查看最终结果' : '进入下一局'}
+              </button>
             )}
-            <button onClick={onClose} className="tavern-btn tavern-btn-gold">回到酒馆</button>
+          </div>
+        )}
+
+        {phase === 'plead' && (
+          <div className="tavern-plead-zone">
+            <p>三局未胜。瑟琳可以替你们低声求情；若失败，就只能支付50G买下萨洛的情报。</p>
+            <div className="tavern-plead-buttons">
+              <button type="button" onClick={plead} className="tavern-btn tavern-btn-gold">让瑟琳求情</button>
+              <button type="button" onClick={() => completeGame(0, 50, true)} className="tavern-btn">支付50G购买情报</button>
+            </div>
+          </div>
+        )}
+
+        {phase === 'final' && final && (
+          <div className="tavern-final-result">
+            <h2>骰局结束</h2>
+            <p className="tavern-final-score">战绩：{final.wins}胜 · 花费{final.spent}G · 收回{final.earnings}G · 彩头{final.gift}G</p>
+            <p className="tavern-final-info">{final.yunlingUnlocked ? '额外情报：黑市药剂商云苓。' : '获得三名队友的完整情报。'}</p>
+            <button type="button" onClick={onClose} className="tavern-btn tavern-btn-gold">回到酒馆</button>
           </div>
         )}
       </motion.div>
 
-      {/* 瑟琳技能判定骰子动画 */}
-      <DiceRollOverlay
-        dice={skillDice}
-        dieType="d20"
-        onClose={handleSkillDiceClose}
-      />
+      <DiceRollOverlay dice={skillDice} dieType="d20" onClose={() => setSkillDice(null)} />
     </motion.div>
   );
 }

@@ -54,6 +54,25 @@ interface TutorialBattleSetup {
   }>;
 }
 
+const YUNLING_POTION_OPTIONS: Array<{ action: string; key: string; label: string; stat?: string; cost: number }> = [
+  { action: '购买力量药水', key: 'str_potion', label: '力量药水', stat: 'str', cost: 100 },
+  { action: '购买敏捷药水', key: 'dex_potion', label: '敏捷药水', stat: 'dex', cost: 100 },
+  { action: '购买体质药水', key: 'con_potion', label: '体质药水', stat: 'con', cost: 100 },
+  { action: '购买智力药水', key: 'int_potion', label: '智力药水', stat: 'int', cost: 100 },
+  { action: '购买感知药水', key: 'wis_potion', label: '感知药水', stat: 'wis', cost: 100 },
+  { action: '购买魅力药水', key: 'cha_potion', label: '魅力药水', stat: 'cha', cost: 100 },
+  { action: '购买治疗药水', key: 'healing_potion', label: '治疗药水', cost: 50 },
+];
+
+const YUNLING_SHOP_HINTS = [
+  ...YUNLING_POTION_OPTIONS.map((option) => option.action),
+  '不购买药水返回公会登记',
+];
+
+function findYunlingPotion(action: string) {
+  return YUNLING_POTION_OPTIONS.find((option) => action.includes(option.action.replace('购买', '')) || action.includes(option.action));
+}
+
 function isFirstPlayerChoice(story: StoryLine[], state: GameState) {
   if (state.first_choice_resolved || state.tutorial_battle_done) return false;
   return !story.some((line) => line.role === 'player');
@@ -157,12 +176,12 @@ function fallbackSuggestions(state: GameState): ActionSuggestion[] {
   const area = String(state.current_area || '');
   if (area.includes('酒馆')) {
     if (state.brock_intro_seen && !state.brock_recruited) {
-      return makeSuggestions(['和布洛克玩喝酒骰子游戏', '询问布洛克需要采集哪种孢子样本【自然DC12】', '向萨洛确认布洛克的报酬行情【洞悉DC12】']);
+      return makeSuggestions(['陪布洛克喝得尽兴', '询问布洛克需要采集哪种孢子样本【自然DC12】', '向萨洛确认布洛克的报酬行情【洞悉DC12】']);
     }
     if (state.tavern_dice_done && !state.salo_intel_done) {
       return makeSuggestions(['听萨洛说明三名队友的位置', '向萨洛打听地底堡垒传闻【魅力DC12】', '和瑟琳讨论远征路线']);
     }
-    return makeSuggestions(['和萨洛玩一局快艇骰子', '先在酒馆里转转再说']);
+    return makeSuggestions(['接受游戏', '付100G购买萨洛的情报']);
   }
   if (area.includes('公会')) {
     return makeSuggestions(['查看远征档案【调查DC12】', '打听地底堡垒传闻【感知DC12】', '与米娜确认任务细节']);
@@ -699,7 +718,7 @@ export default function App() {
         return;
       }
 
-      if (/(?:寻找|找)布洛克|回到回声酒馆寻找布洛克|喝酒骰子|喝酒游戏/.test(action) && !currentState.al_recruited) {
+      if (/(?:寻找|找)布洛克|回到回声酒馆寻找布洛克|喝酒骰子|喝酒游戏|喝得尽兴/.test(action) && !currentState.al_recruited) {
         blockRoute('瑟琳：「先去静默神殿找艾琳。她能保证队伍在后续招募和下潜前有足够的治疗与净化准备。」', [
           '前往静默神殿寻找艾琳',
           '询问萨洛布洛克的脾气【洞悉DC12】',
@@ -748,14 +767,93 @@ export default function App() {
 
       // 酒馆区域：选择玩骰子直接跳转游戏
       const areaText = String(stateRef.current.current_area || '');
-      if (areaText.includes('酒馆') && /骰子|快艇|赌|玩一局|来一局|试试|接受/.test(action)) {
+      const yunlingPotion = findYunlingPotion(action);
+      if ((currentState.yunling_shop_unlocked || areaText.includes('黑市深处')) && (/不购买|返回公会|登记/.test(action) || yunlingPotion)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
-        if (/布洛克|喝酒/.test(action)) {
-          setShowDrinkingDiceGame(true);
-          setPhase('action');
+        if (/不购买|返回公会|登记/.test(action) && !yunlingPotion) {
+          const registration = getScriptedScene('guild-final-registration');
+          if (registration) {
+            playScriptedScene(registration, { focus: false });
+            return;
+          }
+        }
+
+        if (yunlingPotion) {
+          const gold = Number(currentState.gold ?? 200);
+          if (gold < yunlingPotion.cost) {
+            appendStoryLines([`云苓看了一眼你们的金币袋：「这瓶${yunlingPotion.label}要${yunlingPotion.cost}G。等钱够了再谈。」`], 'kp', '云苓', true);
+            setSuggestions(makeSuggestions(YUNLING_SHOP_HINTS));
+            setPhase('narrating');
+            return;
+          }
+
+          const inventoryText = String(currentState.inventory || '长剑,冒险者工具包');
+          const nextInventory = inventoryText.includes(yunlingPotion.label) ? inventoryText : `${inventoryText},${yunlingPotion.label}`;
+          const patch: GameState = {
+            gold: Math.max(0, gold - yunlingPotion.cost),
+            inventory: nextInventory,
+            [`yunling_${yunlingPotion.key}_bought`]: true,
+            last_event: `在云苓处购买${yunlingPotion.label}`,
+          };
+          if (yunlingPotion.stat) patch[yunlingPotion.stat] = Number(currentState[yunlingPotion.stat] ?? 10) + 2;
+          else patch.current_hp = Math.min(Number(currentState.max_hp ?? currentState.current_hp ?? 20), Number(currentState.current_hp ?? 20) + 5);
+
+          setGameState((prev) => ({ ...prev, ...patch }));
+          if (gameId) {
+            void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || '云苓药水状态同步失败', 'error'));
+          }
+          addEvent(`金币 -${yunlingPotion.cost}`, 'state');
+          addEvent(`获得 ${yunlingPotion.label}`, 'state');
+          appendStoryLines([
+            yunlingPotion.stat
+              ? `云苓将${yunlingPotion.label}推到你面前：「下去之后再喝。药效很冲，能让身体短时间记住更强的状态。」你的${yunlingPotion.label.replace('药水', '')}提升了2点。`
+              : '云苓递来一支温热的红色药剂：「治疗药水别等到快死才喝。它能让伤口闭合，但不能替你判断什么时候该撤。」你恢复了5点生命值。',
+          ], 'kp', '云苓', true);
+          setSuggestions(makeSuggestions(YUNLING_SHOP_HINTS));
+          setPhase('narrating');
           return;
         }
-        // "接受骰子游戏" → 进入三局酒馆骰子
+      }
+
+      if (areaText.includes('酒馆') && /付\s*100G|付100G|100G购买|购买萨洛的情报|买情报/.test(action)) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        const currentGold = Number(currentState.gold ?? 200);
+        const patch: GameState = {
+          gold: Math.max(0, currentGold - 100),
+          tavern_dice_done: true,
+          tavern_info_paid: true,
+          tavern_effective_wins: 1,
+          tavern_yunling_unlocked: false,
+          last_event: '支付100G购买萨洛的队友情报',
+        };
+        setGameState((prev) => ({ ...prev, ...patch }));
+        if (gameId) {
+          void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || '萨洛情报购买状态同步失败', 'error'));
+        }
+        addEvent('金币 -100', 'state');
+        setStory((prev) => {
+          const paidLines: StoryLine[] = [
+            { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「痛快。能用金币解决的问题，在这座城里已经算很温柔了。」' },
+            { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「直接买情报可以节省时间。我们记下重点，然后立刻规划招募路线。」' },
+          ];
+          setActiveIndex(prev.length);
+          return [...prev, ...paidLines];
+        });
+        const saloIntel = getScriptedScene('salo-companion-intel');
+        if (saloIntel) playScriptedScene(saloIntel, { focus: false });
+        return;
+      }
+
+      if (areaText.includes('酒馆') && /陪.*布洛克.*喝|布洛克.*喝得尽兴|喝酒/.test(action)) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        setShowDrinkingDiceGame(true);
+        setPhase('action');
+        return;
+      }
+
+      if (areaText.includes('酒馆') && /骰子|快艇|赌|玩一局|来一局|试试|接受/.test(action)) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        // "接受游戏" → 进入三局酒馆骰子
         if (/接受/.test(action)) {
           setShowTavernDice(true);
           dicePokerPendingRef.current = action;
@@ -841,7 +939,7 @@ export default function App() {
             setSuggestions(parsed.suggestions.length ? parsed.suggestions : fallbackSuggestions(stateRef.current));
           }
 
-          // 酒馆区域：瑟琳提示后，显示唯一选项"接受骰子游戏"
+          // 酒馆区域：瑟琳提示后，显示固定两个选项
           const areaText = String(stateRef.current.current_area || '');
           if (
             areaText.includes('酒馆') &&
@@ -851,7 +949,7 @@ export default function App() {
             const recentText = story.slice(-6).map((l) => l.text).join('') + parsed.lines.join('');
             if (/瑟琳.*偷看|偷看.*骰|偷看.*牌|悄悄.*告诉|我能看到.*骰|透视.*骰|看穿.*骰|窥看/.test(recentText)) {
               dicePokerAutoTriggeredRef.current = true;
-              setSuggestions(makeSuggestions(['接受骰子游戏']));
+              setSuggestions(makeSuggestions(['接受游戏', '付100G购买萨洛的情报']));
             }
           }
 
@@ -970,6 +1068,21 @@ export default function App() {
       const scene = getScriptedScene('kaiya-recruited');
       if (scene) {
         playScriptedScene(scene, { extraStatePatch: patch });
+        if (current.tavern_yunling_unlocked) {
+          const yunlingScene = getScriptedScene('yunling-black-market');
+          if (yunlingScene) {
+            const yunlingInventory = `${nextInventory},治疗药水x3`;
+            playScriptedScene(yunlingScene, {
+              focus: false,
+              extraStatePatch: {
+                inventory: yunlingInventory,
+                yunling_free_healing_potions: 3,
+                last_event: '根据萨洛额外情报找到云苓并获得三瓶治疗药水',
+              },
+              dynamicHints: YUNLING_SHOP_HINTS,
+            });
+          }
+        }
         return;
       }
       setGameState((prev) => ({ ...prev, ...patch }));
@@ -1479,30 +1592,43 @@ export default function App() {
               // 关闭弹窗 + 标记完成
               setShowTavernDice(false);
               const wins = result?.wins ?? 0;
-              const updatedState = {
-                ...stateRef.current,
+              const effectiveWins = result?.effectiveWins ?? wins;
+              const spent = Number(result?.spent ?? 0);
+              const earnings = Number(result?.earnings ?? 0);
+              const gift = Number(result?.gift ?? 0);
+              const currentGold = Number(stateRef.current.gold ?? 200);
+              const tavernPatch: GameState = {
+                gold: Math.max(0, currentGold - spent + earnings + gift),
                 tavern_dice_done: true,
-                last_event: `酒馆快艇骰子结束（${wins}胜）`,
+                tavern_wins: wins,
+                tavern_effective_wins: effectiveWins,
+                tavern_dice_spent: spent,
+                tavern_dice_earnings: earnings,
+                tavern_dice_gift: gift,
+                tavern_info_paid: Boolean(result?.paidInfo),
+                tavern_yunling_unlocked: Boolean(result?.yunlingUnlocked),
+                last_event: `酒馆快艇骰子结束（${wins}胜，有效情报胜${effectiveWins}）`,
               };
-              setGameState(updatedState);
+              setGameState((prev) => ({ ...prev, ...tavernPatch }));
               if (gameId) {
-                void patchGameState(gameId, {
-                  tavern_dice_done: true,
-                  last_event: `酒馆快艇骰子结束（${wins}胜）`,
-                }).catch((error: any) => addEvent(error.message || '酒馆骰子状态同步失败', 'error'));
+                void patchGameState(gameId, tavernPatch).catch((error: any) => addEvent(error.message || '酒馆骰子状态同步失败', 'error'));
               }
+              if (spent) addEvent(`金币 -${spent}`, 'state');
+              if (earnings) addEvent(`骰局收回 +${earnings}G`, 'state');
+              if (gift) addEvent(`萨洛彩头 +${gift}G`, 'state');
 
               // 🔴 固定骰子后剧情，不依赖 AI（防止 AI 跑偏生成战斗内容）
               const postDiceLines: StoryLine[] = wins >= 2
                 ? [
                     { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「啧。两胜。你这手气不像第一次玩。」' },
-                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「愿赌服输。我会把艾琳、布洛克、凯娅的位置和脾气都说清楚。你们最好记牢，找人比找路麻烦。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「愿赌服输。我会把艾琳、布洛克、凯娅的位置和脾气都说清楚。你们最好记牢，找人比找路麻烦。另外，黑市深处有个药剂商叫云苓，她手里有真正能下孢海的药。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '主持人', text: '萨洛把一只小钱袋丢到桌上，里面是整整一百枚金币。他又用酒渍在纸角画了一个不会响的铜铃，示意你们收好。' },
                     { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「萨洛很少这么干脆。看来他确实认为这三个人缺一不可。」' },
                     { id: lineId.current++, role: 'kp' as const, speaker: '主持人', text: '瑟琳将银杖收回袖口，对你微微点头。酒馆里的喧嚣重新漫上来，但萨洛的情报像一块石头坠入水面，散开的波纹还没停。' },
                   ]
-                : wins === 1
+                : effectiveWins >= 1
                 ? [
-                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「一胜一负，不亏。冒险者的手气就是这样——从来不会让你空手回去。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: result?.paidInfo ? '「钱也算一种手气。至少你们知道什么时候该少浪费时间。」' : '「一胜一负，不亏。冒险者的手气就是这样——从来不会让你空手回去。」' },
                     { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「行，我说。艾琳、布洛克、凯娅，各有本事，也各有麻烦。你们想凑齐五人队，就得按他们的规矩来。」' },
                     { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「够用了。先听完情报，再规划路线。」' },
                   ]
