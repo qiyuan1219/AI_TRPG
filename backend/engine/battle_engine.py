@@ -67,6 +67,19 @@ SKILLS: dict[str, dict] = {
         "cooldown": 0,
         "effects": [],
     },
+    "brock_bomb": {
+        "id": "brock_bomb",
+        "name": "辣椒炸弹",
+        "targetType": "all_enemies",
+        "requiresHitRoll": False,
+        "damageDice": "2d6",
+        "damageBonusAttribute": None,
+        "damageType": "fire",
+        "armorPierce": 0,
+        "cost": {},
+        "cooldown": 1,
+        "effects": [],
+    },
     "ailin_light": {
         "id": "ailin_light",
         "name": "生命之光",
@@ -163,7 +176,7 @@ DEFAULT_CHARACTERS: list[dict] = [
         "attributes": {"strength": 3, "dexterity": 1, "constitution": 3, "intelligence": 0, "wisdom": 2, "charisma": -1},
         "combatStats": {"hp": 48, "maxHp": 48, "armor": 4, "maxArmor": 4, "defense": 16, "attackBonus": 4, "initiativeBonus": 1},
         "resources": {},
-        "skillIds": ["brock_pan"],
+        "skillIds": ["brock_pan", "brock_bomb"],
         "statuses": [],
         "cooldowns": {},
     },
@@ -300,17 +313,24 @@ class BattleEngine:
             raise ValueError("invalid skill")
         if actor.get("cooldowns", {}).get(skill["id"], 0) > 0:
             raise ValueError("skill on cooldown")
-        targets = [self.get_character(target_id) for target_id in action.get("targetIds", [])]
-        if not targets or any(target is None for target in targets):
+        legal_targets = self._targets_for(actor, skill)
+        legal_target_ids = {target["id"] for target in legal_targets}
+        group_target = skill.get("targetType") in {"all_enemies", "all_allies"}
+        if group_target:
+            targets = legal_targets
+        else:
+            targets = [self.get_character(target_id) for target_id in action.get("targetIds", [])]
+            if not targets or any(target is None for target in targets):
+                raise ValueError("invalid targets")
+        if not targets:
             raise ValueError("invalid targets")
-        legal_target_ids = {target["id"] for target in self._targets_for(actor, skill)}
         if any(target["id"] not in legal_target_ids for target in targets if target):
             raise ValueError("illegal target")
 
         self.state["phase"] = RESOLVE_ACTION
         dice = DiceService(seed=seed, fixed_rolls=list(fixed_rolls or []))
         target = targets[0]
-        events.append({"type": "action_declared", "actorId": actor["id"], "skillId": skill["id"], "targetIds": [target["id"]]})
+        events.append({"type": "action_declared", "actorId": actor["id"], "skillId": skill["id"], "targetIds": [target["id"] for target in targets]})
         if skill.get("requiresHitRoll"):
             roll = dice.roll_die(20, f"{actor['name']} {skill['name']} attack")
             total = roll + actor["combatStats"].get("attackBonus", 0) + skill.get("hitBonus", 0)
@@ -319,11 +339,17 @@ class BattleEngine:
             critical = roll == 20
             events.append({"type": "attack_roll", "actorId": actor["id"], "targetId": target["id"], "dice": "1d20", "rawRoll": roll, "modifier": actor["combatStats"].get("attackBonus", 0) + skill.get("hitBonus", 0), "total": total, "targetDefense": defense, "result": "critical" if critical else "hit" if hit else "miss"})
             if hit:
-                self._apply_damage(actor, target, skill, dice, critical, events)
+                for resolved_target in targets:
+                    self._apply_damage(actor, resolved_target, skill, dice, critical, events)
+        elif skill.get("damageDice"):
+            for resolved_target in targets:
+                self._apply_damage(actor, resolved_target, skill, dice, False, events)
         elif skill.get("healingDice"):
-            self._apply_healing(actor, target, skill, dice, events)
+            for resolved_target in targets:
+                self._apply_healing(actor, resolved_target, skill, dice, events)
         elif skill.get("tempHpDice"):
-            self._apply_temp_hp(actor, target, skill, dice, events)
+            for resolved_target in targets:
+                self._apply_temp_hp(actor, resolved_target, skill, dice, events)
         else:
             events.append({"type": "effect", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]})
 

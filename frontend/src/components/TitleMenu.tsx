@@ -3,18 +3,19 @@ import { motion } from 'framer-motion';
 interface TitleMenuProps {
   onNewGame: () => void;
   onLoadGame: () => void;
+  onSettings: () => void;
   onTest: () => void;
 }
 
 const MENU_ITEMS = [
   { label: '新游戏', action: 'new' },
   { label: '载入游戏', action: 'load' },
-  { label: '设置', action: 'settings', disabled: true },
+  { label: '设置', action: 'settings' },
   { label: '画廊', action: 'gallery', disabled: true },
   { label: '测试', action: 'test' },
 ] as const;
 
-export function TitleMenu({ onNewGame, onLoadGame, onTest }: TitleMenuProps) {
+export function TitleMenu({ onNewGame, onLoadGame, onSettings, onTest }: TitleMenuProps) {
   return (
     <main className="title-menu-screen">
       <div className="title-menu-shade" />
@@ -27,13 +28,16 @@ export function TitleMenu({ onNewGame, onLoadGame, onTest }: TitleMenuProps) {
         <div className="title-brand">
           <p className="eyebrow">D&D AI-TRPG</p>
           <h1>地心之门</h1>
+          <p className="title-intro">
+            新时代 TRPG · AI 跑团游戏。你将和 AI 主持人一起深入逆穹悬城，调查通向九层地狱的地心狱门。
+          </p>
           <div className="title-rule" />
         </div>
 
         <nav className="title-menu-actions" aria-label="主菜单">
           {MENU_ITEMS.map((item, index) => {
             const onClick =
-              item.action === 'new' ? onNewGame : item.action === 'load' ? onLoadGame : item.action === 'test' ? onTest : undefined;
+              item.action === 'new' ? onNewGame : item.action === 'load' ? onLoadGame : item.action === 'settings' ? onSettings : item.action === 'test' ? onTest : undefined;
             const disabled = 'disabled' in item && item.disabled;
 
             return (

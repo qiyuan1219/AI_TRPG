@@ -66,6 +66,16 @@
     0 0 60px rgba(95, 183, 167, 0.18);
 }
 
+.title-intro {
+  max-width: 520px;
+  margin: 18px 0 0;
+  color: rgba(245, 235, 207, 0.86);
+  font-size: 1rem;
+  line-height: 1.8;
+  letter-spacing: 0;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.48);
+}
+
 .title-rule {
   width: 160px;
   height: 1px;
@@ -133,6 +143,87 @@
   background: rgba(8, 10, 14, 0.35);
   box-shadow: none;
   backdrop-filter: blur(6px);
+}
+
+.audio-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 5, 10, 0.58);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.audio-settings-modal {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid rgba(231, 211, 161, 0.24);
+  border-radius: 8px;
+  background: rgba(12, 15, 22, 0.94);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.48);
+}
+
+.audio-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.audio-settings-header span {
+  color: var(--gold-soft);
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.audio-settings-header button {
+  width: 34px;
+  min-height: 34px;
+  border: 1px solid rgba(231, 211, 161, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 1.25rem;
+}
+
+.audio-settings-header button:hover {
+  border-color: rgba(239, 213, 140, 0.55);
+  color: var(--text);
+}
+
+.audio-setting-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.audio-setting-row input {
+  width: 100%;
+  accent-color: var(--gold-soft);
+}
+
+.audio-setting-row b {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  text-align: right;
+}
+
+@media (max-width: 520px) {
+  .audio-setting-row {
+    grid-template-columns: 1fr 48px;
+  }
+
+  .audio-setting-row span {
+    grid-column: 1 / -1;
+  }
 }
 
 .load-game-screen {

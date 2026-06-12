@@ -106,15 +106,16 @@ export function VisualNovelStage({
   const [bgRevealed, setBgRevealed] = useState(false);
   const [bgStageIndex, setBgStageIndex] = useState(-1);
   const stages = scene.bgStages || [];
+  const revealBaseBackgroundImmediately = scene.id !== 'inverse-city';
   // 首触发词：始终用通用触发词展示主背景；后续由 bgStages 的 trigger 独立接管阶段切换
   const firstTrigger = FALLBACK_TRIGGER;
 
   // 场景切换时重置
   useEffect(() => {
     if (!scene.backgroundImage) { setBgRevealed(false); setBgStageIndex(-1); return; }
-    setBgRevealed(false);
+    setBgRevealed(revealBaseBackgroundImmediately);
     setBgStageIndex(-1);
-  }, [scene.id, scene.backgroundImage, stages.length]);
+  }, [scene.id, scene.backgroundImage, revealBaseBackgroundImmediately, stages.length]);
 
   // 第一阶段触发
   useEffect(() => {
@@ -144,13 +145,14 @@ export function VisualNovelStage({
     }
   }, [scriptedBgOverride]);
 
-  // 生效背景图：override > stage > 主背景
+  // 生效背景图：当前台词 > override > stage > 主背景
   const activeBgImage = useMemo(() => {
+    if (line?.bgImage) return line.bgImage;
     if (scriptedBgOverride) return scriptedBgOverride;
     if (bgStageIndex > 0 && stages[bgStageIndex - 1]) return stages[bgStageIndex - 1].image;
     if (bgRevealed && scene.backgroundImage) return scene.backgroundImage;
     return null;
-  }, [scriptedBgOverride, bgStageIndex, bgRevealed, scene.backgroundImage, stages]);
+  }, [line?.bgImage, scriptedBgOverride, bgStageIndex, bgRevealed, scene.backgroundImage, stages]);
 
   function advance() {
     if (isActionPhase) return;
@@ -184,7 +186,7 @@ export function VisualNovelStage({
     return () => window.removeEventListener('keydown', onKey);
   }, [isActionPhase, canAdvance, done, isStreaming, line]);
 
-  const portraitSrc = useMemo(() => (speaker ? resolvePortraitPath(speaker) : null), [speaker]);
+  const portraitSrc = useMemo(() => line?.portrait || (speaker ? resolvePortraitPath(speaker) : null), [line?.portrait, speaker]);
 
   return (
     <main className={`vn-canvas ${scene.themeClass}`} onClick={advance}>
@@ -195,7 +197,7 @@ export function VisualNovelStage({
       <AnimatePresence>
         {activeBgImage && (
           <motion.div
-            key={`bg-${scene.id}-stage${bgStageIndex}`}
+            key={`bg-${activeBgImage}`}
             className="scene-background-image"
             style={{ backgroundImage: `url(${activeBgImage})` }}
             initial={{ opacity: 0 }}
@@ -216,7 +218,7 @@ export function VisualNovelStage({
       {/* 角色立绘 — 居中，仅上半身，渐进式浮现 */}
       <AnimatePresence>
         {portraitSrc && (
-          <div className="character-portrait" key={speaker}>
+          <div className="character-portrait" key={`${speaker}-${portraitSrc}`}>
             <motion.img
               src={portraitSrc}
               alt={speaker}

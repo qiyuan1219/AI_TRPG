@@ -4,6 +4,9 @@ import { Dice3DView, DiceRollOverlay, type DieType } from "./DiceRollOverlay";
 import type { DiceResult } from "../types/game";
 import { fetchBattleNarration, fetchAdvantage } from "../services/api";
 
+const BATTLE_BGM_TRACK = "/assets/bgm/bgm_05_battle_general.mp3";
+const BGM_TRACK_EVENT = "dnd-bgm-track";
+
 export interface BattleResult {
   outcome: "win" | "lose";
 }
@@ -1467,6 +1470,11 @@ function isDamagingAction(actor: BattleUnit, target: BattleUnit, skill: BattleSk
   return actor.faction !== target.faction && !isHealingSkill(skill) && !skill.tags.includes("临时HP");
 }
 
+function isGroupDamageSkill(skill: BattleSkill) {
+  const text = `${skill.name} ${skill.formula} ${skill.effect} ${skill.rule} ${skill.tags.join(" ")}`;
+  return /范围|群体|全体|锥形/.test(text);
+}
+
 function tuneDamageAmount(actor: BattleUnit, rawAmount: number) {
   const multiplier = actor.faction === "ally" ? BATTLE_TUNING.allyDamageMultiplier : BATTLE_TUNING.enemyDamageMultiplier;
   return Math.max(1, Math.round(rawAmount * multiplier));
@@ -2206,6 +2214,14 @@ export function BattleTestScreen({
   const config = useMemo(() => battleConfigOverride ?? getBattleConfig(mode), [battleConfigOverride, mode]);
   const battleBaseUnits = useMemo(() => applyOpeningEffectsToUnits(config.units, openingEffects), [config.units, openingEffects]);
   const openingLogLines = useMemo(() => openingEffects.map((effect) => effect.log), [openingEffects]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(BGM_TRACK_EVENT, { detail: BATTLE_BGM_TRACK }));
+    return () => {
+      window.dispatchEvent(new CustomEvent(BGM_TRACK_EVENT, { detail: '' }));
+    };
+  }, []);
+
   const [initiative, setInitiative] = useState(() => buildInitiative(battleBaseUnits));
   const [phase, setPhase] = useState<BattlePhase>("initiative");
   const [rollRunId, setRollRunId] = useState(1);
@@ -2417,15 +2433,23 @@ export function BattleTestScreen({
     return `KP：${cleaned}`;
   }
 
+  function getResolvedDamageTargets(actor: BattleUnit, target: BattleUnit, skill: BattleSkill) {
+    if (!isGroupDamageSkill(skill) || !isDamagingAction(actor, target, skill)) return [target];
+    const candidates = actor.faction === "ally" ? livingEnemies : livingAllies;
+    return candidates.filter((unit) => unit.hp > 0);
+  }
+
   function executeSettlement(settlement: PendingSettlement) {
     const { unit, target, skill, effect } = settlement;
+    const impactedTargets = getResolvedDamageTargets(unit, target, skill);
+    const targetLabel = impactedTargets.length > 1 ? impactedTargets.map((item) => item.name).join("、") : target.name;
     applyHpEffect(unit, target, skill, effect);
     // 暂存本地兜底文本，先用"KP记录中…"占位
     const localNarration = effect.narration;
     const placeholderEffect = { ...effect, narration: "KP记录中…" };
     setLastEffect(placeholderEffect);
     triggerBattleAnimation(unit, skill, target);
-    pushBattleLog(`${unit.name} 对 ${target.name} 使用 ${skill.name}：${effect.title}`);
+    pushBattleLog(`${unit.name} 对 ${targetLabel} 使用 ${skill.name}：${effect.title}`);
     pushBattleLog("KP记录中…");
 
     // 异步请求 LLM 播报
@@ -2433,7 +2457,7 @@ export function BattleTestScreen({
     const diceInfo = parseResultLine(effect.resultLine);
     fetchBattleNarration({
       actor_name: unit.name,
-      target_name: target.name,
+      target_name: targetLabel,
       skill_name: skill.name,
       outcome,
       amount: effect.amount ?? 0,
@@ -2535,10 +2559,14 @@ export function BattleTestScreen({
     }
 
     if (effect.success && isDamagingAction(actor, target, skill)) {
-      setUnitHp((current) => ({
-        ...current,
-        [target.id]: Math.max(0, (current[target.id] ?? target.hp) - effect.amount!),
-      }));
+      const damageTargets = getResolvedDamageTargets(actor, target, skill);
+      setUnitHp((current) => {
+        const next = { ...current };
+        damageTargets.forEach((damageTarget) => {
+          next[damageTarget.id] = Math.max(0, (current[damageTarget.id] ?? damageTarget.hp) - effect.amount!);
+        });
+        return next;
+      });
     }
   }
 

@@ -7,19 +7,19 @@ interface DialogueLogProps {
   activeIndex: number;
   isStreaming: boolean;
   onClose: () => void;
-  onJumpTo: (index: number) => void;
 }
 
-export function DialogueLog({ story, activeIndex, isStreaming, onClose, onJumpTo }: DialogueLogProps) {
+export function DialogueLog({ story, activeIndex, isStreaming, onClose }: DialogueLogProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const wasStreamingRef = useRef(isStreaming);
+  const visibleStory = story.slice(0, Math.min(Math.max(activeIndex + 1, 0), story.length));
 
   // 自动滚到底部（新对话进入时）
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
-  }, [story.length]);
+  }, [visibleStory.length]);
 
   // 流式输出结束时也滚动
   useEffect(() => {
@@ -59,23 +59,21 @@ export function DialogueLog({ story, activeIndex, isStreaming, onClose, onJumpTo
         {/* 头部 */}
         <div className="dialogue-log-header">
           <span>📜 对话日志</span>
-          <small>{story.length} 条记录</small>
+          <small>{visibleStory.length} 条记录</small>
           <button onClick={onClose} aria-label="关闭日志">✕</button>
         </div>
 
         {/* 日志列表 */}
         <div className="dialogue-log-list" ref={listRef}>
-          {story.length === 0 && (
+          {visibleStory.length === 0 && (
             <p className="log-empty">暂无对话记录</p>
           )}
-          {story.map((line, idx) => {
-            const isActive = idx === activeIndex;
+          {visibleStory.map((line, idx) => {
+            const isActive = idx === visibleStory.length - 1;
             return (
               <div
                 key={line.id}
                 className={`log-entry ${lineClass(line)} ${isActive ? 'log-entry-active' : ''}`}
-                onClick={() => { onJumpTo(idx); onClose(); }}
-                title="点击跳转到此条对话"
               >
                 <span className="log-entry-meta">
                   {roleLabel(line.role) && (

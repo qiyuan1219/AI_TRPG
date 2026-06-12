@@ -1,8 +1,9 @@
 import type { SaveSlotKey, SaveSlotSummary } from '../types/game';
 
-export const SAVE_SLOT_KEYS: SaveSlotKey[] = ['slot-1', 'slot-2', 'slot-3', 'slot-4', 'slot-5'];
+export const SAVE_SLOT_KEYS: SaveSlotKey[] = ['auto', 'slot-1', 'slot-2', 'slot-3', 'slot-4', 'slot-5'];
 
 const SLOT_LABELS: Record<SaveSlotKey, string> = {
+  auto: '自动存档',
   'slot-1': '存档一',
   'slot-2': '存档二',
   'slot-3': '存档三',
@@ -68,9 +69,10 @@ export function SaveLoadPanel({
         {SAVE_SLOT_KEYS.map((slotKey) => {
           const save = saveBySlot.get(slotKey);
           const isBusy = busySlot === slotKey;
+          const isAutoSlot = slotKey === 'auto';
 
           return (
-            <div key={slotKey} className={`save-slot ${save ? 'has-save' : ''}`}>
+            <div key={slotKey} className={`save-slot ${save ? 'has-save' : ''} ${isAutoSlot ? 'is-auto-save' : ''}`}>
               <div className="save-slot-copy">
                 <strong>{save?.title || SLOT_LABELS[slotKey]}</strong>
                 <small>
@@ -82,7 +84,7 @@ export function SaveLoadPanel({
               </div>
 
               <div className="save-slot-actions">
-                {onSave && (
+                {onSave && !isAutoSlot && (
                   <button type="button" onClick={() => onSave(slotKey)} disabled={disabled || hasBusySlot}>
                     {isBusy ? '...' : '存'}
                   </button>

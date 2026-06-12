@@ -39,6 +39,53 @@ import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrat
 type Screen = 'main-menu' | 'new-game' | 'load-game' | 'test' | 'loading' | 'game' | 'tutorial-battle';
 type GamePhase = 'narrating' | 'action';
 
+const AUDIO_STORAGE_KEYS = {
+  bgmVolume: 'dnd_bgm_volume',
+  sfxVolume: 'dnd_sfx_volume',
+};
+
+const BGM_TRACK_EVENT = 'dnd-bgm-track';
+
+const BGM_TRACKS = {
+  title: '/assets/bgm/bgm_01_title_theme.mp3',
+  inverseCity: '/assets/bgm/bgm_02_inverse_city.mp3',
+  guildCompanions: '/assets/bgm/bgm_03_guild_tavern_companions.mp3',
+  elevatorDescent: '/assets/bgm/bgm_04a_elevator_descent.mp3',
+  fungalSea: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  battleGeneral: '/assets/bgm/bgm_05_battle_general.mp3',
+  blackMarket: '/assets/bgm/bgm_06_black_market.mp3',
+  bossBattle: '/assets/bgm/bgm_07_blackstone_guardian_boss.mp3',
+};
+
+function readStoredVolume(key: string, fallback: number) {
+  if (typeof window === 'undefined') return fallback;
+  const stored = Number(window.localStorage.getItem(key));
+  if (!Number.isFinite(stored)) return fallback;
+  return Math.min(1, Math.max(0, stored));
+}
+
+function resolveBgmTrack(screen: Screen, currentLine: StoryLine | undefined, state: GameState) {
+  if (screen === 'main-menu') return BGM_TRACKS.title;
+  if (screen === 'tutorial-battle') return BGM_TRACKS.battleGeneral;
+
+  const text = currentLine?.text || '';
+  const area = String(state.current_area || '');
+
+  if (/boss|Boss|首领|黑石|守护者|黑暗之门/.test(`${area} ${text}`)) return BGM_TRACKS.bossBattle;
+  if (text.includes('黑市藏在补给市场背面的斜巷里')) return BGM_TRACKS.blackMarket;
+  if (text.includes('吊舱落在一座钉进岩壁的钢木平台上')) return BGM_TRACKS.fungalSea;
+  if (text.includes('降渊缆梯中枢悬在城市最下缘')) return BGM_TRACKS.elevatorDescent;
+  if (text.includes('一整座城市倒挂在巨大洞穴的穹顶之上')) return BGM_TRACKS.inverseCity;
+  if (text.includes('你沿着主缆街朝倒挂塔楼区走去')) return BGM_TRACKS.guildCompanions;
+
+  if (/黑市/.test(area)) return BGM_TRACKS.blackMarket;
+  if (/孢海/.test(area)) return BGM_TRACKS.fungalSea;
+  if (/降渊缆梯/.test(area)) return BGM_TRACKS.elevatorDescent;
+  if (/冒险者公会|回声酒馆|静默神殿/.test(area)) return BGM_TRACKS.guildCompanions;
+
+  return '';
+}
+
 const DEFAULT_OPENING = '逆穹城倒挂在巨大洞穴的穹顶之上，蓝绿色荧光在远方深渊中明灭。你的冒险从这一刻开始。';
 const RETREAT_ACTION_RE = /逃跑|撤退|脱战|逃离|后撤|拉开距离|跑路|避战|不战斗/;
 const DC_CHECK_RE = /(?:DC|ＤＣ)\s*\d{1,2}/i;
@@ -73,6 +120,15 @@ const YUNLING_SHOP_HINTS = [
 
 function findYunlingPotion(action: string) {
   return YUNLING_POTION_OPTIONS.find((option) => action.includes(option.action.replace('购买', '')) || action.includes(option.action));
+}
+
+const AUTO_SAVE_SLOT: SaveSlotKey = 'auto';
+
+const SCRIPTED_PORTRAIT_OVERRIDES: Record<string, Record<string, string>> = {};
+
+function getScriptedPortraitOverride(sceneId: string, speaker: string) {
+  const resolvedSpeaker = resolveSpeakerName(speaker);
+  return SCRIPTED_PORTRAIT_OVERRIDES[sceneId]?.[resolvedSpeaker];
 }
 
 function isFirstPlayerChoice(story: StoryLine[], state: GameState) {
@@ -174,7 +230,163 @@ function buildTutorialBattleSetup(dice: DiceResult | null): TutorialBattleSetup 
   };
 }
 
+function linearRecruitmentHints(state: GameState): string[] {
+  if (!state.tutorial_battle_done && !state.first_choice_resolved) {
+    return [
+      '正面迎击裂隙爬兽【力量DC10】',
+      '观察弱点寻找破绽【感知DC10】',
+      '请求瑟琳施展辅助法术【魅力DC12】',
+      '闪避并寻找掩护位置【敏捷DC10】',
+    ];
+  }
+
+  if (state.tutorial_battle_done && !state.guild_registered) {
+    return [
+      '查看吊箱封条【调查DC12】',
+      '询问瑟琳这些魔物为什么怕光【奥秘DC13】',
+      '前往冒险者公会登记',
+    ];
+  }
+
+  if (state.guild_registered && !state.salo_intel_done) {
+    const area = String(state.current_area || '');
+    if (area.includes('酒馆')) {
+      return state.tavern_dice_done
+        ? ['听萨洛说明三名队友的位置', '向萨洛打听地底堡垒传闻【魅力DC12】', '和瑟琳讨论远征路线']
+        : ['和萨洛玩一局快艇骰子', '先在酒馆里转转再说'];
+    }
+    return ['前往回声酒馆找萨洛打听三名队友', '向米娜确认酒馆暗号【洞悉DC12】', '询问赫尔曼远征队登记规则【调查DC12】'];
+  }
+
+  if (state.salo_intel_done && !state.al_recruited) {
+    return [
+      '前往静默神殿寻找艾琳',
+      '询问萨洛艾琳最近在照顾谁【洞悉DC12】',
+      '和瑟琳确认招募顺序',
+    ];
+  }
+
+  if (state.al_recruited && !state.brock_recruited) {
+    const area = String(state.current_area || '');
+    if (area.includes('神殿') || area.includes('教堂')) {
+      return [
+        '让艾琳疗伤【医药DC12】',
+        '询问教堂历史【历史DC10】',
+        '为战士祈祷',
+        '回到回声酒馆找布洛克',
+      ];
+    }
+    if (area.includes('酒馆') && state.brock_intro_seen) {
+      return [
+        '陪布洛克喝得尽兴',
+        '询问布洛克需要采集哪种孢子样本【自然DC12】',
+        '向萨洛确认布洛克的报酬行情【洞悉DC12】',
+      ];
+    }
+    return [
+      '回到回声酒馆找布洛克',
+      '整理艾琳加入后的队伍分工',
+      '向瑟琳确认布洛克的入队条件',
+    ];
+  }
+
+  if (state.brock_recruited && !state.kaiya_recruited) {
+    const area = String(state.current_area || '');
+    if (area.includes('黑市') || area.includes('补给市场') || area.includes('市场')) {
+      return [
+        '购买奥兰的幸运盲盒',
+        '和凯娅确认她能处理的陷阱类型【巧手DC13】',
+        '询问奥兰盲盒保底规则【洞悉DC12】',
+      ];
+    }
+    return [
+      '前往黑市寻找凯娅',
+      '询问布洛克黑市附近的路况【生存DC12】',
+      '和瑟琳确认米娜给出的暗号',
+    ];
+  }
+
+  if (state.kaiya_recruited && state.tavern_yunling_unlocked && !state.yunling_shop_unlocked && !state.yunling_met) {
+    return ['根据萨洛额外情报寻找云苓', '询问凯娅黑市深处的药剂商【调查DC12】', '整理下孢海前的药剂需求'];
+  }
+
+  if (state.kaiya_recruited && !state.expedition_registered) {
+    return ['返回冒险者公会找赫尔曼正式登记小队', '整理五人队伍分工', '让瑟琳核对远征许可清单'];
+  }
+
+  return [];
+}
+
+function constrainActionSuggestions(state: GameState, incoming: ActionSuggestion[] = []) {
+  const linearHints = linearRecruitmentHints(state);
+  if (linearHints.length) return makeSuggestions(linearHints);
+  return incoming.length ? incoming : fallbackSuggestions(state);
+}
+
+function getLinearRouteBlock(action: string, state: GameState): { message: string; hints: string[] } | null {
+  if (!state.guild_registered || state.expedition_registered) return null;
+
+  const wantsTemple = /前往静默神殿|去静默神殿|前往教堂|去教堂|寻找艾琳|找艾琳/.test(action);
+  const wantsBrock = /回声酒馆.*布洛克|寻找布洛克|找布洛克|布洛克.*喝|喝酒|喝得尽兴/.test(action);
+  const wantsMarket = /前往黑市|去黑市|寻找凯娅|找凯娅|幸运盲盒|盲盒|奥兰/.test(action);
+  const wantsGuildRegistration = /正式登记|登记小队|找赫尔曼|返回冒险者公会|回公会|前往冒险者公会|去公会/.test(action);
+  const wantsSalo = /回声酒馆|酒馆|萨洛|快艇骰子|骰局/.test(action);
+
+  if (!state.salo_intel_done) {
+    if (wantsTemple || wantsBrock || wantsMarket) {
+      return {
+        message: '瑟琳：「先去回声酒馆找萨洛。我们还不知道三名队友的具体位置和条件，现在乱跑只会把时间浪费在悬城的岔路里。」',
+        hints: linearRecruitmentHints(state),
+      };
+    }
+    return null;
+  }
+
+  if (!state.al_recruited) {
+    if (wantsBrock || wantsMarket || wantsGuildRegistration) {
+      return {
+        message: '瑟琳：「顺序不能乱。先去静默神殿找艾琳，队伍需要稳定的治疗和净化准备，然后再谈布洛克和凯娅。」',
+        hints: linearRecruitmentHints(state),
+      };
+    }
+    return null;
+  }
+
+  if (!state.brock_recruited) {
+    if (wantsMarket || wantsGuildRegistration || (wantsTemple && !String(state.current_area || '').includes('神殿'))) {
+      return {
+        message: '瑟琳：「艾琳已经加入了。下一站是回声酒馆找布洛克，不要提前去黑市，凯娅的条件要等布洛克入队后再处理。」',
+        hints: linearRecruitmentHints(state),
+      };
+    }
+    return null;
+  }
+
+  if (!state.kaiya_recruited) {
+    if (wantsTemple || wantsBrock || wantsGuildRegistration || (wantsSalo && !String(state.current_area || '').includes('酒馆'))) {
+      return {
+        message: '瑟琳：「布洛克已经点头了。现在去黑市找凯娅，米娜给的暗号该派上用场了。」',
+        hints: linearRecruitmentHints(state),
+      };
+    }
+    return null;
+  }
+
+  if (!state.expedition_registered && (wantsTemple || wantsBrock || wantsMarket || wantsSalo)) {
+    if (state.tavern_yunling_unlocked && !state.yunling_met && /云苓|药剂商|黑市深处/.test(action)) return null;
+    return {
+      message: '瑟琳：「人已经齐了。先回冒险者公会找赫尔曼正式登记小队，领完许可和物资再下缆梯。」',
+      hints: linearRecruitmentHints(state),
+    };
+  }
+
+  return null;
+}
+
 function fallbackSuggestions(state: GameState): ActionSuggestion[] {
+  const linearHints = linearRecruitmentHints(state);
+  if (linearHints.length) return makeSuggestions(linearHints);
+
   const area = String(state.current_area || '');
   if (area.includes('酒馆')) {
     if (state.brock_intro_seen && !state.brock_recruited) {
@@ -233,10 +445,83 @@ function normalizeStoryLines(lines: StoryLine[]): StoryLine[] {
         role,
         speaker,
         text,
+        portrait: typeof line.portrait === 'string' ? line.portrait : undefined,
+        bgImage: typeof line.bgImage === 'string' ? line.bgImage : undefined,
       });
     });
 
   return normalized;
+}
+
+interface AudioSettingsModalProps {
+  open: boolean;
+  bgmVolume: number;
+  sfxVolume: number;
+  onBgmVolumeChange: (value: number) => void;
+  onSfxVolumeChange: (value: number) => void;
+  onClose: () => void;
+}
+
+function AudioSettingsModal({
+  open,
+  bgmVolume,
+  sfxVolume,
+  onBgmVolumeChange,
+  onSfxVolumeChange,
+  onClose,
+}: AudioSettingsModalProps) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="audio-settings-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        >
+          <motion.section
+            className="audio-settings-modal"
+            initial={{ opacity: 0, y: 18, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="audio-settings-header">
+              <span>设置</span>
+              <button type="button" onClick={onClose} aria-label="关闭设置">×</button>
+            </header>
+
+            <label className="audio-setting-row">
+              <span>背景音乐</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={bgmVolume}
+                onChange={(event) => onBgmVolumeChange(Number(event.currentTarget.value))}
+              />
+              <b>{Math.round(bgmVolume * 100)}%</b>
+            </label>
+
+            <label className="audio-setting-row">
+              <span>音效</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={sfxVolume}
+                onChange={(event) => onSfxVolumeChange(Number(event.currentTarget.value))}
+              />
+              <b>{Math.round(sfxVolume * 100)}%</b>
+            </label>
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback?: string }, { error: Error | null }> {
@@ -290,9 +575,15 @@ export default function App() {
   const [fastForwardMode, setFastForwardMode] = useState(false);
   const [scriptedBgOverride, setScriptedBgOverride] = useState<string | null>(null);
   const [showActionPanel, setShowActionPanel] = useState(false); // 行动面板延迟显示
+  const [showAudioSettings, setShowAudioSettings] = useState(false);
+  const [bgmVolume, setBgmVolume] = useState(() => readStoredVolume(AUDIO_STORAGE_KEYS.bgmVolume, 0.65));
+  const [sfxVolume, setSfxVolume] = useState(() => readStoredVolume(AUDIO_STORAGE_KEYS.sfxVolume, 0.8));
+  const [externalBgmTrack, setExternalBgmTrack] = useState('');
 
   const lineId = useRef(1);
   const eventId = useRef(1);
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
+  const bgmTrackRef = useRef('');
   const parserRef = useRef(createNarrativeStreamParser());
   const abortRef = useRef<AbortController | null>(null);
   const stateRef = useRef<GameState>({});
@@ -304,6 +595,7 @@ export default function App() {
   const dicePokerPendingRef = useRef<string>(''); // 已进骰子游戏但尚未请求后端叙事
   const dicePokerAutoTriggeredRef = useRef(false); // 防止自动触发骰子游戏多次
   const scriptedBgSceneRef = useRef<string>('');    // 记录 override 对应的场景 id
+  const autoSaveBusyRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = gameState;
@@ -318,9 +610,49 @@ export default function App() {
     () => () => {
       abortRef.current?.abort();
       clearEventTimers();
+      bgmRef.current?.pause();
     },
     [clearEventTimers],
   );
+
+  useEffect(() => {
+    const audio = new Audio();
+    audio.loop = true;
+    audio.volume = bgmVolume;
+    bgmRef.current = audio;
+
+    const resumeAudio = () => {
+      if (audio.src) void audio.play().catch(() => undefined);
+    };
+
+    window.addEventListener('pointerdown', resumeAudio);
+    window.addEventListener('keydown', resumeAudio);
+
+    return () => {
+      window.removeEventListener('pointerdown', resumeAudio);
+      window.removeEventListener('keydown', resumeAudio);
+      audio.pause();
+      bgmRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(AUDIO_STORAGE_KEYS.bgmVolume, String(bgmVolume));
+    if (bgmRef.current) bgmRef.current.volume = bgmVolume;
+  }, [bgmVolume]);
+
+  useEffect(() => {
+    window.localStorage.setItem(AUDIO_STORAGE_KEYS.sfxVolume, String(sfxVolume));
+  }, [sfxVolume]);
+
+  useEffect(() => {
+    const handleBgmTrack = (event: Event) => {
+      setExternalBgmTrack(typeof (event as CustomEvent<string>).detail === 'string' ? (event as CustomEvent<string>).detail : '');
+    };
+
+    window.addEventListener(BGM_TRACK_EVENT, handleBgmTrack);
+    return () => window.removeEventListener(BGM_TRACK_EVENT, handleBgmTrack);
+  }, []);
 
   const upsertSaveSummary = useCallback((save: SaveSlotSummary) => {
     setSaves((prev) => [...prev.filter((item) => item.slot_key !== save.slot_key), save]);
@@ -426,6 +758,8 @@ export default function App() {
           role: 'kp' as const,
           speaker: line.speaker,
           text: line.text,
+          portrait: line.portrait || getScriptedPortraitOverride(scene.id, line.speaker),
+          bgImage: line.bgImage,
         }));
         const next = [...prev, ...newLines];
         if (options.focus !== false) {
@@ -436,7 +770,7 @@ export default function App() {
 
       scene.events?.forEach((eventText) => addEvent(eventText, 'state'));
       const hints = options.dynamicHints ?? scene.hints;
-      setSuggestions(makeSuggestions(hints));
+      setSuggestions(options.dynamicHints ? makeSuggestions(hints) : constrainActionSuggestions({ ...stateRef.current, ...statePatch }, makeSuggestions(hints)));
       setScriptedBgOverride(scene.bgImage || null);
       scriptedBgSceneRef.current = scene.setArea || '';
       setPhase('narrating');
@@ -445,35 +779,49 @@ export default function App() {
   );
 
   const saveCurrentGame = useCallback(
-    async (slotKey: SaveSlotKey) => {
-      if (!gameId || streaming || saveBusySlot) return;
+    async (slotKey: SaveSlotKey, options: { silent?: boolean; phaseOverride?: GamePhase } = {}) => {
+      const silent = options.silent ?? slotKey === AUTO_SAVE_SLOT;
+      if (!gameId || streaming || (!silent && saveBusySlot)) return;
+      if (silent && autoSaveBusyRef.current) return;
 
-      setSaveBusySlot(slotKey);
-      setSaveMessage('');
-      setSaveMessageTone('neutral');
+      if (silent) {
+        autoSaveBusyRef.current = true;
+      } else {
+        setSaveBusySlot(slotKey);
+        setSaveMessage('');
+        setSaveMessageTone('neutral');
+      }
 
       try {
-        const saveTitle = `${gameState.player_name || '冒险者'} · ${gameState.current_area || '未知区域'}`;
+        const saveTitlePrefix = slotKey === AUTO_SAVE_SLOT ? '自动' : '';
+        const saveTitle = `${saveTitlePrefix}${saveTitlePrefix ? ' · ' : ''}${gameState.player_name || '冒险者'} · ${gameState.current_area || '未知区域'}`;
         const result = await saveGame(gameId, {
           slot_key: slotKey,
           title: saveTitle,
           story,
-          suggestions: suggestions.length ? suggestions : fallbackSuggestions(gameState),
+          suggestions: constrainActionSuggestions(gameState, suggestions),
           active_index: activeIndex,
-          phase,
+          phase: options.phaseOverride ?? phase,
         });
 
         upsertSaveSummary(result.save);
-        setSaveMessage(`已写入：${result.save.title}`);
-        setSaveMessageTone('success');
-        addEvent('存档已写入', 'state');
+        if (!silent) {
+          setSaveMessage(`已写入：${result.save.title}`);
+          setSaveMessageTone('success');
+          addEvent('存档已写入', 'state');
+        }
       } catch (error: any) {
+        if (silent) return;
         const message = error.message || '保存失败';
         setSaveMessage(message);
         setSaveMessageTone('error');
         addEvent(message, 'error');
       } finally {
-        setSaveBusySlot('');
+        if (silent) {
+          autoSaveBusyRef.current = false;
+        } else {
+          setSaveBusySlot('');
+        }
       }
     },
     [
@@ -514,7 +862,7 @@ export default function App() {
         setActiveIndex(restoredStory.length ? Math.min(Math.max(result.active_index, 0), restoredStory.length - 1) : 0);
         setPhase(result.phase === 'narrating' ? 'narrating' : 'action');
         setStreaming(false);
-        setSuggestions(result.suggestions.length ? result.suggestions : fallbackSuggestions(result.state));
+        setSuggestions(constrainActionSuggestions(result.state, result.suggestions));
         setPendingTutorialBattleSetup(null);
         setOpeningFastForward(false);
         tutorialBattleIntentRef.current = false;
@@ -574,28 +922,23 @@ export default function App() {
             role: 'kp' as const,
             speaker: line.speaker,
             text: line.text,
+            bgImage: 'bgImage' in line && typeof line.bgImage === 'string' ? line.bgImage : undefined,
           }));
           setStory(scriptLines);
           setActiveIndex(0);  // 从第一句开始，逐条推进
-          setSuggestions(
-            result.opening_hints?.length
-              ? makeSuggestions(result.opening_hints)
-              : fallbackSuggestions(result.state),
-          );
+          setSuggestions(constrainActionSuggestions(
+            result.state,
+            result.opening_hints?.length ? makeSuggestions(result.opening_hints) : [],
+          ));
         } else {
           // 回退：AI文本解析
           const parsedOpening = extractHints(result.opening || DEFAULT_OPENING);
           const openingLines = splitNarrative(parsedOpening.text || DEFAULT_OPENING);
-          setSuggestions(parsedOpening.suggestions.length ? parsedOpening.suggestions : fallbackSuggestions(result.state));
+          setSuggestions(constrainActionSuggestions(result.state, parsedOpening.suggestions));
           appendStoryLines(openingLines.length ? openingLines : [DEFAULT_OPENING], 'kp', '主持人', true);
         }
 
         if (payload.skip_opening) setOpeningFastForward(true);
-        // 安全网：开篇时确保逆穹城背景图显示，不依赖AI文本触发词匹配
-        if (String(result.state.current_area || '').includes('逆穹')) {
-          setScriptedBgOverride('/assets/scenes/01inverse-city-first-sight.webp');
-          scriptedBgSceneRef.current = '逆穹悬城·主缆街';
-        }
         setScreen('game');
       } catch (error: any) {
         setLoadError(error.message || '连接失败');
@@ -680,8 +1023,11 @@ export default function App() {
           role: 'kp' as const,
           speaker: line.speaker,
           text: line.text,
+          portrait: ('portrait' in line && typeof line.portrait === 'string' ? line.portrait : undefined)
+            || (scene ? getScriptedPortraitOverride(scene.id, line.speaker) : undefined),
+          bgImage: 'bgImage' in line && typeof line.bgImage === 'string' ? line.bgImage : undefined,
         })));
-        setSuggestions(makeSuggestions(checkpoint.hints ?? scene?.hints ?? fallbackSuggestions(nextState).map((item) => item.text)));
+        setSuggestions(constrainActionSuggestions(nextState, makeSuggestions(checkpoint.hints ?? scene?.hints ?? fallbackSuggestions(nextState).map((item) => item.text))));
         setScriptedBgOverride(scene?.bgImage || null);
         scriptedBgSceneRef.current = scene?.setArea || '';
         setActiveIndex(0);
@@ -711,6 +1057,12 @@ export default function App() {
         setSuggestions(makeSuggestions(nextHints));
         setPhase('narrating');
       };
+
+      const linearRouteBlock = getLinearRouteBlock(action, currentState);
+      if (linearRouteBlock) {
+        blockRoute(linearRouteBlock.message, linearRouteBlock.hints);
+        return;
+      }
 
       if (/静默神殿|寻找艾琳|前往教堂|去教堂/.test(action) && !currentState.salo_intel_done) {
         blockRoute('瑟琳：「先去回声酒馆找萨洛。我们还不知道艾琳今晚是否在神殿，也不知道另外两人的条件。」', [
@@ -883,8 +1235,11 @@ export default function App() {
 
       const firstChoice = isFirstPlayerChoice(story, stateRef.current);
       const retreatChoice = RETREAT_ACTION_RE.test(action);
-      const shouldPrepareTutorialBattle = firstChoice && !retreatChoice;
-      const resolvedAction = shouldPrepareTutorialBattle ? ensureFirstBattleCheck(action) : action;
+      const shouldPrepareTutorialBattle = firstChoice;
+      const forcedBattleAction = retreatChoice
+        ? `${action}。瑟琳立刻用银杖封住后撤路线，提醒队伍不能把裂隙爬兽放进人群，必须就地迎击最近的敌人`
+        : action;
+      const resolvedAction = shouldPrepareTutorialBattle ? ensureFirstBattleCheck(forcedBattleAction) : action;
 
       abortRef.current?.abort();
       parserRef.current = createNarrativeStreamParser();
@@ -895,21 +1250,13 @@ export default function App() {
       setStreaming(true);
       setSuggestions([]);
       setPendingTutorialBattleSetup(null);
-      appendStoryLines([resolvedAction], 'player', gameState.player_name || '你', true);
-
-      if (firstChoice && retreatChoice) {
-        setGameState((prev) => ({
-          ...prev,
-          first_choice_resolved: true,
-          last_event: '玩家选择撤退，避开第一次教学战斗',
-        }));
-      }
+      appendStoryLines([action], 'player', gameState.player_name || '你', true);
 
       abortRef.current = runtime.streamAction(gameId, resolvedAction, {
         onNarrative: (chunk) => {
           const parsed = parserRef.current.push(chunk);
           if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
-          if (parsed.suggestions.length) setSuggestions(parsed.suggestions);
+          if (parsed.suggestions.length) setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
         },
         onSystem: (rawEvent) => {
           const parsed = runtime.parseSystemEvent(rawEvent);
@@ -941,7 +1288,7 @@ export default function App() {
             setSuggestions(makeSuggestions(['进入教学战斗']));
             addEvent('开局判定将影响战斗', 'state');
           } else {
-            setSuggestions(parsed.suggestions.length ? parsed.suggestions : fallbackSuggestions(stateRef.current));
+            setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
           }
 
           // 酒馆区域：瑟琳提示后，显示固定两个选项
@@ -978,7 +1325,7 @@ export default function App() {
             }));
             setSuggestions(makeSuggestions(['进入教学战斗']));
           } else {
-            setSuggestions(fallbackSuggestions(stateRef.current));
+            setSuggestions(constrainActionSuggestions(stateRef.current));
           }
         },
       });
@@ -1112,11 +1459,23 @@ export default function App() {
 
   const currentLine = story[activeIndex];
   const canAdvance = Boolean(currentLine) && (activeIndex < story.length - 1 || !streaming);
-  const visibleSuggestions = suggestions.length ? suggestions : fallbackSuggestions(gameState);
+  const requestedBgmTrack = useMemo(() => externalBgmTrack || resolveBgmTrack(screen, currentLine, gameState), [externalBgmTrack, screen, currentLine, gameState]);
+  const visibleSuggestions = suggestions.length ? suggestions : constrainActionSuggestions(gameState);
   const areaText = String(gameState.current_area || '');
   const showLuckyBoxEntry = /黑市|补给市场|市场|奥兰|凯娅/.test(areaText) && Boolean(gameState.kaiya_intro_seen && !gameState.kaiya_recruited);
   const cityAreaVisited = /冒险者公会|回声酒馆|酒馆|黑市|补给市场|市场|静默神殿|神殿|降渊缆梯|缆梯/.test(areaText);
   const canUseCityMap = CITY_MAP_ENABLED && Boolean(gameState.city_map_unlocked || gameState.guild_registered || cityAreaVisited);
+
+  useEffect(() => {
+    const audio = bgmRef.current;
+    if (!audio || !requestedBgmTrack || bgmTrackRef.current === requestedBgmTrack) return;
+
+    bgmTrackRef.current = requestedBgmTrack;
+    audio.src = requestedBgmTrack;
+    audio.loop = true;
+    audio.volume = bgmVolume;
+    void audio.play().catch(() => undefined);
+  }, [requestedBgmTrack, bgmVolume]);
 
   useEffect(() => {
     if (!canUseCityMap && showCityMap) {
@@ -1172,8 +1531,9 @@ export default function App() {
         return;
       }
       setPhase('action');
+      void saveCurrentGame(AUTO_SAVE_SLOT, { silent: true, phaseOverride: 'action' });
     }
-  }, [activeIndex, pendingTutorialBattleSetup, story.length, streaming]);
+  }, [activeIndex, pendingTutorialBattleSetup, saveCurrentGame, story.length, streaming]);
 
   const openLoadGame = useCallback(() => {
     setSaveMessage('');
@@ -1252,7 +1612,24 @@ export default function App() {
   }, [addEvent, appendStoryLines, gameId]);
 
   if (screen === 'main-menu') {
-    return <TitleMenu onNewGame={() => setScreen('new-game')} onLoadGame={openLoadGame} onTest={() => setScreen('test')} />;
+    return (
+      <>
+        <TitleMenu
+          onNewGame={() => setScreen('new-game')}
+          onLoadGame={openLoadGame}
+          onSettings={() => setShowAudioSettings(true)}
+          onTest={() => setScreen('test')}
+        />
+        <AudioSettingsModal
+          open={showAudioSettings}
+          bgmVolume={bgmVolume}
+          sfxVolume={sfxVolume}
+          onBgmVolumeChange={setBgmVolume}
+          onSfxVolumeChange={setSfxVolume}
+          onClose={() => setShowAudioSettings(false)}
+        />
+      </>
+    );
   }
 
   if (screen === 'new-game') {
@@ -1479,10 +1856,6 @@ export default function App() {
             activeIndex={activeIndex}
             isStreaming={streaming}
             onClose={() => setShowDialogueLog(false)}
-            onJumpTo={(index) => {
-              setActiveIndex(index);
-              setPhase('narrating');
-            }}
           />
         )}
       </AnimatePresence>
@@ -1539,7 +1912,7 @@ export default function App() {
                   onNarrative: (chunk) => {
                     const parsed = parserRef.current.push(chunk);
                     if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
-                    if (parsed.suggestions.length) setSuggestions(parsed.suggestions);
+                    if (parsed.suggestions.length) setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
                   },
                   onSystem: (rawEvent) => {
                     const parsed = runtime.parseSystemEvent(rawEvent);
@@ -1553,7 +1926,7 @@ export default function App() {
                   onDone: () => {
                     const parsed = parserRef.current.flush();
                     if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
-                    setSuggestions(parsed.suggestions.length ? parsed.suggestions : fallbackSuggestions(stateRef.current));
+                    setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
                     setStreaming(false);
                   },
                   onError: (error) => {
@@ -1564,7 +1937,7 @@ export default function App() {
                     setStreaming(false);
                     addEvent(message, 'state');
                     appendStoryLines([message], 'system', '系统');
-                    setSuggestions(fallbackSuggestions(stateRef.current));
+                    setSuggestions(constrainActionSuggestions(stateRef.current));
                   },
                 });
               }

@@ -6,7 +6,8 @@ import {
   resolveSpeakerName,
 } from '../data/characterRegistry';
 
-const HINT_RE = /\[HINTS:([\s\S]*?)\]/g;
+const HINT_RE = /[\[【]\s*HINTS\s*[:：]\s*([\s\S]*?)[\]】]/gi;
+const HINT_START_RE = /[\[【]\s*HINTS\s*[:：]/i;
 const SENTENCE_END_CHARS = new Set(['。', '！', '？', '!', '?']);
 const MIN_SEGMENT_TEXT_LENGTH = 10;
 
@@ -75,6 +76,25 @@ function compactText(text: string) {
     .trim();
 }
 
+function findHintStart(input: string) {
+  const match = HINT_START_RE.exec(input);
+  return match ? match.index : -1;
+}
+
+function findHintEnd(input: string, start: number) {
+  const squareEnd = input.indexOf(']', start);
+  const chineseEnd = input.indexOf('】', start);
+  if (squareEnd < 0) return chineseEnd;
+  if (chineseEnd < 0) return squareEnd;
+  return Math.min(squareEnd, chineseEnd);
+}
+
+function stripLooseHintArtifacts(text: string) {
+  const hintStart = findHintStart(text);
+  if (hintStart >= 0) return text.slice(0, hintStart);
+  return text.replace(/\bHINTS\b\s*[:：].*$/i, '');
+}
+
 export function makeSuggestions(hints: string[]): ActionSuggestion[] {
   return hints
     .map((hint) => hint.trim())
@@ -95,7 +115,7 @@ export function extractHints(input: string): { text: string; suggestions: Action
   });
 
   return {
-    text: compactText(text),
+    text: compactText(stripLooseHintArtifacts(text)),
     suggestions: makeSuggestions(hints),
   };
 }
@@ -547,9 +567,9 @@ export function createNarrativeStreamParser() {
     const lines: string[] = [];
 
     while (buffer) {
-      const hintStart = buffer.indexOf('[HINTS:');
+      const hintStart = findHintStart(buffer);
       if (hintStart >= 0) {
-        const hintEnd = buffer.indexOf(']', hintStart);
+        const hintEnd = findHintEnd(buffer, hintStart);
         const beforeHint = buffer.slice(0, hintStart);
         const split = splitCompleteSentences(beforeHint);
         lines.push(...split.complete);

@@ -6,6 +6,8 @@
 export interface ScriptedLine {
   speaker: string;
   text: string;
+  portrait?: string;
+  bgImage?: string;
 }
 
 export interface ScriptedScene {
@@ -44,7 +46,12 @@ const GUILD_ARRIVAL: ScriptedScene = {
   lines: [
     {
       speaker: '主持人',
-      text: '你沿着主缆街抵达倒挂塔楼区。冒险者公会嵌在一座倒悬石塔内，门外挂着剑盾徽记，徽记下方钉满失踪远征队的素描、残缺路线图和被雨水泡皱的悬赏令。',
+      text: '你沿主缆街朝公会方向走去。',
+      bgImage: '/assets/scenes/0101cable-street-walk.webp',
+    },
+    {
+      speaker: '主持人',
+      text: '你沿着主缆街朝倒挂塔楼区走去。街道两侧的符文灯将影子投在头顶的街石上，远处城市缆索发出低沉震响。公会建筑是一栋倒挂的石砌塔楼，门外挂着铁制剑盾徽记，门口贴着泛黄的任务单和悬赏令。',
     },
     {
       speaker: '主持人',
@@ -187,7 +194,7 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
   id: 'cathedral-ailin-recruit',
   triggers: ['前往静默神殿', '去静默神殿', '前往教堂', '去教堂', '寻找艾琳', '前往静默神殿寻找艾琳'],
   setArea: '逆穹悬城·静默神殿',
-  bgImage: '/assets/scenes/11temple-prayer.webp',
+  bgImage: '/assets/scenes/05temple-interior.png',
   statePatch: {
     al_recruited: true,
     al_trust: 72,
@@ -203,6 +210,7 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
     {
       speaker: '主持人',
       text: '神殿大厅里摆着牺牲战士的遗物：折断的缆扣、裂开的护符、没有寄出的家书。几名修女站在灰布两侧，低声诵念安魂祷词。',
+      bgImage: '/assets/scenes/11temple-prayer.webp',
     },
     {
       speaker: '瑟琳',
@@ -215,6 +223,7 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
     {
       speaker: '艾琳',
       text: '「愿白枝引导他们穿过无声之处。愿后来者记住，牺牲不是数字，失踪也不是。」',
+      portrait: '/assets/characters/ailin/ailin_prayer.webp',
     },
     {
       speaker: '主持人',
@@ -255,7 +264,7 @@ const BROCK_TAVERN_INTRO: ScriptedScene = {
   id: 'brock-tavern-intro',
   triggers: ['回到回声酒馆寻找布洛克', '寻找布洛克', '找布洛克', '去酒馆找布洛克'],
   setArea: '逆穹悬城·回声酒馆',
-  bgImage: '/assets/scenes/09brock-tavern-table.webp',
+  bgImage: '/assets/scenes/06tavern-interior.webp',
   statePatch: {
     brock_intro_seen: true,
   },
@@ -265,10 +274,12 @@ const BROCK_TAVERN_INTRO: ScriptedScene = {
     {
       speaker: '主持人',
       text: '你们再次回到回声酒馆时，萨洛只朝角落抬了抬下巴。那里坐着一个宽肩矮壮的男人，桌上摆着铁锅、酒杯和一只装满干燥菌片的布袋。',
+      bgImage: '/assets/scenes/09brock-tavern-table.webp',
     },
     {
       speaker: '布洛克',
       text: '「公会的人？我不喜欢公会的人。他们总说‘采样’，最后把会发光的、会咬人的、会救命的全装进一个箱子。」',
+      portrait: '/assets/characters/senluo/brock_tavern.webp',
     },
     {
       speaker: '艾琳',
@@ -295,7 +306,7 @@ const BROCK_RECRUITED: ScriptedScene = {
   manualOnly: true,
   triggers: ['布洛克喝酒骰子结束'],
   setArea: '逆穹悬城·回声酒馆',
-  bgImage: '/assets/scenes/09brock-tavern-table.webp',
+  bgImage: '/assets/scenes/06tavern-interior.webp',
   statePatch: {
     sl_recruited: true,
     sl_trust: 64,
@@ -308,6 +319,8 @@ const BROCK_RECRUITED: ScriptedScene = {
     {
       speaker: '布洛克',
       text: '「行，酒量和骰运都还没让我失望。采样条件写清楚：活性孢子三份，不能烧菌巢，不能把会繁殖的样本丢进城市排水沟。」',
+      bgImage: '/assets/scenes/09brock-tavern-table.webp',
+      portrait: '/assets/characters/senluo/brock_tavern.webp',
     },
     {
       speaker: '瑟琳',
@@ -336,7 +349,7 @@ const BLACK_MARKET_KAIYA_INTRO: ScriptedScene = {
   id: 'blackmarket-kaiya-intro',
   triggers: ['前往黑市寻找凯娅', '去黑市找凯娅', '寻找凯娅', '前往黑市'],
   setArea: '逆穹悬城·黑市',
-  bgImage: '/assets/scenes/10orlan-lucky-box.webp',
+  bgImage: '/assets/scenes/07blackmarket-stall.webp',
   statePatch: {
     blackmarket_unlocked: true,
     kaiya_intro_seen: true,
@@ -359,6 +372,7 @@ const BLACK_MARKET_KAIYA_INTRO: ScriptedScene = {
     {
       speaker: '凯娅',
       text: '「缺页最值钱。公会这次终于学会不把我的名字写在明档上了？」',
+      portrait: '/assets/characters/kelaiya/kaiya_blackmarket.webp',
     },
     {
       speaker: '凯娅',
@@ -402,10 +416,12 @@ const KAIYA_RECRUITED: ScriptedScene = {
     {
       speaker: '主持人',
       text: '钻石落进凯娅掌心时，她没有立刻收起，而是举到冷光灯下看了看切面。光在她眼底一闪，像某种被确认的契约。',
+      bgImage: '/assets/scenes/10orlan-lucky-box.webp',
     },
     {
       speaker: '凯娅',
       text: '「不错，是真的。你们至少知道筹码要先放在桌上。」',
+      portrait: '/assets/characters/kelaiya/kaiya_blackmarket.webp',
     },
     {
       speaker: '凯娅',

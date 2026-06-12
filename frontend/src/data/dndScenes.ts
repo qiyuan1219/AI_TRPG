@@ -10,11 +10,11 @@ export const DND_SCENES: SceneVisual[] = [
     backgroundImage: '/assets/scenes/01inverse-city-first-sight.webp',
     bgStages: [
       {
-        trigger: '补给吊箱从缆车上震落',
-        image: '/assets/battle/b1-cablestreet-battle.png',
+        trigger: '你们没走多远，街尽头传来刺耳的金属刮擦声',
+        image: '/assets/scenes/02tutorial-battle-trigger.webp',
       },
       {
-        trigger: '裂隙爬兽被银白色光芒逼退',
+        trigger: '最后一只裂隙爬兽被银白色光芒逼退',
         image: '/assets/scenes/03post-battle-street.webp',
       },
     ],
@@ -39,6 +39,7 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '传闻、情报与一杯暖酒',
     aliases: ['回声酒馆', '酒馆', '萨洛'],
     themeClass: 'scene-guild',
+    backgroundImage: '/assets/scenes/06tavern-interior.webp',
   },
   {
     id: 'market',
@@ -46,6 +47,7 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '抗孢面罩、冷光灯、远征工具与黑市讲价',
     aliases: ['补给市场', '市场', '黑市', '黑市摊位', '奥兰', '讲价'],
     themeClass: 'scene-library',
+    backgroundImage: '/assets/scenes/07blackmarket-stall.webp',
   },
   {
     id: 'forge',

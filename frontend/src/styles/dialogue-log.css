@@ -80,13 +80,6 @@
   padding: 8px 10px;
   border-radius: 6px;
   border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 150ms ease;
-}
-
-.log-entry:hover {
-  border-color: rgba(231,211,161,0.18);
-  background: rgba(255,255,255,0.04);
 }
 
 .log-entry-active {

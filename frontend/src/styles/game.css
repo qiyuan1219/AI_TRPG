@@ -196,6 +196,11 @@
   border-color: rgba(95, 183, 167, 0.42);
 }
 
+.save-slot.is-auto-save {
+  border-color: rgba(239, 213, 140, 0.34);
+  background: rgba(239, 213, 140, 0.055);
+}
+
 .save-slot-copy {
   display: grid;
   min-width: 0;

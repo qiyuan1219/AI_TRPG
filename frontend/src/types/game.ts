@@ -14,6 +14,8 @@ export interface StoryLine {
   role: 'kp' | 'player' | 'system';
   speaker: string;
   text: string;
+  portrait?: string;
+  bgImage?: string;
 }
 
 export interface SceneVisual {
@@ -99,12 +101,12 @@ export interface CreateGameResult {
   game_id: string;
   session_id?: string;
   opening: string;
-  opening_script?: Array<{ speaker: string; text: string }>;  // 固定开场脚本，speaker绝对正确
+  opening_script?: Array<{ speaker: string; text: string; bgImage?: string }>;  // 固定开场脚本，speaker绝对正确
   opening_hints?: string[];                                    // 开场HINTS
   state: GameState;
 }
 
-export type SaveSlotKey = 'slot-1' | 'slot-2' | 'slot-3' | 'slot-4' | 'slot-5';
+export type SaveSlotKey = 'auto' | 'slot-1' | 'slot-2' | 'slot-3' | 'slot-4' | 'slot-5';
 
 export interface SaveSlotSummary {
   slot_key: SaveSlotKey;

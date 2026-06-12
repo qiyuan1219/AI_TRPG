@@ -28,7 +28,7 @@ from logger import get_logger, new_session
 router_dnd = APIRouter(prefix="/api/dnd")
 OPENING_TIMEOUT = 30
 init_db()
-SAVE_SLOT_KEYS = {"slot-1", "slot-2", "slot-3", "slot-4", "slot-5"}
+SAVE_SLOT_KEYS = {"auto", "slot-1", "slot-2", "slot-3", "slot-4", "slot-5"}
 
 # 对话历史缓存（每局游戏保留最近20轮）
 _chat_history: dict[str, list[dict]] = {}
@@ -402,7 +402,6 @@ SCRIPTED_OPENING_HINTS = [
     "正面迎击裂隙爬兽【力量DC10】",
     "观察弱点寻找破绽【感知DC10】",
     "请求瑟琳施展辅助法术【魅力DC12】",
-    "撤退脱战拉开距离【敏捷DC10】",
     "闪避并寻找掩护位置【敏捷DC10】",
 ]
 
@@ -438,6 +437,7 @@ async def create_dnd_game(req: CreateDNDRequest):
         "city_map_unlocked": False,
         "blackmarket_unlocked": False,
         "al_recruited": False,
+        "sl_recruited": False,
         "kl_recruited": False,
         "recruited_companions": "瑟琳",
         # 核心同伴 - "银杖"瑟琳固定同行
@@ -508,7 +508,7 @@ async def patch_state(game_id: str, req: StatePatchRequest):
         state["actions_in_area"] = int(patch.get("actions_in_area", 0))
 
     recruited = [item.strip() for item in str(state.get("recruited_companions", "")).split(",") if item.strip()]
-    for flag, name in (("al_recruited", "艾琳"), ("kl_recruited", "凯娅")):
+    for flag, name in (("al_recruited", "艾琳"), ("sl_recruited", "布洛克"), ("kl_recruited", "凯娅")):
         if state.get(flag) and name not in recruited:
             recruited.append(name)
     if recruited:

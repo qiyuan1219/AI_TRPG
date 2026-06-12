@@ -627,10 +627,6 @@ export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenPro
             activeIndex={activeIndex}
             isStreaming={busy}
             onClose={() => setShowDialogueLog(false)}
-            onJumpTo={(index) => {
-              setActiveIndex(index);
-              setPhase('narrating');
-            }}
           />
         )}
       </AnimatePresence>
