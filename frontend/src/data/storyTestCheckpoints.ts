@@ -182,6 +182,7 @@ export const STORY_TEST_CHECKPOINTS: StoryTestCheckpoint[] = [
       '购买力量药水',
       '购买智力药水',
       '购买治疗药水',
+      '购买净化之心',
       '不购买药水返回公会登记',
     ],
   },

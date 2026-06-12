@@ -187,7 +187,7 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
   id: 'cathedral-ailin-recruit',
   triggers: ['前往静默神殿', '去静默神殿', '前往教堂', '去教堂', '寻找艾琳', '前往静默神殿寻找艾琳'],
   setArea: '逆穹悬城·静默神殿',
-  bgImage: '/assets/scenes/05temple-interior.png',
+  bgImage: '/assets/scenes/11temple-prayer.webp',
   statePatch: {
     al_recruited: true,
     al_trust: 72,
@@ -255,7 +255,7 @@ const BROCK_TAVERN_INTRO: ScriptedScene = {
   id: 'brock-tavern-intro',
   triggers: ['回到回声酒馆寻找布洛克', '寻找布洛克', '找布洛克', '去酒馆找布洛克'],
   setArea: '逆穹悬城·回声酒馆',
-  bgImage: '/assets/scenes/06tavern-interior.webp',
+  bgImage: '/assets/scenes/09brock-tavern-table.webp',
   statePatch: {
     brock_intro_seen: true,
   },
@@ -295,7 +295,7 @@ const BROCK_RECRUITED: ScriptedScene = {
   manualOnly: true,
   triggers: ['布洛克喝酒骰子结束'],
   setArea: '逆穹悬城·回声酒馆',
-  bgImage: '/assets/scenes/06tavern-interior.webp',
+  bgImage: '/assets/scenes/09brock-tavern-table.webp',
   statePatch: {
     sl_recruited: true,
     sl_trust: 64,
@@ -336,7 +336,7 @@ const BLACK_MARKET_KAIYA_INTRO: ScriptedScene = {
   id: 'blackmarket-kaiya-intro',
   triggers: ['前往黑市寻找凯娅', '去黑市找凯娅', '寻找凯娅', '前往黑市'],
   setArea: '逆穹悬城·黑市',
-  bgImage: '/assets/scenes/07blackmarket-stall.webp',
+  bgImage: '/assets/scenes/10orlan-lucky-box.webp',
   statePatch: {
     blackmarket_unlocked: true,
     kaiya_intro_seen: true,
@@ -435,7 +435,7 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
   manualOnly: true,
   triggers: ['根据萨洛额外情报寻找云苓'],
   setArea: '逆穹悬城·黑市深处',
-  bgImage: '/assets/scenes/07blackmarket-stall.webp',
+  bgImage: '/assets/scenes/12yunling-apothecary.webp',
   statePatch: {
     yunling_met: true,
     yunling_shop_unlocked: true,
@@ -481,12 +481,13 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
     },
     {
       speaker: '云苓',
-      text: '「真话比较贵。看在萨洛赢得不难看的份上，三瓶治疗药水送你们。之后想买，按规矩付钱。」',
+      text: '「真话比较贵。看在萨洛赢得不难看的份上，三瓶治疗药水送你们。之后想买，按规矩付钱。柜台最里面那枚净化之心也卖，但它不是给小伤小痛用的；如果你们遇到被黑石侵蚀、却还没完全失去自我的人，它也许能替你们多留一个选择。」',
     },
   ],
   hints: [
     '购买力量药水',
     '购买治疗药水',
+    '购买净化之心',
     '不购买药水返回公会登记',
   ],
 };

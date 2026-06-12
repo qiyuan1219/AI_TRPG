@@ -9,6 +9,7 @@ import type {
 } from '../types/game';
 
 const BASE = '/api/dnd';
+const BATTLE_BASE = '/api/battles';
 const SAFE_SERVICE_MESSAGE = '主持人暂时没有回应，已为本轮处理启用兜底。';
 const CONNECTION_ERROR_PATTERN =
   /(connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|load\s*failed|timeout|timed\s*out|econn|socket|fetch|body\s*stream|terminated|aborted)/i;
@@ -327,6 +328,58 @@ export async function fetchBattleNarration(payload: BattleNarratePayload): Promi
   } catch {
     return '';
   }
+}
+
+export interface AuthoritativeBattleAction {
+  actorId?: string;
+  skillId?: string;
+  targetIds?: string[];
+  seed?: number;
+  fixed_rolls?: number[];
+  auto_enemy?: boolean;
+}
+
+export interface AuthoritativeBattleResult {
+  battleId: string;
+  battleState: Record<string, any>;
+  currentActor?: Record<string, any> | null;
+  legalActions: Array<Record<string, any>>;
+  events: Array<Record<string, any>>;
+}
+
+export async function startAuthoritativeBattle(payload: {
+  characters?: Array<Record<string, any>>;
+  seed?: number;
+  fixed_rolls?: number[];
+} = {}): Promise<AuthoritativeBattleResult> {
+  const response = await apiFetch(`${BATTLE_BASE}/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }, '启动战斗失败');
+
+  if (!response.ok) throw new Error(await readErrorMessage(response, '启动战斗失败'));
+  return response.json();
+}
+
+export async function getAuthoritativeBattle(battleId: string): Promise<AuthoritativeBattleResult> {
+  const response = await apiFetch(`${BATTLE_BASE}/${battleId}`, undefined, '获取战斗失败');
+  if (!response.ok) throw new Error(await readErrorMessage(response, '获取战斗失败'));
+  return response.json();
+}
+
+export async function submitAuthoritativeBattleAction(
+  battleId: string,
+  payload: AuthoritativeBattleAction,
+): Promise<AuthoritativeBattleResult> {
+  const response = await apiFetch(`${BATTLE_BASE}/${battleId}/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }, '提交战斗行动失败');
+
+  if (!response.ok) throw new Error(await readErrorMessage(response, '提交战斗行动失败'));
+  return response.json();
 }
 
 export function chatStream(

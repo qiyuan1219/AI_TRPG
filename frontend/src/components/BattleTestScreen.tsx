@@ -13,10 +13,8 @@ const AVATAR_MAP: Record<string, string> = {
   adventurer: '/assets/chibi/adventurer/avatar.png',
   selin: '/assets/chibi/selin/avatar.png',
   senluo: '/assets/chibi/senluo/avatar.png',
-  liyase: '/assets/chibi/liyase/avatar.png',
   ailin: '/assets/chibi/ailin/avatar.png',
   kelaiya: '/assets/chibi/kelaiya/avatar.png',
-  leiduo: '/assets/chibi/leiduo/avatar.png',
   crawler: '/assets/chibi/crawler/avatar.png',
 };
 
@@ -25,10 +23,8 @@ const SPRITE_SHEET_MAP: Record<string, string> = {
   adventurer: '/assets/chibi/adventurer/adventurer_chibi_spritesheet.png',
   selin: '/assets/chibi/selin/selin_chibi_spritesheet.png',
   senluo: '/assets/chibi/senluo/senluo_chibi_spritesheet.png',
-  liyase: '/assets/chibi/liyase/liyase_chibi_spritesheet.png',
   ailin: '/assets/chibi/ailin/ailin_chibi_spritesheet.png',
   kelaiya: '/assets/chibi/kelaiya/kelaiya_chibi_spritesheet.png',
-  leiduo: '/assets/chibi/leiduo/leiduo_chibi_spritesheet.png',
   crawler: '/assets/chibi/crawler/crawler_chibi_spritesheet.png',
 };
 
@@ -80,7 +76,7 @@ export interface NonCombatSkill {
   effect: string;
 }
 
-export type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "liyase" | "ailin" | "kelaiya" | "leiduo";
+export type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "ailin" | "kelaiya";
 type BattleFxKind = "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail" | "poison" | "shadow" | "wind" | "earth" | "water" | "shield" | "buff" | "debuff" | "critical";
 
 export interface BattleUnit {
@@ -218,7 +214,7 @@ const TUTORIAL_QUICK_RULES: QuickRule[] = [
   { title: "4 结算", text: "右侧会展示骰点、AC 或 DC、伤害/治疗，以及 KP 对结果的解释。" },
 ];
 
-const BACKGROUND_URL = "/assets/battle/b1-sanctum-placeholder.png";
+const BACKGROUND_URL = "/assets/battle/b1-cablestreet-battle.png";
 
 const BATTLE_TUNING = {
   allyHitBonus: 2,
@@ -1152,25 +1148,14 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     ], nonCombatSkills: [],
   },
   {
-    id: "test-liyase", name: "莉娅", faction: "ally", role: "精灵·神射手", portrait: "莉", model: "liyase",
-    hp: 36, maxHp: 36, ac: 16, speed: 35, proficiency: 2,
-    abilities: { str: 10, dex: 18, con: 13, int: 12, wis: 16, cha: 10 },
-    resourceProfile: ["远程", "标记", "掩护"], statuses: ["后排"], traits: ["HP36/AC16", "长弓"],
-    skills: [
-      { id: "LY1", name: "精准射击", resource: "战斗技能", source: "队友技能", formula: "DEX+熟练 vs AC；1d8+4穿刺", effect: "远程攻击+标记", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 14, label: "精准射击" }, tags: ["远程"] },
-      { id: "LY2", name: "猎人印记", resource: "战斗技能", source: "队友技能", formula: "额外1d6伤害", effect: "标记目标增伤", cooldown: "每战斗3次", rule: "额外伤害", roll: { kind: "damage", dieType: "d6", diceCount: 1, bonus: 0, label: "猎人印记" }, tags: ["增伤"] },
-      { id: "LY3", name: "掩护箭雨", resource: "战斗技能", source: "队友技能", formula: "范围DEX豁免DC15；2d6穿刺", effect: "范围减速", cooldown: "每战斗1次", rule: "范围豁免", roll: { kind: "save", dc: 15, targetSaveBonus: 2, label: "掩护箭雨" }, tags: ["范围"] },
-    ], nonCombatSkills: [],
-  },
-  {
     id: "test-ailin", name: "艾琳", faction: "ally", role: "精灵·生命牧师", portrait: "艾", model: "ailin",
     hp: 28, maxHp: 28, ac: 14, speed: 30, proficiency: 2,
     abilities: { str: 8, dex: 14, con: 13, int: 12, wis: 18, cha: 15 },
     resourceProfile: ["治疗", "祝福", "护盾"], statuses: ["后排"], traits: ["HP28/AC14", "治疗+2"],
     skills: [
       { id: "AL1", name: "生命之光", resource: "战斗技能", source: "队友技能", formula: "恢复2d8+4", effect: "治疗+解控", cooldown: "每回合1次", rule: "治疗骰", roll: { kind: "healing", dieType: "d8", diceCount: 2, bonus: 4, label: "生命之光" }, tags: ["治疗"] },
-      { id: "AL2", name: "神圣祝福", resource: "战斗技能", source: "队友技能", formula: "攻击+1d4", effect: "祝福队友", cooldown: "每战斗3次", rule: "增益", roll: { kind: "none" }, tags: ["增益"] },
-      { id: "AL3", name: "白枝护盾", resource: "战斗技能", source: "队友技能", formula: "减伤2d6", effect: "反应护盾", cooldown: "每战斗2次", rule: "减伤", roll: { kind: "damage", dieType: "d6", diceCount: 2, bonus: 0, label: "白枝护盾" }, tags: ["减伤"] },
+      { id: "AL2", name: "神圣祝福", resource: "战斗技能", source: "队友技能", formula: "友方AC+1，临时HP 1d4+2", effect: "祝福队友，提供临时防护", cooldown: "每战斗3次", rule: "友方增益", roll: { kind: "damage", dieType: "d4", diceCount: 1, bonus: 2, label: "神圣祝福临时HP" }, tags: ["增益", "祝福", "临时HP"] },
+      { id: "AL3", name: "白枝护盾", resource: "战斗技能", source: "队友技能", formula: "友方AC+2，临时HP 2d6", effect: "白枝光盾护住队友", cooldown: "每战斗2次", rule: "友方护盾", roll: { kind: "damage", dieType: "d6", diceCount: 2, bonus: 0, label: "白枝护盾临时HP" }, tags: ["护盾", "增益", "临时HP"] },
     ], nonCombatSkills: [],
   },
   {
@@ -1182,17 +1167,6 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
       { id: "KL1", name: "猫爪突袭", resource: "战斗技能", source: "队友技能", formula: "DEX+熟练 vs AC；1d6+4+2d6偷袭", effect: "潜行偷袭", cooldown: "每回合1次", rule: "偷袭", roll: { kind: "attack", ability: "dex", targetAc: 14, label: "猫爪突袭" }, tags: ["攻击"] },
       { id: "KL2", name: "陷阱拆除", resource: "战斗技能", source: "队友技能", formula: "DEX巧手DC14", effect: "拆除+反伤", cooldown: "每战斗2次", rule: "技能检定", roll: { kind: "ability", ability: "dex", dc: 14, label: "陷阱拆除" }, tags: ["反伤"] },
       { id: "KL3", name: "烟幕撤退", resource: "战斗技能", source: "队友技能", formula: "制造烟雾", effect: "遮蔽脱离", cooldown: "每战斗1次", rule: "遮蔽", roll: { kind: "none" }, tags: ["遮蔽"] },
-    ], nonCombatSkills: [],
-  },
-  {
-    id: "test-leiduo", name: "雷铎", faction: "ally", role: "机械人形·大盾", portrait: "雷", model: "leiduo",
-    hp: 55, maxHp: 55, ac: 20, speed: 25, proficiency: 2,
-    abilities: { str: 18, dex: 10, con: 18, int: 12, wis: 10, cha: 8 },
-    resourceProfile: ["格挡", "修复", "护卫"], statuses: ["前排"], traits: ["HP55/AC20", "机械体"],
-    skills: [
-      { id: "LD1", name: "盾墙格挡", resource: "战斗技能", source: "队友技能", formula: "STR+熟练 vs AC；1d8+4钝击", effect: "命中后AC+2", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "str", targetAc: 14, label: "盾墙格挡" }, tags: ["攻击"] },
-      { id: "LD2", name: "炉心修复", resource: "战斗技能", source: "队友技能", formula: "恢复1d12+4", effect: "自我修复", cooldown: "每战斗2次", rule: "治疗骰", roll: { kind: "healing", dieType: "d12", diceCount: 1, bonus: 4, label: "炉心修复" }, tags: ["治疗"] },
-      { id: "LD3", name: "守护协议", resource: "战斗技能", source: "队友技能", formula: "代伤+减半", effect: "替队友承伤", cooldown: "每轮1次", rule: "反应", roll: { kind: "none" }, tags: ["护卫"] },
     ], nonCombatSkills: [],
   },
   {
@@ -1235,11 +1209,11 @@ const TEST_BATTLE_CONFIG: BattleConfig = {
   quickRules: QUICK_RULES,
   eyebrow: "COMBAT SANDBOX",
   title: "战斗测试",
-  subtitle: "冒险者+瑟琳+布洛克+莉娅+艾琳+凯娅+雷铎 vs 三只裂隙爬兽",
+  subtitle: "冒险者+瑟琳+布洛克+艾琳+凯娅 vs 三只裂隙爬兽",
   backLabel: "返回测试",
   rerollLog: "重新进行全员 1D20 先攻判定。",
-  initialLog: "战斗测试初始化：7名我方 + 3名敌方，选技能、指定对象、掷骰结算。",
-  initiativeNote: "10位单位同时1D20判定：D20 + 敏捷调整值 + 其他加值。",
+  initialLog: "战斗测试初始化：5名我方 + 3名敌方，选技能、指定对象、掷骰结算。",
+  initiativeNote: "8位单位同时1D20判定：D20 + 敏捷调整值 + 其他加值。",
   winTitle: "战斗测试胜利",
   loseTitle: "战斗测试失败",
   winText: "三只裂隙爬兽已失去战斗能力，测试完成。",
@@ -1390,7 +1364,8 @@ function getTargetCandidates(unit: BattleUnit, skill: BattleSkill, allies: Battl
   const livingAllies = allies.filter((target) => target.hp > 0);
   const livingEnemies = enemies.filter((target) => target.hp > 0);
 
-  if (skill.name === "回气" || skill.tags.includes("临时HP") || skill.name === "烟中恶鬼") return [unit];
+  if (skill.name === "回气" || skill.name === "烟中恶鬼") return [unit];
+  if (skill.tags.some((tag) => ["临时HP", "增益", "祝福", "护盾"].includes(tag))) return livingAllies.length ? livingAllies : allies;
   if (skill.roll.kind === "healing") return livingAllies.length ? livingAllies : allies;
   if (skill.roll.kind === "none" && skill.tags.some((tag) => ["护卫", "抗性", "减伤"].includes(tag))) return livingAllies.length ? livingAllies : allies;
   if (unit.faction === "ally") return livingEnemies;
@@ -2162,18 +2137,12 @@ function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
     SN1: "bash",
     SN2: "heal",
     SN3: "fire",
-    LY1: "pierce",
-    LY2: "buff",
-    LY3: "wind",
     AL1: "heal",
     AL2: "buff",
     AL3: "shield",
     KL1: "shadow",
     KL2: "debuff",
     KL3: "shadow",
-    LD1: "shield",
-    LD2: "heal",
-    LD3: "shield",
     CA1: "slash",
     CA2: "poison",
     CA3: "fail",
@@ -2198,7 +2167,7 @@ function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
   if (idMatch) return idMatch;
 
   if (skill.roll.kind === "none") {
-    if (unit.model === "ailin" || unit.model === "leiduo") return "shield";
+    if (unit.model === "ailin") return "shield";
     return "buff";
   }
 
@@ -2208,15 +2177,11 @@ function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
     case "senluo":
     case "grum":
       return "bash";
-    case "liyase":
-      return "pierce";
     case "ailin":
       return "radiant";
     case "kelaiya":
     case "lisa":
       return "shadow";
-    case "leiduo":
-      return "shield";
     case "crawler":
       return "poison";
     case "talia":
@@ -2310,6 +2275,12 @@ export function BattleTestScreen({
   const pendingTargets = pendingActor && pendingSkill ? getTargetCandidates(pendingActor, pendingSkill, allies, enemies) : [];
   const pendingTargetIds = useMemo(() => new Set(pendingTargets.map((unit) => unit.id)), [pendingTargets]);
   const enemyTurn = phase === "battle" && activeUnit?.faction === "enemy";
+
+  useEffect(() => {
+    if (phase !== "battle" || battleWon || battleLost || activeUnit?.faction !== "ally" || !activeUnitId || activeUnit.hp <= 0) return;
+    setActionUnitId(activeUnitId);
+    setTargetSelection(null);
+  }, [activeUnitId, activeUnit?.faction, activeUnit?.hp, battleLost, battleWon, phase]);
 
   const completeInitiative = useCallback(() => {
     setPhase("battle");
@@ -2437,6 +2408,15 @@ export function BattleTestScreen({
     };
   }
 
+  function sanitizeBattleNarration(text: string, fallback: string) {
+    let cleaned = String(text || "").replace(/\s+/g, " ").trim();
+    if (!cleaned) return fallback;
+    if (/莉娅|莉亚瑟|雷铎|炉心守卫者/.test(cleaned)) return fallback;
+    cleaned = cleaned.replace(/^KP[:：]\s*/i, "").replace(/[，、；：:—-]+$/g, "").trim();
+    if (cleaned && !/[。！？.!?」”]$/.test(cleaned)) cleaned += "。";
+    return `KP：${cleaned}`;
+  }
+
   function executeSettlement(settlement: PendingSettlement) {
     const { unit, target, skill, effect } = settlement;
     applyHpEffect(unit, target, skill, effect);
@@ -2463,7 +2443,7 @@ export function BattleTestScreen({
       tags: skill.tags,
       ac_dc: diceInfo.acDc,
     }).then(llmNarration => {
-      const finalNarration = llmNarration ? `KP：${llmNarration}` : localNarration;
+      const finalNarration = sanitizeBattleNarration(llmNarration, localNarration);
       setLastEffect(prev => prev ? { ...prev, narration: finalNarration } : null);
       pushBattleLog(finalNarration);
     });
@@ -2546,7 +2526,7 @@ export function BattleTestScreen({
   function applyHpEffect(actor: BattleUnit, target: BattleUnit, skill: BattleSkill, effect: BattleEffect) {
     if (!effect.amount || effect.amount <= 0) return;
 
-    if (skill.roll.kind === "healing") {
+    if (skill.roll.kind === "healing" || (actor.faction === target.faction && skill.tags.some((tag) => ["临时HP", "增益", "祝福", "护盾"].includes(tag)))) {
       setUnitHp((current) => ({
         ...current,
         [target.id]: Math.min(target.maxHp, (current[target.id] ?? target.hp) + effect.amount!),
@@ -3110,19 +3090,19 @@ function InitiativeRollOverlay({
 }) {
   const [settled, setSettled] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const [started, setStarted] = useState(false);
   const orderedResults = useMemo(() => sortInitiative(entries, unitMap, unitOrder), [entries, unitMap, unitOrder]);
 
   useEffect(() => {
+    if (!started) return;
     const settleTimer = window.setTimeout(() => setSettled(true), 1300);
     const revealTimer = window.setTimeout(() => setRevealed(true), 2200);
-    const doneTimer = window.setTimeout(onComplete, 3900);
 
     return () => {
       window.clearTimeout(settleTimer);
       window.clearTimeout(revealTimer);
-      window.clearTimeout(doneTimer);
     };
-  }, [onComplete]);
+  }, [started]);
 
   return (
     <motion.section
@@ -3142,7 +3122,7 @@ function InitiativeRollOverlay({
       >
         <header>
           <p className="eyebrow">INITIATIVE ROLL</p>
-          <h2>同时投掷先攻</h2>
+          <h2>{started ? "行动顺序掷骰中" : "准备投掷行动顺序"}</h2>
           <small>{note}</small>
         </header>
 
@@ -3162,21 +3142,35 @@ function InitiativeRollOverlay({
                 <Dice3DView
                   dieType="d20"
                   roll={entry.roll}
-                  rolling={!settled}
+                  rolling={started && !settled}
                   revealed={revealed}
-                  size={112}
+                  size={148}
                   className="battle-init-dice-wrap"
                 />
                 <p>
                   {revealed
                     ? `${entry.roll} ${formatModifier(entry.dexMod)}${entry.otherBonus ? ` ${formatModifier(entry.otherBonus)}` : ""} = ${entry.total}`
-                    : settled ? "确认结果" : "掷骰中"}
+                    : started ? (settled ? "确认结果" : "掷骰中") : "等待投掷"}
                 </p>
                 {revealed && <i>第 {rank} 位</i>}
               </article>
             );
           })}
         </div>
+
+        <footer className="battle-init-actions">
+          {!started ? (
+            <button type="button" className="start-button" onClick={() => setStarted(true)}>
+              投掷行动顺序
+            </button>
+          ) : revealed ? (
+            <button type="button" className="start-button" onClick={onComplete}>
+              进入第一回合
+            </button>
+          ) : (
+            <span>骰子正在决定行动顺序...</span>
+          )}
+        </footer>
       </motion.div>
     </motion.section>
   );

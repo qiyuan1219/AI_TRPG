@@ -32,11 +32,6 @@ NPC_TRUST_KEYS = {
     "布洛克·铁锅": "sl_trust",
     "森洛": "sl_trust",
     "森洛·铁锅": "sl_trust",
-    "莉娅": "ly_trust",
-    "精灵": "ly_trust",
-    "精灵莉娅": "ly_trust",
-    "莉亚瑟": "ly_trust",
-    "莉亚瑟·青弦": "ly_trust",
     "艾琳": "al_trust",
     "艾琳·白枝": "al_trust",
     "白枝": "al_trust",
@@ -45,8 +40,6 @@ NPC_TRUST_KEYS = {
     "软爪凯娅": "kl_trust",
     "克莱娅": "kl_trust",
     "克莱娅·软爪": "kl_trust",
-    "雷铎": "ld_trust",
-    "雷铎·炉心": "ld_trust",
 }
 
 NPC_HP_KEYS = {
@@ -58,10 +51,6 @@ NPC_HP_KEYS = {
     "布洛克·铁锅": "sl_hp",
     "森洛": "sl_hp",
     "森洛·铁锅": "sl_hp",
-    "莉娅": "ly_hp",
-    "精灵莉娅": "ly_hp",
-    "莉亚瑟": "ly_hp",
-    "莉亚瑟·青弦": "ly_hp",
     "艾琳": "al_hp",
     "艾琳·白枝": "al_hp",
     "白枝": "al_hp",
@@ -70,8 +59,6 @@ NPC_HP_KEYS = {
     "软爪凯娅": "kl_hp",
     "克莱娅": "kl_hp",
     "克莱娅·软爪": "kl_hp",
-    "雷铎": "ld_hp",
-    "雷铎·炉心": "ld_hp",
 }
 
 

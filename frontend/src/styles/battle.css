@@ -250,17 +250,11 @@
 .battle-avatar-senluo {
   background: linear-gradient(135deg, #4a3020, #c4723a 48%, #5f8f5f);
 }
-.battle-avatar-liyase {
-  background: linear-gradient(135deg, #2a4a2a, #6aaa50 48%, #d4c868);
-}
 .battle-avatar-ailin {
   background: linear-gradient(135deg, #3a5080, #8ab4e0 48%, #f5e8c8);
 }
 .battle-avatar-kelaiya {
   background: linear-gradient(135deg, #4a3050, #b878c8 48%, #e8c888);
-}
-.battle-avatar-leiduo {
-  background: linear-gradient(135deg, #3a4050, #8898b8 48%, #e8c868);
 }
 
 .battle-roster {
@@ -1173,10 +1167,6 @@
 .battle-sprite-senluo .sprite-head { background: #7a4030; }
 .battle-sprite-senluo .sprite-weapon { background: #8c6840; }
 
-.battle-sprite-liyase .sprite-body { background: linear-gradient(180deg, #6aaa50, #3a6a3a); }
-.battle-sprite-liyase .sprite-head { background: #508a40; }
-.battle-sprite-liyase .sprite-weapon { background: #c8b040; }
-
 .battle-sprite-ailin .sprite-body { background: linear-gradient(180deg, #b8c8e0, #6a80b0); }
 .battle-sprite-ailin .sprite-head { background: #8ab4e0; }
 .battle-sprite-ailin .sprite-weapon { background: #e8d888; }
@@ -1184,10 +1174,6 @@
 .battle-sprite-kelaiya .sprite-body { background: linear-gradient(180deg, #c8a8d8, #6a4a80); }
 .battle-sprite-kelaiya .sprite-head { background: #9878b8; }
 .battle-sprite-kelaiya .sprite-weapon { background: #c8b060; }
-
-.battle-sprite-leiduo .sprite-body { background: linear-gradient(180deg, #a0a8c0, #586880); }
-.battle-sprite-leiduo .sprite-head { background: #8088a0; }
-.battle-sprite-leiduo .sprite-weapon { background: #a8b8d0; }
 
 .battle-combatant-name {
   position: relative;
@@ -2352,8 +2338,21 @@
 
 .battle-init-roll-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
   gap: 10px;
+}
+
+.battle-init-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 18px;
+}
+
+.battle-init-actions span {
+  color: rgba(231, 211, 161, 0.78);
+  font-size: 0.92rem;
 }
 
 .battle-init-card {

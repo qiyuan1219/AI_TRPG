@@ -13,6 +13,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes_companion_events import router_companion_events
+from api.routes_battles import router_battles
 from api.routes_dnd import router_dnd
 from api.routes_dice_poker import router_poker
 from api.routes_tavern_dice_poker import router_tavern_dice
@@ -38,6 +39,7 @@ app.include_router(router_dnd)
 app.include_router(router_poker)
 app.include_router(router_tavern_dice)
 app.include_router(router_companion_events)
+app.include_router(router_battles)
 
 
 @app.get("/")
@@ -47,6 +49,7 @@ async def root():
         "service": "AI-DM (地下城主)",
         "docs": "/docs",
         "api": "/api/dnd",
+        "battles": "/api/battles",
         "dice_poker": "/api/dice-poker",
     }
 

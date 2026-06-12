@@ -35,7 +35,14 @@ export function DrinkingDiceGame({ onBack, onComplete }: DrinkingDiceGameProps) 
   }
 
   return (
-    <main className="test-screen">
+    <main
+      className="test-screen"
+      style={{
+        backgroundImage: 'linear-gradient(90deg, rgba(10,8,14,0.88), rgba(10,8,14,0.58)), url(/assets/scenes/09brock-tavern-table.webp)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       <section className="test-layout">
         <header className="test-header">
           <div>

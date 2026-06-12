@@ -42,6 +42,7 @@ type GamePhase = 'narrating' | 'action';
 const DEFAULT_OPENING = '逆穹城倒挂在巨大洞穴的穹顶之上，蓝绿色荧光在远方深渊中明灭。你的冒险从这一刻开始。';
 const RETREAT_ACTION_RE = /逃跑|撤退|脱战|逃离|后撤|拉开距离|跑路|避战|不战斗/;
 const DC_CHECK_RE = /(?:DC|ＤＣ)\s*\d{1,2}/i;
+const CITY_MAP_ENABLED = false;
 
 interface TutorialBattleSetup {
   openingEffects: Array<{
@@ -62,6 +63,7 @@ const YUNLING_POTION_OPTIONS: Array<{ action: string; key: string; label: string
   { action: '购买感知药水', key: 'wis_potion', label: '感知药水', stat: 'wis', cost: 100 },
   { action: '购买魅力药水', key: 'cha_potion', label: '魅力药水', stat: 'cha', cost: 100 },
   { action: '购买治疗药水', key: 'healing_potion', label: '治疗药水', cost: 50 },
+  { action: '购买净化之心', key: 'purification_heart', label: '净化之心', cost: 200 },
 ];
 
 const YUNLING_SHOP_HINTS = [
@@ -796,7 +798,8 @@ export default function App() {
             last_event: `在云苓处购买${yunlingPotion.label}`,
           };
           if (yunlingPotion.stat) patch[yunlingPotion.stat] = Number(currentState[yunlingPotion.stat] ?? 10) + 2;
-          else patch.current_hp = Math.min(Number(currentState.max_hp ?? currentState.current_hp ?? 20), Number(currentState.current_hp ?? 20) + 5);
+          else if (yunlingPotion.key === 'healing_potion') patch.current_hp = Math.min(Number(currentState.max_hp ?? currentState.current_hp ?? 20), Number(currentState.current_hp ?? 20) + 5);
+          else if (yunlingPotion.key === 'purification_heart') patch.purification_heart_owned = true;
 
           setGameState((prev) => ({ ...prev, ...patch }));
           if (gameId) {
@@ -807,6 +810,8 @@ export default function App() {
           appendStoryLines([
             yunlingPotion.stat
               ? `云苓将${yunlingPotion.label}推到你面前：「下去之后再喝。药效很冲，能让身体短时间记住更强的状态。」你的${yunlingPotion.label.replace('药水', '')}提升了2点。`
+              : yunlingPotion.key === 'purification_heart'
+                ? '云苓取出一枚被银线缝住的透明晶核：「净化之心不是药，是选择。等你们遇到那个还没完全被黑石吃掉的人，再决定要不要用它。」'
               : '云苓递来一支温热的红色药剂：「治疗药水别等到快死才喝。它能让伤口闭合，但不能替你判断什么时候该撤。」你恢复了5点生命值。',
           ], 'kp', '云苓', true);
           setSuggestions(makeSuggestions(YUNLING_SHOP_HINTS));
@@ -1111,7 +1116,7 @@ export default function App() {
   const areaText = String(gameState.current_area || '');
   const showLuckyBoxEntry = /黑市|补给市场|市场|奥兰|凯娅/.test(areaText) && Boolean(gameState.kaiya_intro_seen && !gameState.kaiya_recruited);
   const cityAreaVisited = /冒险者公会|回声酒馆|酒馆|黑市|补给市场|市场|静默神殿|神殿|降渊缆梯|缆梯/.test(areaText);
-  const canUseCityMap = Boolean(gameState.city_map_unlocked || gameState.guild_registered || cityAreaVisited);
+  const canUseCityMap = CITY_MAP_ENABLED && Boolean(gameState.city_map_unlocked || gameState.guild_registered || cityAreaVisited);
 
   useEffect(() => {
     if (!canUseCityMap && showCityMap) {

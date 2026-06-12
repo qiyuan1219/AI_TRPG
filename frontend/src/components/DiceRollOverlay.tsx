@@ -19,7 +19,7 @@ export interface DiceRollOverlayProps {
   attackMissed?: boolean;
   targetAc?: number;
   diceKind?: string;        // "命中判定" / "伤害掷骰" / "治疗掷骰" / "检定" 等
-  charSkill?: string;        // "雷铎 · 盾墙格挡"
+  charSkill?: string;        // "艾琳 · 白枝护盾"
   showD20Calc?: boolean;    // 命中骰时显示 D20+加值=总计 vs AC
 }
 
@@ -164,7 +164,7 @@ function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDice
 function createDieGeometry(dieType: DieType, radius: number) {
   switch (dieType) {
     case "d4":
-      return new THREE.TetrahedronGeometry(radius * 1.15, 0);
+      return new THREE.TetrahedronGeometry(radius * 0.82, 0);
     case "d6":
       return new THREE.BoxGeometry(radius * 1.15, radius * 1.15, radius * 1.15);
     case "d8":
@@ -340,6 +340,7 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
   const resultSides = DIE_SIDES[resultDieType];
   const isNatMax = Number(result?.roll) === resultSides;
   const isNat1 = result?.roll === "1";
+  const dcLabel = result?.dc ? (String(result.dc).startsWith("AC") ? String(result.dc).replace(/\s+/g, "") : `DC${String(result.dc).replace(/^DC\s*/i, "")}`) : "";
 
   // 推断技能特效类型
   const skillEffect = useMemo(() => (dice ? inferSkillEffect(dice.data) : null), [dice]);
@@ -365,16 +366,25 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
     };
   }, [closed]); // eslint-disable-line
 
+  function closeOverlay() {
+    if (!effectRevealed || closed) return;
+    setClosed(true);
+    onClose?.();
+  }
+
+  useEffect(() => {
+    if (!effectRevealed || closed) return;
+    const onKeyDown = () => closeOverlay();
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [effectRevealed, closed]); // eslint-disable-line
+
   return (
     <>
     <div
       className="dice-overlay"
       style={{ display: show ? "flex" : "none" }}
-      onClick={() => {
-        if (!effectRevealed || closed) return;
-        setClosed(true);
-        onClose?.();
-      }}
+      onClick={closeOverlay}
     >
       <motion.div
         className="dice-modal dice-modal-3d"
@@ -382,6 +392,13 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
         animate={{ scale: show ? 1 : 0.6, opacity: show ? 1 : 0 }}
         transition={{ type: "spring", stiffness: 260, damping: 22 }}
       >
+        {(charSkill || diceKind) && (
+          <div className="dice-top-context">
+            {diceKind && <span>{diceKind}</span>}
+            {charSkill && <b>{charSkill}</b>}
+          </div>
+        )}
+
         {result?.damageDice && !attackMode ? (
           /* 非攻击模式：D20 + 伤害骰组合显示 */
           <div className="dice-multi-row">
@@ -499,14 +516,12 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            {/* 第一行：骰子定位标签 */}
-            {diceKind && <div className="dice-kind-tag">{diceKind}</div>}
+            {/* 第一行：DC/AC 目标 */}
+            {dcLabel && <div className="dice-dc-highlight">{dcLabel}</div>}
 
-            {/* 第二行：角色 · 技能名（命中骰可跳过） */}
-            {charSkill && !showD20Calc && <div className="dice-char-skill">{charSkill}</div>}
-
-            {/* 第三行：计算式 */}
+            {/* 第二行：计算式 */}
             <div className="dice-calc dice-calc-v2">
+              <span className="dice-result-prefix">结果：</span>
               {result.multiDice ? (
                 <>
                   {/* 多骰子：总计 = 骰1 + 骰2 + 加成 */}
@@ -515,14 +530,19 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   {result.multiDice.rolls.map((rv, idx) => (
                     <span key={idx} className="dice-eq-roll">{rv}</span>
                   ))}
+                  <span className="dice-eq-note">（点数）</span>
                   {bonus > 0 && (
                     <>
                       <span className="dice-eq-sep">+</span>
                       <span className="dice-eq-bonus">{bonus}</span>
+                      <span className="dice-eq-note">（加值）</span>
                     </>
                   )}
                   {bonus < 0 && (
-                    <span className="dice-eq-bonus">{bonus}</span>
+                    <>
+                      <span className="dice-eq-bonus">{bonus}</span>
+                      <span className="dice-eq-note">（加值）</span>
+                    </>
                   )}
                 </>
               ) : result.damageDice ? (
@@ -533,14 +553,17 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   </span>
                   <span className="dice-eq-sep">=</span>
                   <span className="dice-eq-roll">{result.roll}</span>
+                  <span className="dice-eq-note">（命中点数）</span>
                   <span className="dice-eq-sep">+</span>
                   {result.damageDice.rolls.map((rv, idx) => (
                     <span key={idx} className="dice-eq-roll">{rv}</span>
                   ))}
+                  <span className="dice-eq-note">（伤害点数）</span>
                   {result.damageDice.bonus > 0 && (
                     <>
                       <span className="dice-eq-sep">+</span>
                       <span className="dice-eq-bonus">{result.damageDice.bonus}</span>
+                      <span className="dice-eq-note">（加值）</span>
                     </>
                   )}
                 </>
@@ -550,10 +573,12 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   <span className="dice-total dice-eq-total">{result.total}</span>
                   <span className="dice-eq-sep">=</span>
                   <span className={`dice-eq-roll ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}>{result.roll}</span>
+                  <span className="dice-eq-note">（点数）</span>
                   {bonus !== 0 && (
                     <>
                       <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
                       <span className="dice-eq-bonus">{bonus}</span>
+                      <span className="dice-eq-note">（加值）</span>
                     </>
                   )}
                 </>
@@ -563,23 +588,19 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   <span className="dice-total dice-eq-total">{result.total}</span>
                   <span className="dice-eq-sep">=</span>
                   <span className={`dice-eq-roll ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}>{result.roll}</span>
+                  <span className="dice-eq-note">（点数）</span>
                   {bonus !== 0 && (
                     <>
                       <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
                       <span className="dice-eq-bonus">{bonus}</span>
+                      <span className="dice-eq-note">（加值）</span>
                     </>
                   )}
                 </>
               )}
             </div>
 
-            {/* 第四行：AC/DC 对比 */}
-            {result.dc && (
-              <div className="dice-dc">
-                <span>/</span>
-                <span>DC {result.dc.replace("AC", "").trim()}</span>
-              </div>
-            )}
+            {/* 第三行：成败 */}
             {effectRevealed && (result.verdict || typeof result.success === "boolean") && (
               <motion.div
                 className={`dice-verdict ${
@@ -594,15 +615,15 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                 transition={{ delay: 0.05, type: "spring", stiffness: 360, damping: 14 }}
               >
                 {attackMissed
-                  ? `未命中 (AC ${targetAc}) ✗`
+                  ? "失败"
                   : result.verdict ||
                   (isNatMax
-                    ? "🎉 大成功!"
+                    ? "大成功"
                     : isNat1
-                      ? "💀 大失败!"
+                      ? "大失败"
                       : result.success
-                        ? "通过 ✓"
-                        : "失败 ✗")}
+                        ? "成功"
+                        : "失败")}
               </motion.div>
             )}
           </motion.div>
@@ -617,7 +638,7 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.4 }}
         >
-          <span>点击任意处继续</span>
+          <span>点击任意键以继续</span>
         </motion.div>
       )}
     </div>

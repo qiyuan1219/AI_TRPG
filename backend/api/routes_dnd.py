@@ -134,7 +134,7 @@ def _find_dc_check(message: str) -> tuple[str, int] | None:
         label = _clean_check_label(match.group(1))
         if not label or label.upper() in {"D", "DC"}:
             continue
-        if _contains_any(label, tuple(_ATTR_MAP.keys())) or _contains_any(label, ("瑟琳", "银杖", "逆钟", "布洛克", "森洛", "铁锅", "莉娅", "莉亚瑟", "青弦", "艾琳", "白枝", "凯娅", "克莱娅", "软爪", "雷铎", "炉心")):
+        if _contains_any(label, tuple(_ATTR_MAP.keys())) or _contains_any(label, ("瑟琳", "银杖", "逆钟", "布洛克", "森洛", "铁锅", "艾琳", "白枝", "凯娅", "克莱娅", "软爪")):
             return label, int(match.group(2))
 
     match = _DC_AFTER_RE.search(message)
@@ -176,14 +176,6 @@ def _resolve_check(label: str, message: str, state: dict) -> tuple[str, int, int
         if _contains_any(text, ("料理", "食材", "做饭", "烹饪")):
             return "布洛克-孢海料理", 4, 0
 
-    if _contains_any(text, ("莉娅", "莉亚瑟", "青弦", "精灵")):
-        if _contains_any(text, ("追踪", "足迹", "痕迹", "生存")):
-            return "莉娅-追踪", 5, 0
-        if _contains_any(text, ("侦查", "察觉", "发现", "观察")):
-            return "莉娅-精灵感知", 5, 0
-        if _contains_any(text, ("射击", "弓箭", "远程")):
-            return "莉娅-精准射击", 6, 0
-
     if _contains_any(text, ("艾琳", "白枝")):
         if _contains_any(text, ("治疗", "医药", "包扎", "医术", "稳定")):
             return "艾琳-医者之手", 6, 0
@@ -191,14 +183,6 @@ def _resolve_check(label: str, message: str, state: dict) -> tuple[str, int, int
             return "艾琳-圣典学识", 5, 0
         if _contains_any(text, ("说服", "安抚", "劝慰")):
             return "艾琳-安抚低语", 4, 0
-
-    if "雷铎" in text or "炉心" in text:
-        if _contains_any(text, ("黑石", "共鸣", "奥秘", "方尖碑")):
-            return "雷铎-黑石共鸣", 4, 0
-        if _contains_any(text, ("破障", "撞开", "清理", "塌方")):
-            return "雷铎-重装破障", 5, 0
-        if _contains_any(text, ("守护", "防护", "盾")):
-            return "雷铎-巨盾守护", 6, 0
 
     if _contains_any(text, ("瑟琳", "银杖", "逆钟")):
         if _contains_any(text, ("奥秘", "魔法", "鉴定", "符文")):
@@ -460,14 +444,10 @@ async def create_dnd_game(req: CreateDNDRequest):
         "se_hp": 34, "se_trust": 84, "se_alive": True,
         # 可选同伴1 - 布洛克
         "sl_hp": 46, "sl_trust": 60, "sl_alive": True,
-        # 可选同伴2 - 莉娅
-        "ly_hp": 34, "ly_trust": 65, "ly_alive": True,
-        # 可选同伴3 - 艾琳
+        # 可选同伴2 - 艾琳
         "al_hp": 32, "al_trust": 60, "al_alive": True,
-        # 可选同伴4 - 凯娅
+        # 可选同伴3 - 凯娅
         "kl_hp": 36, "kl_trust": 55, "kl_alive": True,
-        # 可选同伴5 - 雷铎
-        "ld_hp": 58, "ld_trust": 75, "ld_alive": True,
         "triggered_events": "",
         "last_event": "游戏开始",
     }

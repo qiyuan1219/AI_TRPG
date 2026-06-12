@@ -681,9 +681,24 @@ BATTLE_NARRATE_PROMPT = """你是"D&D 地心之门"的战场解说员（KP）。
 - 必须提及{actor_name}对{target_name}使用了技能"{skill_name}"
 - 根据判定结果（命中/未命中/擦伤/半豁免/治疗/击杀等）描述攻防互动
 - 如有伤害/治疗数值，要在叙述中带出
-- 语言要有画面感、节奏感，像跑团 KP 的口吻
+- 语言贴合《地心之门》的固定剧本风格：冷光、缆索、孢尘、黑石、祷文、破甲声等意象可以少量使用，语气像中文视觉小说/TRPG主持人
 - 绝对不要公式化，每次描述都要不同
-- 只输出叙述文字，不要加"KP："前缀，不要标点以外的格式"""
+- 只输出叙述文字，不要加"KP："前缀，不要标点以外的格式
+- 必须是完整闭合的中文句子，不能以逗号、顿号、冒号、破折号或半截动作结尾
+- 当前版本队伍只有冒险者、瑟琳、布洛克、艾琳、凯娅，绝对不要提及莉娅、莉亚瑟、雷铎或炉心守卫者"""
+
+
+def _sanitize_battle_narration(text: str) -> str:
+    cleaned = " ".join(str(text or "").split()).strip()
+    if not cleaned:
+        return ""
+    forbidden_names = ("莉娅", "莉亚瑟", "雷铎", "炉心守卫者")
+    if any(name in cleaned for name in forbidden_names):
+        return ""
+    cleaned = cleaned.rstrip("，、；：:-— ")
+    if cleaned and cleaned[-1] not in "。！？.!?」”":
+        cleaned += "。"
+    return cleaned
 
 
 async def dm_battle_narrate(
@@ -735,7 +750,7 @@ async def dm_battle_narrate(
             stream=False,
         )
         text = resp.choices[0].message.content
-        return text.strip() if text else ""
+        return _sanitize_battle_narration(text)
     except Exception:
         return ""
 

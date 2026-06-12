@@ -11,7 +11,7 @@ export const DND_SCENES: SceneVisual[] = [
     bgStages: [
       {
         trigger: '补给吊箱从缆车上震落',
-        image: '/assets/scenes/02tutorial-battle-trigger.webp',
+        image: '/assets/battle/b1-cablestreet-battle.png',
       },
       {
         trigger: '裂隙爬兽被银白色光芒逼退',

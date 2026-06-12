@@ -30,7 +30,14 @@ export function LuckyBoxGame({ gold, onBack, onComplete }: LuckyBoxGameProps) {
   const guaranteed = won && rolls.length >= 8 && finalRoll <= 18;
 
   return (
-    <main className="test-screen">
+    <main
+      className="test-screen"
+      style={{
+        backgroundImage: 'linear-gradient(90deg, rgba(10,8,14,0.88), rgba(10,8,14,0.58)), url(/assets/scenes/10orlan-lucky-box.webp)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       <section className="test-layout">
         <header className="test-header">
           <div>
