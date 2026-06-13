@@ -781,6 +781,11 @@
   gap: 10px;
 }
 
+.trust-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 42px;
+}
+
 .meter-label,
 .panel-row,
 .trust-row,
@@ -794,6 +799,57 @@
 .trust-row b {
   color: var(--text);
   font-family: Consolas, monospace;
+}
+
+.trust-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.trust-row span small {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.trust-tier {
+  color: var(--teal);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 800;
+  text-align: right;
+}
+
+.trust-log-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(231, 211, 161, 0.12);
+}
+
+.trust-log-list p {
+  display: grid;
+  grid-template-columns: 48px 32px minmax(0, 1fr);
+  gap: 7px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.trust-log-list b,
+.trust-log-list em {
+  font-style: normal;
+  font-weight: 800;
+}
+
+.trust-log-list b {
+  color: var(--text);
+}
+
+.trust-log-list span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .hp-track {
@@ -880,6 +936,24 @@
   font-size: 0.9rem;
 }
 
+.companion-skill strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.companion-skill strong em {
+  color: var(--gold-soft);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.companion-pending {
+  opacity: 0.72;
+}
+
 .skill-group small,
 .companion-skill small {
   color: var(--muted);
@@ -904,6 +978,16 @@
 
 .trust-low {
   color: var(--danger) !important;
+}
+
+.trust-subtle {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.trust-hidden {
+  opacity: 0.55;
+  font-style: italic;
 }
 
 .inventory-block p {
@@ -1301,6 +1385,179 @@
     0 4px 20px rgba(0, 0, 0, 0.8);
   letter-spacing: 0.14em;
   user-select: none;
+}
+
+.opening-action-tutorial {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(95, 183, 167, 0.14), transparent 36%),
+    rgba(0, 0, 0, 0.66);
+  pointer-events: auto;
+  backdrop-filter: blur(2px);
+}
+
+.opening-action-tutorial-card {
+  position: relative;
+  display: grid;
+  width: min(460px, calc(100vw - 40px));
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(18, 21, 28, 0.96), rgba(10, 12, 16, 0.96)),
+    rgba(13, 17, 22, 0.94);
+  box-shadow: 0 28px 76px rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(14px);
+}
+
+.opening-action-tutorial-progress {
+  height: 3px;
+  background: rgba(231, 211, 161, 0.1);
+}
+
+.opening-action-tutorial-progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-soft), var(--teal));
+  transition: width 180ms ease;
+}
+
+.opening-action-tutorial-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+
+.opening-action-tutorial-card header span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 58px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(95, 183, 167, 0.42);
+  border-radius: 6px;
+  background: rgba(95, 183, 167, 0.12);
+  color: var(--teal);
+  font-family: Consolas, monospace;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.opening-action-tutorial-card header button {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid rgba(231, 211, 161, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.opening-action-tutorial-card h2 {
+  margin: 14px 18px 0;
+  color: var(--gold-soft);
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: 1.18rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.opening-action-tutorial-card p {
+  min-height: 82px;
+  margin: 14px 24px 20px;
+  color: var(--text);
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.opening-action-tutorial-card footer {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) 48px minmax(92px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(231, 211, 161, 0.14);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.opening-action-tutorial-card footer small {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 0.86rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.opening-action-tutorial-card footer button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.opening-action-tutorial-prev {
+  border: 1px solid rgba(231, 211, 161, 0.24);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+}
+
+.opening-action-tutorial-next {
+  border: 1px solid rgba(239, 213, 140, 0.52);
+  background: linear-gradient(180deg, #c99a37, #8f6723);
+  color: #fff7df;
+  box-shadow: 0 8px 24px rgba(212, 168, 67, 0.18);
+}
+
+.opening-action-tutorial-card button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.opening-action-tutorial-card button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 720px) {
+  .opening-action-tutorial {
+    padding: 12px;
+  }
+
+  .opening-action-tutorial-card {
+    width: min(390px, calc(100vw - 24px));
+  }
+
+  .opening-action-tutorial-card p {
+    min-height: 92px;
+    margin-right: 16px;
+    margin-left: 16px;
+    font-size: 0.88rem;
+  }
+
+  .opening-action-tutorial-card footer {
+    grid-template-columns: 1fr 42px 1fr;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .opening-action-tutorial-card footer button {
+    padding: 0 10px;
+    font-size: 0.86rem;
+  }
 }
 
 /* ── 视觉小说风格中心选择列 ── */

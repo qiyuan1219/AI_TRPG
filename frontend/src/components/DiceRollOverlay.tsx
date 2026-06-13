@@ -545,28 +545,6 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                     </>
                   )}
                 </>
-              ) : result.damageDice ? (
-                <>
-                  {/* D20 + 伤害骰 */}
-                  <span className="dice-total dice-eq-total">
-                    {Number(result.roll) + result.damageDice.total}
-                  </span>
-                  <span className="dice-eq-sep">=</span>
-                  <span className="dice-eq-roll">{result.roll}</span>
-                  <span className="dice-eq-note">（命中点数）</span>
-                  <span className="dice-eq-sep">+</span>
-                  {result.damageDice.rolls.map((rv, idx) => (
-                    <span key={idx} className="dice-eq-roll">{rv}</span>
-                  ))}
-                  <span className="dice-eq-note">（伤害点数）</span>
-                  {result.damageDice.bonus > 0 && (
-                    <>
-                      <span className="dice-eq-sep">+</span>
-                      <span className="dice-eq-bonus">{result.damageDice.bonus}</span>
-                      <span className="dice-eq-note">（加值）</span>
-                    </>
-                  )}
-                </>
               ) : showD20Calc ? (
                 <>
                   {/* 命中 D20：显示 D20+加值=总计，vs AC */}
@@ -574,6 +552,21 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   <span className="dice-eq-sep">=</span>
                   <span className={`dice-eq-roll ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}>{result.roll}</span>
                   <span className="dice-eq-note">（点数）</span>
+                  {bonus !== 0 && (
+                    <>
+                      <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
+                      <span className="dice-eq-bonus">{bonus}</span>
+                      <span className="dice-eq-note">（加值）</span>
+                    </>
+                  )}
+                </>
+              ) : result.damageDice ? (
+                <>
+                  {/* 非攻击组合检定：D20结果和附带效果分开展示，避免混作同一次攻击伤害。 */}
+                  <span className="dice-total dice-eq-total">{result.total}</span>
+                  <span className="dice-eq-sep">=</span>
+                  <span className="dice-eq-roll">{result.roll}</span>
+                  <span className="dice-eq-note">（D20）</span>
                   {bonus !== 0 && (
                     <>
                       <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>

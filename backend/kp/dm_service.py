@@ -135,6 +135,8 @@ TOOLS = [
                     "npc": {"type": "string", "description": "NPC名称"},
                     "amount": {"type": "integer", "description": "信任变化量, 正增负减"},
                     "reason": {"type": "string", "description": "变化原因"},
+                    "visibility": {"type": "string", "enum": ["show", "hidden"], "description": "前端是否明示本次信任变化"},
+                    "source": {"type": "string", "enum": ["free_action", "preset_choice", "sidequest_key_choice", "battle_result", "boss_preparation", "check_result"], "description": "信任变化来源"},
                 },
                 "required": ["npc", "amount", "reason"]
             }
@@ -265,7 +267,14 @@ def execute_tool(name: str, args: dict) -> dict:
     elif name == "update_hp":
         return {"action": "hp", "amount": args["amount"], "reason": args["reason"]}
     elif name == "update_trust":
-        return {"action": "trust", "npc": args["npc"], "amount": args["amount"], "reason": args["reason"]}
+        return {
+            "action": "trust",
+            "npc": args["npc"],
+            "amount": args["amount"],
+            "reason": args["reason"],
+            "visibility": args.get("visibility", "show"),
+            "source": args.get("source", "free_action"),
+        }
     elif name == "update_area":
         return {"action": "area", "area": args["area"], "reason": args["reason"]}
     elif name == "level_up":

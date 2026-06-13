@@ -5,6 +5,7 @@ interface TitleMenuProps {
   onLoadGame: () => void;
   onSettings: () => void;
   onTest: () => void;
+  onPrimeAudio?: () => void;
 }
 
 const MENU_ITEMS = [
@@ -15,9 +16,9 @@ const MENU_ITEMS = [
   { label: '测试', action: 'test' },
 ] as const;
 
-export function TitleMenu({ onNewGame, onLoadGame, onSettings, onTest }: TitleMenuProps) {
+export function TitleMenu({ onNewGame, onLoadGame, onSettings, onTest, onPrimeAudio }: TitleMenuProps) {
   return (
-    <main className="title-menu-screen">
+    <main className="title-menu-screen" onPointerDownCapture={onPrimeAudio} onKeyDownCapture={onPrimeAudio}>
       <div className="title-menu-shade" />
       <motion.section
         className="title-menu-layout"

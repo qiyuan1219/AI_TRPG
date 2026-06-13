@@ -1,5 +1,6 @@
 import { chatStream, createGame } from './api';
 import type { DiceResult, GameRuntimeService, GameState } from '../types/game';
+import { withCompanionTrust } from '../utils/trust';
 
 const NPC_TRUST_KEYS: Record<string, string> = {
   瑟琳: 'se_trust',
@@ -10,19 +11,14 @@ const NPC_TRUST_KEYS: Record<string, string> = {
   '布洛克·铁锅': 'sl_trust',
   森洛: 'sl_trust',
   '森洛·铁锅': 'sl_trust',
-  莉娅: 'ly_trust',
-  精灵莉娅: 'ly_trust',
-  莉亚瑟: 'ly_trust',
-  '莉亚瑟·青弦': 'ly_trust',
   艾琳: 'al_trust',
   '艾琳·白枝': 'al_trust',
   白枝: 'al_trust',
   凯娅: 'kl_trust',
+  软爪: 'kl_trust',
   软爪凯娅: 'kl_trust',
   克莱娅: 'kl_trust',
   '克莱娅·软爪': 'kl_trust',
-  雷铎: 'ld_trust',
-  '雷铎·炉心': 'ld_trust',
 };
 
 const NPC_HP_KEYS: Record<string, string> = {
@@ -34,19 +30,14 @@ const NPC_HP_KEYS: Record<string, string> = {
   '布洛克·铁锅': 'sl_hp',
   森洛: 'sl_hp',
   '森洛·铁锅': 'sl_hp',
-  莉娅: 'ly_hp',
-  精灵莉娅: 'ly_hp',
-  莉亚瑟: 'ly_hp',
-  '莉亚瑟·青弦': 'ly_hp',
   艾琳: 'al_hp',
   '艾琳·白枝': 'al_hp',
   白枝: 'al_hp',
   凯娅: 'kl_hp',
+  软爪: 'kl_hp',
   软爪凯娅: 'kl_hp',
   克莱娅: 'kl_hp',
   '克莱娅·软爪': 'kl_hp',
-  雷铎: 'ld_hp',
-  '雷铎·炉心': 'ld_hp',
 };
 
 export function parseDiceEvent(event: string): DiceResult | null {
@@ -68,9 +59,9 @@ export function formatDiceResult(dice: DiceResult): string {
 
   switch (dice.type) {
     case 'skill_check':
-      return `${d.成功 ? '检定成功' : '检定失败'} D20=${d.掷骰?.replace('D20=', '')} +${d.加值} = ${d.总计} / DC${d.DC}`;
+      return `${d.成功 ? '检定成功' : '检定失败'} D20=${String(d.掷骰 || '').replace('D20=', '')} +${d.加值} = ${d.总计} / DC${d.DC}`;
     case 'attack_roll': {
-      const roll = d.攻击掷骰?.match(/D20=(\d+)/)?.[1] || '?';
+      const roll = String(d.攻击掷骰 || '').match(/D20=(\d+)/)?.[1] || '?';
       return `${d.命中 ? '命中' : '未命中'} D20=${roll}${d.伤害 ? `，造成 ${d.伤害} 点伤害` : ''} / AC${d.目标AC}`;
     }
     case 'roll_dice_tool':
@@ -78,14 +69,31 @@ export function formatDiceResult(dice: DiceResult): string {
     case 'death_save':
       return d.成功 ? '死亡豁免成功' : '死亡豁免失败';
     case 'error':
-      return String(d.msg || '发生错误');
+      return String(d.msg || d.error || '发生错误');
     default:
       return d.msg || JSON.stringify(d);
   }
 }
 
+function formatTrustChange(change: Record<string, any>) {
+  if (Array.isArray(change.applied)) {
+    return change.applied
+      .filter((item: any) => item.visibility !== 'hidden')
+      .map((item: any) => {
+        const amount = Number(item.delta || 0);
+        const signed = amount > 0 ? `+${amount}` : String(amount);
+        return `${item.companionName || '同伴'}信任 ${signed}${item.reason ? `：${item.reason}` : ''}`;
+      })
+      .join('；');
+  }
+  const amount = Number(change.change || 0);
+  const signed = amount > 0 ? `+${amount}` : String(amount);
+  return `${change.npc || '同伴'}信任 ${signed}${change.reason ? `：${change.reason}` : ''}`;
+}
+
 function formatStateChange(change: Record<string, any>) {
   if (change.type === 'snapshot') return '';
+  if (change.type === 'trust') return formatTrustChange(change);
 
   const amount = Number(change.change || 0);
   const signed = amount > 0 ? `+${amount}` : String(amount);
@@ -94,7 +102,6 @@ function formatStateChange(change: Record<string, any>) {
   if (change.type === 'gold') return `金币 ${signed}${reason}`;
   if (change.type === 'hp') return `HP ${signed}${reason}`;
   if (change.type === 'inventory') return `${change.op === 'add' ? '获得' : '失去'} ${change.item}`;
-  if (change.type === 'trust') return `${change.npc}信任 ${signed}${reason}`;
   if (change.type === 'area') return `场景切换：${change.new}${reason}`;
   if (change.type === 'level_up') return `升级到 Lv.${change.new}${reason}`;
   if (change.type === 'npc_hp') return `${change.npc} HP ${signed}${reason}`;
@@ -109,7 +116,7 @@ function formatStateChange(change: Record<string, any>) {
 function applyStateChange(state: GameState, change: Record<string, any>): GameState {
   if (change.type === 'snapshot') return { ...(change.state || state) };
 
-  const next = { ...state };
+  let next = { ...state };
 
   if (change.type === 'gold') next.gold = change.new;
   else if (change.type === 'hp') {
@@ -117,8 +124,20 @@ function applyStateChange(state: GameState, change: Record<string, any>): GameSt
     if (change.max) next.max_hp = change.max;
   } else if (change.type === 'inventory') next.inventory = change.inventory;
   else if (change.type === 'trust') {
-    const key = NPC_TRUST_KEYS[change.npc];
-    if (key) next[key] = change.new;
+    if (change.companionTrust) next.companionTrust = change.companionTrust;
+    if (Array.isArray(change.trustLogs)) next.trustLogs = change.trustLogs;
+    if (Array.isArray(change.applied)) {
+      change.applied.forEach((item: any) => {
+        if (item.companionId && Number.isFinite(Number(item.newValue))) {
+          next = withCompanionTrust(next, item.companionId, Number(item.newValue));
+        }
+      });
+    } else if (change.companionId && Number.isFinite(Number(change.new))) {
+      next = withCompanionTrust(next, change.companionId, Number(change.new));
+    } else {
+      const key = NPC_TRUST_KEYS[change.npc];
+      if (key) next[key] = change.new;
+    }
   } else if (change.type === 'area') next.current_area = change.new;
   else if (change.type === 'level_up') {
     next.level = change.new;

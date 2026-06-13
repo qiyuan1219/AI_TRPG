@@ -19,8 +19,19 @@ import {
 } from '../services/api';
 import type { ActionSuggestion, DiceResult, SceneVisual, StoryLine } from '../types/game';
 
+export interface CompanionEventCompleteResult {
+  event: CompanionSideEventInfo;
+  state: CompanionSideEventState;
+}
+
 interface CompanionEventTestScreenProps {
   onBack: () => void;
+  onComplete?: (result: CompanionEventCompleteResult) => void;
+  eventId?: string;
+  initialTrust?: number;
+  playerName?: string;
+  returnLabel?: string;
+  testMode?: boolean;
 }
 
 type RuntimePhase = 'narrating' | 'action' | 'battle';
@@ -257,9 +268,18 @@ function SideEventStatusPanel({
   );
 }
 
-export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenProps) {
+export function CompanionEventTestScreen({
+  onBack,
+  onComplete,
+  eventId = 'block_echo_forest',
+  initialTrust = 55,
+  playerName = '玩家',
+  returnLabel = '返回测试',
+  testMode = true,
+}: CompanionEventTestScreenProps) {
   const nextLineId = useRef(1);
   const nextEventId = useRef(1);
+  const completionNotifiedRef = useRef(false);
   const [sessionId, setSessionId] = useState('');
   const [event, setEvent] = useState<CompanionSideEventInfo | null>(null);
   const [state, setState] = useState<CompanionSideEventState | null>(null);
@@ -347,18 +367,20 @@ export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenPro
 
   async function restart() {
     setBusy(true);
+    completionNotifiedRef.current = false;
+    setSideQuestEnded(false);
     setActiveDice(null);
     setPendingFeedback(null);
     setEvents([]);
     try {
-      const result = await startCompanionSideEvent();
+      const result = await startCompanionSideEvent(eventId, initialTrust);
       setSessionId(result.session_id);
       setEvent(result.event);
       setState(result.state);
       setStory([makeLine('kp', '主持人', result.event.opening)]);
       setActiveIndex(0);
       setPhase('action');
-      addEvent('支线测试已开始', 'state');
+      addEvent(testMode ? '支线测试已开始' : '同伴支线已开始', 'state');
       summarizeState(result.state);
     } catch (err: any) {
       setStory([makeLine('system', '系统', err?.message || '支线事件启动失败')]);
@@ -374,7 +396,7 @@ export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenPro
     setBusy(true);
     setPhase('narrating');
     setStory((prev) => {
-      const next = [...prev, makeLine('player', '玩家', choice.label)];
+      const next = [...prev, makeLine('player', playerName, choice.label)];
       setActiveIndex(next.length - 1);
       return next;
     });
@@ -438,7 +460,7 @@ export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenPro
     setBusy(true);
     setPhase('narrating');
     setStory((prev) => {
-      const next = [...prev, makeLine('player', '玩家', content)];
+      const next = [...prev, makeLine('player', playerName, content)];
       setActiveIndex(next.length - 1);
       return next;
     });
@@ -516,7 +538,7 @@ export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenPro
     setPhase('narrating');
     const goodbyeMsg = '暂时就这些了，我们继续前进吧';
     setStory((prev) => {
-      const next = [...prev, makeLine('player', '玩家', goodbyeMsg)];
+      const next = [...prev, makeLine('player', playerName, goodbyeMsg)];
       setActiveIndex(next.length - 1);
       return next;
     });
@@ -544,6 +566,10 @@ export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenPro
       const next = Math.min(index + 1, story.length - 1);
       if (sideQuestEnded && next >= story.length - 1) {
         // 支线结束后，看完告别语自动返回
+        if (onComplete && event && state && !completionNotifiedRef.current) {
+          completionNotifiedRef.current = true;
+          onComplete({ event, state });
+        }
         setTimeout(() => onBack(), 500);
         return story.length - 1;
       }
@@ -613,11 +639,13 @@ export function CompanionEventTestScreen({ onBack }: CompanionEventTestScreenPro
           📜 对话日志
         </button>
         <button type="button" className="game-title-btn" onClick={onBack}>
-          返回测试
+          {returnLabel}
         </button>
-        <button type="button" className="game-save-btn" onClick={restart} disabled={busy}>
-          重开支线
-        </button>
+        {testMode && (
+          <button type="button" className="game-save-btn" onClick={restart} disabled={busy}>
+            重开支线
+          </button>
+        )}
       </div>
 
       <AnimatePresence>

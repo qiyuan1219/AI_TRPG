@@ -165,8 +165,8 @@ function projectEnemyHand(ed: number[], revealed: number[]) {
 function describeEnemyRead(ed: number[], revealed: number[], settled: boolean) {
   if (settled||revealed.length===5) return `敌方完整牌型：${evaluateHand(ed).label}`;
   if (!revealed.length) return "瑟琳还未获取敌骰情报";
-  const rd = revealed.map(i=>ed[i]); const pr = projectEnemyHand(ed,reversed);
-  return `已透露 #${reversed.map(i=>i+1).join("/")}：${rd.join("/")}，推测追${pr?.label??"高点"}`;
+  const rd = revealed.map(i=>ed[i]); const pr = projectEnemyHand(ed,revealed);
+  return `已透露 #${revealed.map(i=>i+1).join("/")}：${rd.join("/")}，推测追${pr?.label??"高点"}`;
 }
 
 function analyzeBestReroll(pd: number[], ed: number[], revealed: number[], exact: boolean): AdvisorPlan {
@@ -357,7 +357,7 @@ export function YachtDiceTestScreen({ onBack }: YachtDiceTestScreenProps) {
         {/* 瑟琳行动 */}
         {sessionState === "prep" && !serlynCheck && !serlynSkipped && (
           <div className="yvn-serlyn-bar">
-            <Dice3DView dieType="d20" roll={serlynCheck?.roll??null} rolling={Boolean(serlynCheck?.rolling)} revealed={Boolean(serlynCheck)} size={72} className="yvn-d20-sm" />
+            <Dice3DView dieType="d20" roll={null} rolling={false} revealed={false} size={72} className="yvn-d20-sm" />
             <div className="yvn-choices">
               <button type="button" className="yvn-btn-choice" onClick={()=>runSerlynCheck("stealth")}>🔍 潜行偷窥</button>
               <button type="button" className="yvn-btn-choice" onClick={()=>runSerlynCheck("favor")}>💬 人情说服</button>

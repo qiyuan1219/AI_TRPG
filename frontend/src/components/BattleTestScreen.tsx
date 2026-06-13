@@ -121,8 +121,13 @@ interface BattleAnimationCue {
   id: number;
   actorId: string;
   targetId: string;
+  targetIds: string[];
   skillId: string;
   effectKind: BattleFxKind;
+  feedback?: {
+    text: string;
+    tone: "damage" | "heal" | "miss" | "effect";
+  };
 }
 
 interface BattleEffect {
@@ -145,6 +150,14 @@ interface PendingSettlement {
   skill: BattleSkill;
   effect: BattleEffect;
   isEnemy?: boolean;
+}
+
+interface BattleTutorialCardProps {
+  intro: NonNullable<BattleConfig["tutorialIntro"]>;
+  step: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  onClose: () => void;
 }
 
 export interface BattleOpeningEffect {
@@ -176,6 +189,7 @@ export interface BattleConfig {
   quickRules: QuickRule[];
   eyebrow: string;
   title: string;
+  backgroundUrl?: string;
   subtitle: string;
   backLabel: string;
   rerollLog: string;
@@ -206,15 +220,15 @@ const ABILITY_LABELS: Array<[AbilityKey, string]> = [
 const QUICK_RULES: QuickRule[] = [
   { title: "流程", text: "每回合选择 1 个战斗技能，指定对象后立刻进入骰子判定。" },
   { title: "技能", text: "每个角色只展示 3 个战斗技能，暂不区分移动、附赠动作、反应和距离。" },
-  { title: "判定", text: "攻击看 D20 + 加值 vs AC；治疗和范围技能按各自骰子结算。" },
-  { title: "节奏", text: "我方有 +2 节奏加值，普通未命中会造成压制擦伤；敌方伤害降低。" },
+  { title: "命中", text: "攻击先投 D20，结果为骰面 + 属性/熟练/其他加值；达到目标 AC 才命中。" },
+  { title: "伤害", text: "攻击命中后再投伤害骰，例如 1D8 或 2D4；未命中则行动结束。" },
 ];
 
 const TUTORIAL_QUICK_RULES: QuickRule[] = [
   { title: "1 先攻", text: "战斗开始先投 1D20 + 敏捷调整值，数值越高越早行动。" },
   { title: "2 技能", text: "轮到我方时选择一个技能；本教学每名角色每回合只做一次主要行动。" },
   { title: "3 目标", text: "选好技能后指定发光目标。攻击技能打敌人，治疗技能点我方。" },
-  { title: "4 结算", text: "右侧会展示骰点、AC 或 DC、伤害/治疗，以及 KP 对结果的解释。" },
+  { title: "4 结算", text: "攻击命中后才会进入伤害骰；未命中不会投伤害，也不会造成伤害。" },
 ];
 
 const BACKGROUND_URL = "/assets/battle/b1-cablestreet-battle.png";
@@ -222,9 +236,9 @@ const BACKGROUND_URL = "/assets/battle/b1-cablestreet-battle.png";
 const BATTLE_TUNING = {
   allyHitBonus: 2,
   allySaveDcBonus: 1,
-  allyDamageMultiplier: 1.35,
-  enemyDamageMultiplier: 0.65,
-  allyGrazeDamage: 4,
+  allyDamageMultiplier: 1,
+  enemyDamageMultiplier: 1,
+  allyGrazeDamage: 0,
   enemyGrazeDamage: 0,
   enemyRollDelayMs: 520,
   enemyEndDelayMs: 3300,
@@ -845,8 +859,8 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
     abilities: { str: 16, dex: 13, con: 15, int: 10, wis: 12, cha: 8 },
     weaponMastery: "本场教学只保留核心概念：攻击检定、技能检定、治疗。",
     resourceProfile: ["攻击检定 vs AC", "力量检定 vs DC", "治疗恢复 HP"],
-    statuses: ["前排", "教学保护", "敌伤降低"],
-    traits: ["HP30 / AC18", "攻击加值会自动计算", "未命中也可能造成 4 点擦伤压制", "本场目标：把两只小怪打到 HP0"],
+    statuses: ["前排", "教学保护"],
+    traits: ["HP30 / AC18", "攻击加值会自动计算", "未命中不会造成伤害", "本场目标：把两只小怪打到 HP0"],
     skills: [
       {
         id: "TA1",
@@ -854,7 +868,7 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
         resource: "战斗技能",
         source: "职业技能",
         formula: "STR + 熟练 vs AC；1d8+3 挥砍",
-        effect: "教学重点：D20 + 力量调整值 + 熟练加值 >= 目标 AC 即命中。命中造成伤害，未命中也可能触发擦伤压制。",
+        effect: "教学重点：D20 + 力量调整值 + 熟练加值 >= 目标 AC 即命中。命中后再投伤害骰；未命中则行动结束。",
         cooldown: "每回合 1 次",
         rule: "攻击检定",
         roll: { kind: "attack", ability: "str", targetAc: 12, label: "稳步斩击命中判定" },
@@ -1231,7 +1245,7 @@ const TUTORIAL_BATTLE_CONFIG: BattleConfig = {
   subtitle: "冒险者与瑟琳对抗三只裂隙爬兽：先学先攻、攻击、豁免、治疗，再继续主线。",
   backLabel: "返回剧情",
   rerollLog: "教学战斗重置：重新投先攻，并恢复冒险者、瑟琳和三只裂隙爬兽的 HP。",
-  initialLog: "新手教学开始：先看教学说明，再投先攻；本场敌人伤害降低，重点是理解流程。",
+  initialLog: "新手教学开始：先看教学说明，再投先攻；本场重点是理解流程。",
   initiativeNote: "5 位单位同时进行 1D20 判定：D20 + 敏捷调整值 + 其他加值。数值最高者先行动。",
   winTitle: "教学战斗胜利",
   loseTitle: "教学战斗失败",
@@ -1275,12 +1289,21 @@ function applyOpeningEffectsToUnits(units: BattleUnit[], effects: BattleOpeningE
     const nextHp = Math.max(1, Math.min(unit.maxHp, unit.hp + hpDelta));
     const nextAc = Math.max(6, unit.ac + acDelta);
 
+    // 开局先攻减值
+    const initDebuff = unitEffects.reduce((sum, effect) => sum + ((effect as any).initDebuff ?? 0), 0);
+    // 开局攻击/命中加值
+    const atkBonus = unitEffects.reduce((sum, effect) => sum + ((effect as any).atkBonus ?? 0), 0);
+    const hitBonus = unitEffects.reduce((sum, effect) => sum + ((effect as any).hitBonus ?? 0), 0);
+
     return {
       ...unit,
       hp: nextHp,
       ac: nextAc,
       statuses: [...unit.statuses, ...statuses],
       traits: [...unit.traits, ...traits],
+      initiativeBonus: (unit.initiativeBonus ?? 0) + initDebuff,
+      openingAtkBonus: atkBonus,
+      openingHitBonus: hitBonus,
     };
   });
 }
@@ -1299,6 +1322,54 @@ function boldifyDiceNotation(text: string): React.ReactNode[] {
   return parts.map((part, i) =>
     /^\d+d\d+$/i.test(part) ? <b key={i}>{part}</b> : part
   );
+}
+
+const DAMAGE_TYPE_WORDS_RE = /\s*(挥砍|钝击|穿刺|毒素|火焰|冷冻|寒冷|力场|立场|光耀|暗影|黯蚀|奥术|雷电|闪电|酸蚀|心灵|坏死|辐射)\s*/g;
+const DAMAGE_TYPE_TAG_RE = /^(挥砍|钝击|穿刺|毒素|火焰|冷冻|寒冷|力场|立场|光耀|暗影|黯蚀|奥术|雷电|闪电|酸蚀|心灵|坏死|辐射)$/;
+
+function stripDamageTypeWords(text: string) {
+  return text
+    .replace(DAMAGE_TYPE_WORDS_RE, " ")
+    .replace(/\s*([；;，,。])\s*/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function formatDiceNotation(text: string) {
+  return stripDamageTypeWords(text).replace(/(\d*)d(\d+)/gi, (_match, count, sides) => `${count || 1}D${sides}`);
+}
+
+function formatCombatTextForPlayer(text: string) {
+  return formatDiceNotation(text)
+    .replace(/受\s*\/\s*龙火克制/g, "弱点明显")
+    .replace(/受龙火克制/g, "弱点明显")
+    .replace(/敌伤降低|敌人伤害降低|敌方伤害降低/g, "教学保护")
+    .replace(/Graze/g, "未命中不造成伤害")
+    .replace(/未命中仍可用[^，。；;]*/g, "未命中不造成伤害");
+}
+
+function formatSkillFormulaForPlayer(skill: BattleSkill) {
+  return formatDiceNotation(skill.formula);
+}
+
+function formatSkillEffectForPlayer(skill: BattleSkill) {
+  return stripDamageTypeWords(skill.effect)
+    .replace(/未命中也可能触发擦伤压制。?/g, "未命中则行动结束。")
+    .replace(/未命中也可能造成\s*\d+\s*点擦伤压制。?/g, "未命中则行动结束。")
+    .replace(/裂隙爬兽怕光，?/g, "");
+}
+
+function formatDamageFormulaForPlayer(formula: string) {
+  const damagePart = formula.split(/；|;/)[1] ?? formula;
+  const match = damagePart.match(/(\d*)d(\d+)(?:\s*[+＋]\s*(\d+))?/i);
+  if (!match) return formatDiceNotation(damagePart);
+  const count = match[1] || "1";
+  const bonus = match[3] ? `+${match[3]}` : "";
+  return `${count}D${match[2]}${bonus}`;
+}
+
+function visibleSkillTags(skill: BattleSkill) {
+  return skill.tags.filter((tag) => !DAMAGE_TYPE_TAG_RE.test(tag));
 }
 
 function rollDie(sides: number) {
@@ -1423,11 +1494,12 @@ function rollFormulaAmount(formula: string) {
 function rollDamageOnly(skill: BattleSkill, unitName: string): DiceResult | null {
   const fd = rollFormulaDice(skill.formula);
   if (!fd) return null;
+  const diceLabel = `${fd.count}D${sidesFromDieType(fd.dieType)}`;
   return {
     type: "dice_test",
     data: {
       骰子: fd.dieType.toUpperCase(),
-      属性: `${unitName}：${skill.name}（伤害）`,
+      属性: `${unitName}：${skill.name}（${formatDamageFormulaForPlayer(skill.formula)}）`,
       掷骰: `${fd.dieType.toUpperCase()}=${fd.rolls[0]}`,
       结果: fd.rolls[0],
       骰数: fd.count,
@@ -1435,7 +1507,7 @@ function rollDamageOnly(skill: BattleSkill, unitName: string): DiceResult | null
       全部掷骰: fd.rolls,
       加值: fd.bonus,
       总计: fd.total,
-      描述: fd.count > 1 ? `${fd.count}${fd.dieType} 合计 ${fd.rolls.join(" + ")}` + (fd.bonus ? ` + ${fd.bonus} = ${fd.total}` : ` = ${fd.total}`) : "结果已生成",
+      描述: fd.count > 1 ? `${diceLabel} 合计 ${fd.rolls.join(" + ")}` + (fd.bonus ? ` + ${fd.bonus} = ${fd.total}` : ` = ${fd.total}`) : `${diceLabel}${fd.bonus ? ` + ${fd.bonus}` : ""}`,
       id: Date.now(),
     },
   };
@@ -1803,9 +1875,13 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
   const amountRoll = (preRolledDamage !== undefined && preRolledDamage !== null)
     ? { total: Number(preRolledDamage), detail: "" }
     : rollFormulaAmount(skill.formula);
-  const rawAmount = dice?.type === "dice_test" ? Number(dice.data["总计"] ?? dice.data["结果"] ?? 0) : amountRoll?.total;
+  const rolledAmount = dice?.type === "dice_test" ? Number(dice.data["总计"] ?? dice.data["结果"] ?? 0) : amountRoll?.total;
+  const rawAmount = Number.isFinite(Number(rolledAmount)) ? Number(rolledAmount) : undefined;
   const damageAction = isDamagingAction(actor, target, skill);
-  const tunedAmount = rawAmount && damageAction ? tuneDamageAmount(actor, rawAmount) : rawAmount;
+  const openingDmgBonus = (actor as any).openingAtkBonus ?? 0;
+  const tunedAmount = rawAmount !== undefined ? rawAmount + (damageAction ? openingDmgBonus : 0) : undefined;
+  const displayFormula = formatSkillFormulaForPlayer(skill);
+  const displayEffect = formatSkillEffectForPlayer(skill);
 
   if (!dice) {
     const narration = buildKpNarration({ actor, target, skill, dice, outcome: "trigger" });
@@ -1815,9 +1891,9 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
       targetName: target.name,
       skillName: skill.name,
       title: "触发/预设生效",
-      formula: skill.formula,
+      formula: displayFormula,
       resultLine: diceLine(null),
-      detail: `${target.name} 已被指定为 ${skill.name} 的对象。${skill.effect}`,
+      detail: `${target.name} 已被指定为 ${skill.name} 的对象。${displayEffect}`,
       narration,
     };
   }
@@ -1825,25 +1901,41 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
   if (dice.type === "attack_roll") {
     const success = Boolean(dice.data["命中"]);
     const d20 = getD20Roll(dice);
-    const grazeAmount = damageAction && !success && d20 !== 1 ? (actor.faction === "ally" ? BATTLE_TUNING.allyGrazeDamage : BATTLE_TUNING.enemyGrazeDamage) : 0;
-    const finalAmount = success ? tunedAmount : grazeAmount || undefined;
-    const outcome = success ? "hit" : grazeAmount ? "graze" : "miss";
+    const finalAmount = success ? tunedAmount : undefined;
+    const outcome = success ? "hit" : "miss";
     const narration = buildKpNarration({ actor, target, skill, dice, amount: finalAmount, outcome });
     return {
       id: Number(dice.data.id ?? Date.now()),
       actorName: actor.name,
       targetName: target.name,
       skillName: skill.name,
-      title: success ? "攻击命中" : grazeAmount ? "擦伤压制" : "攻击未命中",
-      formula: skill.formula,
+      title: success ? "攻击命中" : "攻击未命中",
+      formula: displayFormula,
       resultLine: diceLine(dice),
       amount: finalAmount,
-      success: success || grazeAmount > 0,
+      success,
       detail: success
-        ? `${target.name} 受到${finalAmount ? `约 ${finalAmount} 点` : ""}效果结算。${amountRoll ? `伤害骰：${amountRoll.detail}。` : ""}${damageAction ? "测试节奏已应用伤害倍率。" : ""}${skill.effect}`
-        : grazeAmount
-          ? `${target.name} 未被正面命中，但我方测试节奏触发擦伤压制，造成 ${grazeAmount} 点伤害。`
-          : `${target.name} 未被命中，本次主要效果不触发。`,
+        ? `${target.name} 已被命中，接下来投掷伤害骰 ${formatDamageFormulaForPlayer(skill.formula)}。`
+        : `D20 ${d20 || "?"} 未达到 AC ${dice.data["目标AC"] ?? "?"}，${target.name} 未被命中，本次攻击结束。`,
+      narration,
+    };
+  }
+
+  if (dice.type === "dice_test" && skill.roll.kind === "attack") {
+    const finalAmount = tunedAmount;
+    const damageFormula = formatDamageFormulaForPlayer(skill.formula);
+    const narration = buildKpNarration({ actor, target, skill, dice, amount: finalAmount, outcome: "hit" });
+    return {
+      id: Number(dice.data.id ?? Date.now()),
+      actorName: actor.name,
+      targetName: target.name,
+      skillName: skill.name,
+      title: "攻击命中",
+      formula: `伤害：${damageFormula}`,
+      resultLine: diceLine(dice),
+      amount: finalAmount,
+      success: Boolean(finalAmount),
+      detail: `命中后投掷伤害骰 ${damageFormula}，造成 ${finalAmount ?? 0} 点伤害。${displayEffect}`,
       narration,
     };
   }
@@ -1859,13 +1951,13 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
       targetName: target.name,
       skillName: skill.name,
       title: targetSaved ? "目标豁免成功（半效）" : "目标豁免失败",
-      formula: skill.formula,
+      formula: displayFormula,
       resultLine: diceLine(dice),
       amount: finalAmount,
       success: Boolean(finalAmount),
       detail: targetSaved
-        ? `${target.name} 通过豁免，效果减弱为半效。${amountRoll ? `基础伤害骰：${amountRoll.detail}。` : ""}${damageAction ? "测试节奏已应用伤害倍率。" : ""}`
-        : `${target.name} 豁免失败，技能完整生效。${amountRoll ? `基础伤害骰：${amountRoll.detail}。` : ""}${damageAction ? "测试节奏已应用伤害倍率。" : ""}${skill.effect}`,
+        ? `${target.name} 通过豁免，效果减弱为半效。${amountRoll ? `基础伤害骰：${amountRoll.detail}。` : ""}`
+        : `${target.name} 豁免失败，技能完整生效。${amountRoll ? `基础伤害骰：${amountRoll.detail}。` : ""}${displayEffect}`,
       narration,
     };
   }
@@ -1880,12 +1972,12 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
       targetName: target.name,
       skillName: skill.name,
       title: success ? "检定成功" : "检定失败",
-      formula: skill.formula,
+      formula: displayFormula,
       resultLine: diceLine(dice),
       amount: finalAmount,
       success,
       detail: success
-        ? `${skill.effect}${amountRoll ? ` 结算骰：${amountRoll.detail}。` : ""}${damageAction ? "测试节奏已应用伤害倍率。" : ""}`
+        ? `${displayEffect}${amountRoll ? ` 结算骰：${amountRoll.detail}。` : ""}`
         : "本次检定失败，技能主要效果不触发。",
       narration,
     };
@@ -1898,11 +1990,11 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
     targetName: target.name,
     skillName: skill.name,
     title: skill.roll.kind === "healing" ? "治疗结算" : "骰子结算",
-    formula: skill.formula,
+    formula: displayFormula,
     resultLine: diceLine(dice),
     amount: tunedAmount,
     success: true,
-    detail: `${target.name} 获得 ${tunedAmount ?? 0} 点${skill.roll.kind === "healing" ? "治疗" : "效果值"}。${skill.effect}`,
+    detail: `${target.name} 获得 ${tunedAmount ?? 0} 点${skill.roll.kind === "healing" ? "治疗" : "效果值"}。${displayEffect}`,
     narration,
   };
 }
@@ -1923,7 +2015,7 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
   const now = Date.now();
   const fxKind = getBattleFxKind(unit, skill);
 
-  const formulaDice = rollFormulaDice(skill.formula);
+  const formulaDice = skill.roll.kind === "attack" ? null : rollFormulaDice(skill.formula);
 
   if (skill.roll.kind === "attack") {
     const roll1 = rollD20();
@@ -1933,7 +2025,7 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
       ? (advType === "advantage" ? Math.max(roll1, roll2) : Math.min(roll1, roll2))
       : roll1;
     const abilityMod = abilityModifier(unit.abilities[skill.roll.ability ?? "str"]);
-    const bonus = abilityMod + unit.proficiency + (skill.roll.bonus ?? 0) + (unit.faction === "ally" ? BATTLE_TUNING.allyHitBonus : 0);
+    const bonus = abilityMod + unit.proficiency + (skill.roll.bonus ?? 0) + (unit.faction === "ally" ? BATTLE_TUNING.allyHitBonus : 0) + ((unit as any).openingHitBonus ?? 0);
     const total = finalRoll + bonus;
     const targetAc = target?.ac ?? skill.roll.targetAc ?? 14;
 
@@ -1946,6 +2038,9 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
         武器: `${unit.name}：${skill.name}`,
         攻击掷骰: `D20=${finalRoll}`,
         加值: bonus,
+        属性加值: abilityMod,
+        熟练加值: unit.proficiency,
+        其他效果加成: (skill.roll.bonus ?? 0) + (unit.faction === "ally" ? BATTLE_TUNING.allyHitBonus : 0) + ((unit as any).openingHitBonus ?? 0),
         总计: total,
         目标AC: targetAc,
         命中: hitResult,
@@ -1953,12 +2048,6 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
         fxKind,
         effectKind: fxKind,
         id: now,
-        附带伤害骰: formulaDice ? true : false,
-        伤害骰面: formulaDice?.dieType,
-        伤害骰数: formulaDice?.count,
-        全部伤害掷骰: formulaDice?.rolls,
-        伤害加值: formulaDice?.bonus ?? 0,
-        伤害总计: formulaDice?.total ?? 0,
         优势掷骰: useAdv ? advType : undefined,
         优势骰: useAdv ? [roll1, roll2] : undefined,
       },
@@ -1968,7 +2057,7 @@ function rollSkillDice(unit: BattleUnit, skill: BattleSkill, target?: BattleUnit
   if (skill.roll.kind === "ability") {
     const roll = rollD20();
     const abilityMod = abilityModifier(unit.abilities[skill.roll.ability ?? "str"]);
-    const bonus = abilityMod + unit.proficiency + (skill.roll.bonus ?? 0) + (unit.faction === "ally" ? BATTLE_TUNING.allyHitBonus : 0);
+    const bonus = abilityMod + unit.proficiency + (skill.roll.bonus ?? 0) + (unit.faction === "ally" ? BATTLE_TUNING.allyHitBonus : 0) + ((unit as any).openingHitBonus ?? 0);
     const total = roll + bonus;
     const dc = (skill.roll.dc ?? 13) + (unit.faction === "ally" ? BATTLE_TUNING.allySaveDcBonus : 0);
 
@@ -2232,11 +2321,13 @@ export function BattleTestScreen({
   const [targetSelection, setTargetSelection] = useState<TargetSelection | null>(null);
   const [activeDice, setActiveDice] = useState<DiceResult | null>(null);
   const [attackPhase, setAttackPhase] = useState<"d20" | "damage" | null>(null);
-  const pendingAttackRef = useRef<{ unit: BattleUnit; target: BattleUnit; skill: BattleSkill; hit: boolean } | null>(null);
+  const pendingAttackRef = useRef<{ unit: BattleUnit; target: BattleUnit; skill: BattleSkill; hit: boolean; isEnemy?: boolean } | null>(null);
   const [advantage, setAdvantage] = useState<{ type: "advantage" | "disadvantage"; reason: string } | null>(null);
   const advantageRef = useRef(advantage);
   advantageRef.current = advantage;
   const [lastEffect, setLastEffect] = useState<BattleEffect | null>(null);
+  const [kpReportPending, setKpReportPending] = useState(false);
+  const kpReportEffectIdRef = useRef<number | null>(null);
   const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null);
   const [battleAnimation, setBattleAnimation] = useState<BattleAnimationCue | null>(null);
   const enemyActingKeyRef = useRef<string | null>(null);
@@ -2245,6 +2336,7 @@ export function BattleTestScreen({
   const [usedResources, setUsedResources] = useState<Record<string, Partial<Record<BattleResource, boolean>>>>({});
   const [battleLog, setBattleLog] = useState<string[]>([...openingLogLines, config.initialLog].slice(0, 4));
   const [showTutorialIntro, setShowTutorialIntro] = useState(() => Boolean(config.tutorialIntro));
+  const [tutorialIntroStep, setTutorialIntroStep] = useState(0);
   const [showQuickRules, setShowQuickRules] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(-2);
   const [tutorialHint, setTutorialHint] = useState<string | null>(null);
@@ -2316,18 +2408,34 @@ export function BattleTestScreen({
     setBattleAnimation(null);
   }
 
-  function triggerBattleAnimation(unit: BattleUnit, skill: BattleSkill, target: BattleUnit) {
+  function buildBattleFeedback(actor: BattleUnit, target: BattleUnit, skill: BattleSkill, effect: BattleEffect): BattleAnimationCue["feedback"] {
+    if (effect.success === false || /未命中|失败/.test(effect.title)) {
+      return { text: "MISS", tone: "miss" };
+    }
+    if (typeof effect.amount !== "number") return undefined;
+    if (skill.roll.kind === "healing" || actor.faction === target.faction) {
+      return { text: `+${effect.amount}`, tone: "heal" };
+    }
+    if (isDamagingAction(actor, target, skill)) {
+      return { text: `-${effect.amount}`, tone: "damage" };
+    }
+    return { text: String(effect.amount), tone: "effect" };
+  }
+
+  function triggerBattleAnimation(unit: BattleUnit, skill: BattleSkill, target: BattleUnit, effect: BattleEffect, impactedTargets: BattleUnit[]) {
     if (battleAnimationTimerRef.current) {
       window.clearTimeout(battleAnimationTimerRef.current);
     }
 
     const id = Date.now();
-    const effectKind = getBattleFxKind(unit, skill);
-    setBattleAnimation({ id, actorId: unit.id, targetId: target.id, skillId: skill.id, effectKind });
+    const feedback = buildBattleFeedback(unit, target, skill, effect);
+    const effectKind = feedback?.tone === "miss" ? "fail" : getBattleFxKind(unit, skill);
+    const targetIds = impactedTargets.length ? impactedTargets.map((item) => item.id) : [target.id];
+    setBattleAnimation({ id, actorId: unit.id, targetId: target.id, targetIds, skillId: skill.id, effectKind, feedback });
     battleAnimationTimerRef.current = window.setTimeout(() => {
       setBattleAnimation((current) => (current?.id === id ? null : current));
       battleAnimationTimerRef.current = null;
-    }, effectKind === "heal" || effectKind === "shield" || effectKind === "arcane" ? 1100 : 860);
+    }, effectKind === "heal" || effectKind === "shield" || effectKind === "arcane" || feedback ? 1150 : 860);
   }
 
   function rerollInitiative() {
@@ -2340,6 +2448,8 @@ export function BattleTestScreen({
     setTargetSelection(null);
     setActiveDice(null);
     setLastEffect(null);
+    setKpReportPending(false);
+    kpReportEffectIdRef.current = null;
     setPendingSettlement(null);
     setEnemyTurnDone(false);
     setAdvantage(null);
@@ -2351,6 +2461,7 @@ export function BattleTestScreen({
     setUnitHp(Object.fromEntries(battleBaseUnits.map((unit) => [unit.id, unit.hp])));
     setUsedResources({});
     setShowTutorialIntro(Boolean(config.tutorialIntro));
+    setTutorialIntroStep(0);
     setShowQuickRules(false);
     setTutorialStep(-2);
     setTutorialHint(null);
@@ -2370,6 +2481,7 @@ export function BattleTestScreen({
   }
 
   function nextTurn() {
+    if (kpReportPending) return;
     advanceTurn();
     setActionUnitId(null);
     setTargetSelection(null);
@@ -2427,7 +2539,7 @@ export function BattleTestScreen({
   function sanitizeBattleNarration(text: string, fallback: string) {
     let cleaned = String(text || "").replace(/\s+/g, " ").trim();
     if (!cleaned) return fallback;
-    if (/莉娅|莉亚瑟|雷铎|炉心守卫者/.test(cleaned)) return fallback;
+    if (/炉心守卫者/.test(cleaned)) return fallback;
     cleaned = cleaned.replace(/^KP[:：]\s*/i, "").replace(/[，、；：:—-]+$/g, "").trim();
     if (cleaned && !/[。！？.!?」”]$/.test(cleaned)) cleaned += "。";
     return `KP：${cleaned}`;
@@ -2439,6 +2551,11 @@ export function BattleTestScreen({
     return candidates.filter((unit) => unit.hp > 0);
   }
 
+  function isAnimationTarget(unit: BattleUnit) {
+    if (!battleAnimation) return false;
+    return battleAnimation.targetIds?.includes(unit.id) || battleAnimation.targetId === unit.id;
+  }
+
   function executeSettlement(settlement: PendingSettlement) {
     const { unit, target, skill, effect } = settlement;
     const impactedTargets = getResolvedDamageTargets(unit, target, skill);
@@ -2447,8 +2564,10 @@ export function BattleTestScreen({
     // 暂存本地兜底文本，先用"KP记录中…"占位
     const localNarration = effect.narration;
     const placeholderEffect = { ...effect, narration: "KP记录中…" };
+    kpReportEffectIdRef.current = placeholderEffect.id;
+    setKpReportPending(true);
     setLastEffect(placeholderEffect);
-    triggerBattleAnimation(unit, skill, target);
+    triggerBattleAnimation(unit, skill, target, effect, impactedTargets);
     pushBattleLog(`${unit.name} 对 ${targetLabel} 使用 ${skill.name}：${effect.title}`);
     pushBattleLog("KP记录中…");
 
@@ -2464,12 +2583,21 @@ export function BattleTestScreen({
       d20_roll: diceInfo.d20Roll,
       d20_total: diceInfo.d20Total,
       damage_label: "",
-      tags: skill.tags,
+      tags: visibleSkillTags(skill),
       ac_dc: diceInfo.acDc,
     }).then(llmNarration => {
       const finalNarration = sanitizeBattleNarration(llmNarration, localNarration);
-      setLastEffect(prev => prev ? { ...prev, narration: finalNarration } : null);
+      if (kpReportEffectIdRef.current !== placeholderEffect.id) return;
+      setLastEffect(prev => prev?.id === placeholderEffect.id ? { ...prev, narration: finalNarration } : prev);
       pushBattleLog(finalNarration);
+      setKpReportPending(false);
+      kpReportEffectIdRef.current = null;
+    }).catch(() => {
+      if (kpReportEffectIdRef.current !== placeholderEffect.id) return;
+      setLastEffect(prev => prev?.id === placeholderEffect.id ? { ...prev, narration: localNarration } : prev);
+      pushBattleLog(localNarration);
+      setKpReportPending(false);
+      kpReportEffectIdRef.current = null;
     });
 
     if (!settlement.isEnemy) {
@@ -2479,7 +2607,7 @@ export function BattleTestScreen({
       } else if (effect.success) {
         showTutorialHint("⚔️ 命中！仔细观察KP的战斗描写和伤害数值", 4000);
       } else {
-        showTutorialHint("💨 未命中/擦伤！即使失手也可能造成压制伤害", 4000);
+        showTutorialHint("💨 未命中！攻击行动结束，不会投掷伤害骰", 4000);
       }
     }
   }
@@ -2529,7 +2657,7 @@ export function BattleTestScreen({
       pendingAttackRef.current = { unit, target, skill, hit };
       setActiveDice(dice);
       advanceTutorialStep(3);
-      showTutorialHint("⚔️ D20命中判定中！观察骰子和AC对比 → 命中则继续投伤害骰", 5000);
+      showTutorialHint("⚔️ 先投 D20 命中骰：总计达到目标 AC，才会继续投伤害骰", 5000);
       return;
     }
 
@@ -2676,6 +2804,15 @@ export function BattleTestScreen({
 
     const rollTimer = window.setTimeout(() => {
       const dice = rollSkillDice(actingUnit, skill, target);
+      if (skill.roll.kind === "attack") {
+        const hit = Boolean(dice?.data["命中"]);
+        setAttackPhase("d20");
+        pendingAttackRef.current = { unit: actingUnit, target, skill, hit, isEnemy: true };
+        setActiveDice(dice);
+        pushBattleLog(`${actingUnit.name} 对 ${target.name} 使用 ${skill.name}：先投命中骰`);
+        return;
+      }
+
       const effect = buildBattleEffect(actingUnit, target, skill, dice);
       if (dice) setActiveDice(dice);
       // 延迟结算：骰子关闭后由 settleEffect 处理
@@ -2699,7 +2836,7 @@ export function BattleTestScreen({
 
   return (
     <main className="battle-test-screen">
-      <div className="battle-background" style={{ backgroundImage: `url(${BACKGROUND_URL})` }} />
+      <div className="battle-background" style={{ backgroundImage: `url(${config.backgroundUrl || BACKGROUND_URL})` }} />
       <div className="battle-overlay" />
 
       <header className="battle-hud-header">
@@ -2812,9 +2949,10 @@ export function BattleTestScreen({
               active={unit.id === activeUnit?.id && phase === "battle"}
               targetable={pendingTargetIds.has(unit.id)}
               casting={battleAnimation?.actorId === unit.id}
-              impacted={battleAnimation?.targetId === unit.id}
+              impacted={isAnimationTarget(unit)}
               animationKey={battleAnimation?.id}
-              effectKind={battleAnimation?.targetId === unit.id ? battleAnimation.effectKind : undefined}
+              effectKind={isAnimationTarget(unit) ? battleAnimation?.effectKind : undefined}
+              feedback={isAnimationTarget(unit) ? battleAnimation?.feedback : undefined}
               onClick={() => handleModelClick(unit)}
             />
           ))}
@@ -2827,9 +2965,10 @@ export function BattleTestScreen({
               active={unit.id === activeUnit?.id && phase === "battle"}
               targetable={pendingTargetIds.has(unit.id)}
               casting={battleAnimation?.actorId === unit.id}
-              impacted={battleAnimation?.targetId === unit.id}
+              impacted={isAnimationTarget(unit)}
               animationKey={battleAnimation?.id}
-              effectKind={battleAnimation?.targetId === unit.id ? battleAnimation.effectKind : undefined}
+              effectKind={isAnimationTarget(unit) ? battleAnimation?.effectKind : undefined}
+              feedback={isAnimationTarget(unit) ? battleAnimation?.feedback : undefined}
               onClick={() => handleModelClick(unit)}
             />
           ))}
@@ -2858,11 +2997,12 @@ export function BattleTestScreen({
             <BattleEffectPanel
               effect={lastEffect}
               nextTurnLabel={
-                enemyTurn && !enemyTurnDone ? "等待敌方行动结束"
+                kpReportPending ? "KP战场报告生成中…"
+                : enemyTurn && !enemyTurnDone ? "等待敌方行动结束"
                 : enemyTurn && enemyTurnDone ? "敌方行动完毕，下一行动 →"
                 : "下一行动 →"
               }
-              nextTurnDisabled={phase !== "battle" || (enemyTurn && !enemyTurnDone) || battleWon || battleLost || Boolean(activeDice)}
+              nextTurnDisabled={kpReportPending || phase !== "battle" || (enemyTurn && !enemyTurnDone) || battleWon || battleLost || Boolean(activeDice)}
               onNextTurn={nextTurn}
             />
           </motion.section>
@@ -2936,10 +3076,23 @@ export function BattleTestScreen({
         onClose={() => {
           // 攻击技能两阶段流程
           if (attackPhase === "d20" && pendingAttackRef.current) {
-            const { unit, target, skill, hit } = pendingAttackRef.current;
+            const { unit, target, skill, hit, isEnemy } = pendingAttackRef.current;
             if (hit) {
               // 命中 → 进入伤害骰阶段
               const dmgDice = rollDamageOnly(skill, unit.name);
+              if (!dmgDice) {
+                const effect = buildBattleEffect(unit, target, skill, activeDice);
+                setAttackPhase(null);
+                setActiveDice(null);
+                pendingAttackRef.current = null;
+                const settlement: PendingSettlement = { unit, target, skill, effect, isEnemy };
+                executeSettlement(settlement);
+                if (isEnemy) {
+                  setEnemyTurnDone(true);
+                  enemyActingKeyRef.current = null;
+                }
+                return;
+              }
               setAttackPhase("damage");
               setActiveDice(dmgDice);
               pushBattleLog(`${unit.name} 对 ${target.name} 使用 ${skill.name}：D20命中 → 投掷伤害骰`);
@@ -2949,18 +3102,26 @@ export function BattleTestScreen({
               setAttackPhase(null);
               setActiveDice(null);
               pendingAttackRef.current = null;
-              const settlement: PendingSettlement = { unit, target, skill, effect };
+              const settlement: PendingSettlement = { unit, target, skill, effect, isEnemy };
               executeSettlement(settlement);
+              if (isEnemy) {
+                setEnemyTurnDone(true);
+                enemyActingKeyRef.current = null;
+              }
             }
           } else if (attackPhase === "damage" && pendingAttackRef.current) {
             // 伤害骰关闭 → 完整结算
-            const { unit, target, skill } = pendingAttackRef.current;
+            const { unit, target, skill, isEnemy } = pendingAttackRef.current;
             const effect = buildBattleEffect(unit, target, skill, activeDice);
             setAttackPhase(null);
             setActiveDice(null);
             pendingAttackRef.current = null;
-            const settlement: PendingSettlement = { unit, target, skill, effect };
+            const settlement: PendingSettlement = { unit, target, skill, effect, isEnemy };
             executeSettlement(settlement);
+            if (isEnemy) {
+              setEnemyTurnDone(true);
+              enemyActingKeyRef.current = null;
+            }
           } else {
             // 非攻击技能
             setAttackPhase(null);
@@ -2975,30 +3136,16 @@ export function BattleTestScreen({
         {tutorialHint && mode === "tutorial" && (
           <motion.div
             className="tutorial-step-hint"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            style={{
-              position: "fixed",
-              bottom: 140,
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 110,
-              background: "linear-gradient(135deg, rgba(20,20,40,0.95), rgba(30,30,60,0.95))",
-              border: "1px solid rgba(180,160,120,0.5)",
-              borderRadius: 12,
-              padding: "12px 24px",
-              color: "#e8d5a3",
-              fontSize: 15,
-              fontWeight: 500,
-              textAlign: "center",
-              maxWidth: "90vw",
-              pointerEvents: "none",
-              boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
-            }}
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            {tutorialHint}
+            <span>战斗提示</span>
+            <p>{tutorialHint}</p>
+            <button type="button" aria-label="关闭战斗提示" onClick={() => setTutorialHint(null)}>
+              ×
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -3007,10 +3154,22 @@ export function BattleTestScreen({
         {showTutorialIntro && config.tutorialIntro && (
           <BattleTutorialIntro
             intro={config.tutorialIntro}
-            onStart={() => {
+            step={tutorialIntroStep}
+            onPrevious={() => setTutorialIntroStep((step) => Math.max(0, step - 1))}
+            onNext={() => {
+              if (!config.tutorialIntro) return;
+              if (tutorialIntroStep < config.tutorialIntro.steps.length - 1) {
+                setTutorialIntroStep((step) => Math.min(config.tutorialIntro!.steps.length - 1, step + 1));
+                return;
+              }
               setShowTutorialIntro(false);
               advanceTutorialStep(-1);
-              showTutorialHint("👆 点击下方「开始先攻」按钮，观察5位角色的行动顺序排列", 6000);
+              showTutorialHint("点击下方“投掷行动顺序”，观察每名角色的先攻结果。", 6000);
+            }}
+            onClose={() => {
+              setShowTutorialIntro(false);
+              advanceTutorialStep(-1);
+              showTutorialHint("点击下方“投掷行动顺序”，观察每名角色的先攻结果。", 6000);
             }}
           />
         )}
@@ -3034,11 +3193,16 @@ export function BattleTestScreen({
 
 function BattleTutorialIntro({
   intro,
-  onStart,
-}: {
-  intro: NonNullable<BattleConfig["tutorialIntro"]>;
-  onStart: () => void;
-}) {
+  step,
+  onPrevious,
+  onNext,
+  onClose,
+}: BattleTutorialCardProps) {
+  const item = intro.steps[step] ?? intro.steps[0];
+  const total = intro.steps.length;
+  const isFirst = step <= 0;
+  const isLast = step >= total - 1;
+
   return (
     <motion.section
       className="battle-tutorial-intro-backdrop"
@@ -3051,51 +3215,34 @@ function BattleTutorialIntro({
     >
       <motion.div
         className="battle-tutorial-intro"
-        initial={{ opacity: 0, scale: 0.96, y: 18 }}
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 18 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
       >
+        <div className="battle-tutorial-progress">
+          <i style={{ width: `${((step + 1) / total) * 100}%` }} />
+        </div>
         <header>
-          <div>
-            <p className="eyebrow">COMBAT BASICS</p>
-            <h2>{intro.title}</h2>
-            <small>{intro.subtitle}</small>
-          </div>
-          <button type="button" className="ghost-button" onClick={onStart}>
-            关闭说明
+          <span>COMBAT</span>
+          <button type="button" aria-label="关闭战斗教学" onClick={onClose}>
+            ×
           </button>
         </header>
 
-        <div className="battle-tutorial-grid">
-          <section className="battle-tutorial-steps">
-            {intro.steps.map((step, index) => (
-              <article key={step.title}>
-                <span>{index + 1}</span>
-                <div>
-                  <b>{step.title}</b>
-                  <p>{step.text}</p>
-                </div>
-              </article>
-            ))}
-          </section>
-
-          <aside className="battle-tutorial-enemies">
-            <b>小怪技能组</b>
-            {intro.enemySkills.map((enemy) => (
-              <section key={enemy.name}>
-                <span>{enemy.name}</span>
-                {enemy.skills.map((skill) => (
-                  <p key={skill}>{skill}</p>
-                ))}
-              </section>
-            ))}
-          </aside>
-        </div>
+        <small>{intro.subtitle}</small>
+        <h2>{item.title.replace(/^[①②③④⑤⑥⑦⑧]\s*/, "")}</h2>
+        <p>{item.text}</p>
 
         <footer>
-          <span>胜利条件：让三只裂隙爬兽的 HP 归 0。战斗结束后回到剧情。</span>
-          <button type="button" className="start-button" onClick={onStart}>
-            开始先攻
+          <button type="button" className="battle-tutorial-prev" disabled={isFirst} onClick={onPrevious}>
+            上一步
+          </button>
+          <em>
+            {step + 1} / {total}
+          </em>
+          <button type="button" className="battle-tutorial-next" onClick={onNext}>
+            {isLast ? "开始先攻" : "下一步"}
           </button>
         </footer>
       </motion.div>
@@ -3253,6 +3400,7 @@ function BattleModel({
   impacted,
   animationKey,
   effectKind = "slash",
+  feedback,
   onClick,
 }: {
   unit: BattleUnit;
@@ -3262,12 +3410,13 @@ function BattleModel({
   impacted: boolean;
   animationKey?: number;
   effectKind?: BattleFxKind;
+  feedback?: BattleAnimationCue["feedback"];
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`battle-combatant ${active ? "is-active" : ""} ${targetable ? "is-targetable" : ""} ${casting ? "is-casting" : ""} ${impacted ? "is-impacted" : ""} ${unit.hp <= 0 ? "is-defeated" : ""} ${unit.faction === "enemy" ? "is-enemy" : "is-ally"}`}
+      className={`battle-combatant ${active ? "is-active" : ""} ${targetable ? "is-targetable" : ""} ${casting ? "is-casting" : ""} ${impacted ? "is-impacted" : ""} ${feedback?.tone === "miss" ? "is-missed" : ""} ${unit.hp <= 0 ? "is-defeated" : ""} ${unit.faction === "enemy" ? "is-enemy" : "is-ally"}`}
       onClick={onClick}
       aria-label={unit.name}
     >
@@ -3299,6 +3448,15 @@ function BattleModel({
           <i />
           <i />
           <i />
+        </span>
+      )}
+      {feedback && (
+        <span
+          key={`feedback-${animationKey ?? unit.id}`}
+          className={`battle-floating-feedback is-${feedback.tone}`}
+          aria-hidden="true"
+        >
+          {feedback.text}
         </span>
       )}
       <span className="battle-combatant-info">
@@ -3409,12 +3567,12 @@ function UnitDetailModal({
             {unit.weaponMastery && (
               <div className="battle-stat-note">
                 <b>精通/资源</b>
-                <span>{unit.weaponMastery}</span>
+                <span>{formatCombatTextForPlayer(unit.weaponMastery)}</span>
               </div>
             )}
             <div className="battle-status-list">
               {unit.statuses.map((status) => (
-                <span key={status}>{status}</span>
+                <span key={status}>{formatCombatTextForPlayer(status)}</span>
               ))}
             </div>
           </section>
@@ -3436,10 +3594,10 @@ function UnitDetailModal({
           <section className="battle-detail-block battle-traits">
             <h2>规则画像</h2>
             {unit.traits.map((trait) => (
-              <span key={trait}>{trait}</span>
+              <span key={trait}>{formatCombatTextForPlayer(trait)}</span>
             ))}
             {unit.resourceProfile.map((profile) => (
-              <span key={profile}>{profile}</span>
+              <span key={profile}>{formatCombatTextForPlayer(profile)}</span>
             ))}
           </section>
 
@@ -3476,13 +3634,13 @@ function SkillCard({ skill, compact = true }: { skill: BattleSkill; compact?: bo
         <b>{skill.name}</b>
         <em>{skill.cooldown}</em>
       </div>
-      <small>{boldifyDiceNotation(skill.formula)}</small>
-      {!compact && <p>{boldifyDiceNotation(skill.effect)}</p>}
+      <small>{boldifyDiceNotation(formatSkillFormulaForPlayer(skill))}</small>
+      {!compact && <p>{boldifyDiceNotation(formatSkillEffectForPlayer(skill))}</p>}
       <div className="battle-skill-meta">
         <i>{skillNeedsRoll(skill) ? "需掷骰" : "无掷骰"}</i>
         <i>{skill.rule}</i>
         {skill.trigger && <i>{skill.trigger}</i>}
-        {skill.tags.map((tag) => (
+        {visibleSkillTags(skill).map((tag) => (
           <i key={tag}>{tag}</i>
         ))}
       </div>
@@ -3563,7 +3721,7 @@ function ActionPanel({
               >
                 <span>技能</span>
                 <b>{skill.name}</b>
-                <small>{boldifyDiceNotation(skill.formula)}</small>
+                <small>{boldifyDiceNotation(formatSkillFormulaForPlayer(skill))}</small>
                 <em>{skillTargetHint(skill)}</em>
               </button>
             );

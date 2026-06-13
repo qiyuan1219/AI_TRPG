@@ -16,6 +16,7 @@ export interface StoryLine {
   text: string;
   portrait?: string;
   bgImage?: string;
+  bgm?: string;
 }
 
 export interface SceneVisual {
@@ -36,6 +37,48 @@ export interface SceneBgStage {
 
 export interface GameState {
   [key: string]: any;
+  companionTrust?: Partial<Record<CompanionId, number>>;
+  trustLogs?: TrustLog[];
+  companionMemories?: CompanionMemory[];
+  se_trust?: number;
+  al_trust?: number;
+  sl_trust?: number;   // 布洛克(森洛)
+  kl_trust?: number;
+  trust_sl?: number;   // 瑟琳
+  trust_block?: number;
+  trust_al?: number;
+  trust_kl?: number;
+}
+
+export type CompanionId = 'serin' | 'ailin' | 'brock' | 'kaiya';
+
+export interface TrustChange {
+  companionId: CompanionId;
+  delta: number;
+  reason: string;
+  visibility: 'show' | 'hidden';
+}
+
+export interface CompanionMemory {
+  companionId: CompanionId;
+  memoryKey: string;
+  summary: string;
+  nodeId?: string;
+  createdAt?: string;
+}
+
+export interface TrustLog {
+  id: string;
+  nodeId: string;
+  companionId: CompanionId;
+  companionName: string;
+  oldValue: number;
+  delta: number;
+  newValue: number;
+  reason: string;
+  source: string;
+  visibility: 'show' | 'hidden';
+  createdAt: string;
 }
 
 export type SkillKind = 'combat' | 'noncombat' | 'support' | 'story';
@@ -101,7 +144,7 @@ export interface CreateGameResult {
   game_id: string;
   session_id?: string;
   opening: string;
-  opening_script?: Array<{ speaker: string; text: string; bgImage?: string }>;  // 固定开场脚本，speaker绝对正确
+  opening_script?: Array<{ speaker: string; text: string; bgImage?: string; bgm?: string }>;  // 固定开场脚本，speaker绝对正确
   opening_hints?: string[];                                    // 开场HINTS
   state: GameState;
 }

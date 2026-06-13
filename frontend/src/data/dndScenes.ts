@@ -10,7 +10,7 @@ export const DND_SCENES: SceneVisual[] = [
     backgroundImage: '/assets/scenes/01inverse-city-first-sight.webp',
     bgStages: [
       {
-        trigger: '你们没走多远，街尽头传来刺耳的金属刮擦声',
+        trigger: '你们刚离开主缆街口，前方忽然传来一阵刺耳的金属摩擦声',
         image: '/assets/scenes/02tutorial-battle-trigger.webp',
       },
       {
@@ -83,6 +83,7 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '九条秘银主缆垂向深渊',
     aliases: ['降渊缆梯', '缆梯', '缆梯中枢', '吊舱', '垂降'],
     themeClass: 'scene-maze',
+    backgroundImage: '/assets/scenes/elevator-hub.webp',
   },
   {
     id: 'spore-outpost',

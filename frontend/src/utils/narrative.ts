@@ -89,9 +89,48 @@ function findHintEnd(input: string, start: number) {
   return Math.min(squareEnd, chineseEnd);
 }
 
-function stripLooseHintArtifacts(text: string) {
+function collectHintItems(fragment: string, hints: string[]) {
+  fragment
+    .replace(/^[\s|\[\]\u3010\u3011]+|[\s|\[\]\u3010\u3011]+$/g, '')
+    .split('|')
+    .map((item) => item.trim().replace(/^[\s\[\]\u3010\u3011]+|[\s\[\]\u3010\u3011]+$/g, ''))
+    .filter((item) => item && !/^HINTS\s*[:：]?$/i.test(item))
+    .forEach((item) => hints.push(item));
+}
+
+function findLoosePipeHintStart(input: string) {
+  const leadingPipe = input.search(/^\s*\|/);
+  if (leadingPipe >= 0) return leadingPipe;
+
+  const afterSentence = input.search(/[。！？.!?」”"]\s*\|/);
+  if (afterSentence < 0) return -1;
+  const pipeOffset = input.slice(afterSentence).search(/\|/);
+  return pipeOffset < 0 ? -1 : afterSentence + pipeOffset;
+}
+
+function looksLikeActionSuggestionArtifact(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (HINT_START_RE.test(trimmed) || /\bHINTS\b/i.test(trimmed)) return true;
+
+  const pipeCount = (trimmed.match(/\|/g) || []).length;
+  const hasCheckMarker = /(?:DC|ＤＣ)\s*\d{1,3}|[\u3010\u3011]/i.test(trimmed);
+  return (trimmed.startsWith('|') || pipeCount >= 2) && hasCheckMarker;
+}
+
+function stripLooseHintArtifacts(text: string, hints: string[] = []) {
   const hintStart = findHintStart(text);
   if (hintStart >= 0) return text.slice(0, hintStart);
+
+  const loosePipeStart = findLoosePipeHintStart(text);
+  if (loosePipeStart >= 0) {
+    const fragment = text.slice(loosePipeStart);
+    if (looksLikeActionSuggestionArtifact(fragment)) {
+      collectHintItems(fragment, hints);
+      return text.slice(0, loosePipeStart);
+    }
+  }
+
   return text.replace(/\bHINTS\b\s*[:：].*$/i, '');
 }
 
@@ -115,7 +154,7 @@ export function extractHints(input: string): { text: string; suggestions: Action
   });
 
   return {
-    text: compactText(stripLooseHintArtifacts(text)),
+    text: compactText(stripLooseHintArtifacts(text, hints)),
     suggestions: makeSuggestions(hints),
   };
 }
@@ -257,6 +296,7 @@ function isPureSpeechAttribution(text: string) {
 }
 
 function pushNarration(segments: NarrativeSegment[], text: string, speaker: string) {
+  if (looksLikeActionSuggestionArtifact(text)) return;
   if (isPureSpeechAttribution(text)) return;
 
   const raw = text.trim();
@@ -273,6 +313,7 @@ function pushNarration(segments: NarrativeSegment[], text: string, speaker: stri
 
 function pushDialogue(segments: NarrativeSegment[], text: string, speaker: string) {
   const cleaned = text.trim();
+  if (looksLikeActionSuggestionArtifact(cleaned)) return;
   if (!cleaned) return;
   segments.push({ speaker, text: `"${cleaned}"` });
 }

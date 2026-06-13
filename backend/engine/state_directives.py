@@ -12,6 +12,12 @@ import json
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
+from engine.trust_system import (
+    apply_trust_changes,
+    canonicalize_trust_state,
+    resolve_companion_id,
+)
+
 
 @dataclass
 class Directive:
@@ -127,17 +133,28 @@ def _hp(state: dict, data: dict) -> dict:
 def _trust(state: dict, data: dict) -> dict:
     npc = str(data.get("npc", "")).strip()
     amount = _amount(data)
-    key = NPC_TRUST_KEYS.get(npc, f"{npc}_trust")
-    old = int(state.get(key, 50))
-    state[key] = max(0, min(100, old + amount))
-    return {
-        "type": "trust",
-        "npc": npc,
-        "old": old,
-        "new": state[key],
-        "change": amount,
-        "reason": data.get("reason", ""),
-    }
+    companion_id = (
+        data.get("companionId")
+        or resolve_companion_id(npc)
+        or resolve_companion_id(NPC_TRUST_KEYS.get(npc, ""))
+    )
+    if not companion_id:
+        return {"type": "unknown", "reason": f"未知同伴: {npc}"}
+    source = str(data.get("source") or "free_action")
+    return apply_trust_changes(
+        state,
+        [{
+            "companionId": companion_id,
+            "delta": amount,
+            "reason": data.get("reason", ""),
+            "visibility": data.get("visibility", "show"),
+            "source": source,
+        }],
+        {
+            "eventType": source,
+            "nodeId": data.get("nodeId") or state.get("currentNodeId") or state.get("current_area"),
+        },
+    )
 
 
 def _area(state: dict, data: dict) -> dict:
@@ -271,6 +288,7 @@ DIRECTIVE_HANDLERS: dict[str, ChangeHandler] = {
 
 
 def apply_directive(state: dict, directive: Directive | dict) -> dict:
+    canonicalize_trust_state(state)
     if isinstance(directive, Directive):
         name, data = directive.name, directive.data
     else:

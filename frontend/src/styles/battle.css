@@ -503,6 +503,11 @@
   filter: drop-shadow(0 0 24px rgba(239, 213, 140, 0.64)) drop-shadow(0 20px 18px rgba(0, 0, 0, 0.42));
 }
 
+.battle-combatant.is-impacted.is-missed .battle-sprite {
+  animation: battle-miss-dodge 520ms ease-out 1;
+  filter: drop-shadow(0 0 18px rgba(209, 213, 219, 0.36)) drop-shadow(0 20px 18px rgba(0, 0, 0, 0.42));
+}
+
 .battle-combatant.is-defeated {
   opacity: 0.48;
 }
@@ -1015,6 +1020,51 @@
   border: 0;
   background: radial-gradient(circle, rgba(209,213,219,0.32), transparent 64%);
   animation: battle-fx-fail 520ms ease-out 1 both;
+}
+
+.battle-floating-feedback {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  z-index: 12;
+  min-width: 76px;
+  padding: 4px 10px;
+  border: 1px solid rgba(231, 211, 161, 0.34);
+  border-radius: 8px;
+  background: rgba(7, 9, 13, 0.74);
+  color: #ffd36a;
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: 1.58rem;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 0;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.58), 0 0 18px rgba(255, 211, 106, 0.42);
+  transform: translateX(-50%);
+  animation: battle-feedback-rise 1150ms cubic-bezier(0.2, 0.85, 0.25, 1) 1 both;
+}
+
+.battle-floating-feedback.is-damage {
+  border-color: rgba(236, 95, 82, 0.46);
+  color: #ff7468;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.62), 0 0 18px rgba(236, 95, 82, 0.5);
+}
+
+.battle-floating-feedback.is-heal {
+  border-color: rgba(115, 198, 157, 0.5);
+  color: #8ce0b2;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.62), 0 0 18px rgba(115, 198, 157, 0.48);
+}
+
+.battle-floating-feedback.is-miss {
+  min-width: 88px;
+  border-color: rgba(209, 213, 219, 0.38);
+  color: #d1d5db;
+  font-size: 1.18rem;
+  font-family: Consolas, monospace;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.68), 0 0 16px rgba(209, 213, 219, 0.28);
+  animation-name: battle-feedback-miss;
 }
 
 .battle-sprite-adventurer .sprite-body {
@@ -1908,6 +1958,197 @@
   min-height: 40px;
 }
 
+/* First battle tutorial: centered in-game prompt, matching VN tutorial cards. */
+.battle-tutorial-intro-backdrop {
+  background:
+    radial-gradient(circle at 50% 44%, rgba(95, 183, 167, 0.14), transparent 36%),
+    rgba(0, 0, 0, 0.66);
+  backdrop-filter: blur(2px);
+}
+
+.battle-tutorial-intro {
+  width: min(460px, calc(100vw - 40px));
+  max-height: none;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background:
+    linear-gradient(180deg, rgba(18, 21, 28, 0.96), rgba(10, 12, 16, 0.96)),
+    rgba(13, 17, 22, 0.94);
+  box-shadow: 0 28px 76px rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(14px);
+}
+
+.battle-tutorial-progress {
+  height: 3px;
+  background: rgba(231, 211, 161, 0.1);
+}
+
+.battle-tutorial-progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-soft), var(--teal));
+  transition: width 180ms ease;
+}
+
+.battle-tutorial-intro header {
+  align-items: center;
+  gap: 12px;
+  padding: 18px 18px 0;
+  border-bottom: 0;
+}
+
+.battle-tutorial-intro header span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 70px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(95, 183, 167, 0.42);
+  border-radius: 6px;
+  background: rgba(95, 183, 167, 0.12);
+  color: var(--teal);
+  font-family: Consolas, monospace;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.battle-tutorial-intro header button {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid rgba(231, 211, 161, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.battle-tutorial-intro > small {
+  margin: 10px 24px 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.battle-tutorial-intro h2 {
+  margin: 14px 18px 0;
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: 1.18rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.battle-tutorial-intro > p {
+  min-height: 92px;
+  margin: 14px 24px 20px;
+  color: var(--text);
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.battle-tutorial-intro footer {
+  display: grid;
+  grid-template-columns: minmax(92px, 1fr) 48px minmax(92px, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(231, 211, 161, 0.14);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.battle-tutorial-intro footer em {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 0.86rem;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
+}
+
+.battle-tutorial-intro footer button {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.battle-tutorial-prev {
+  border: 1px solid rgba(231, 211, 161, 0.24);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+}
+
+.battle-tutorial-next {
+  border: 1px solid rgba(239, 213, 140, 0.52);
+  background: linear-gradient(180deg, #c99a37, #8f6723);
+  color: #fff7df;
+  box-shadow: 0 8px 24px rgba(212, 168, 67, 0.18);
+}
+
+.battle-tutorial-intro button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.battle-tutorial-intro button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.tutorial-step-hint {
+  position: fixed;
+  right: 24px;
+  top: 96px;
+  z-index: 110;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  width: min(420px, calc(100vw - 48px));
+  gap: 8px 12px;
+  padding: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(18, 21, 28, 0.96), rgba(10, 12, 16, 0.96)),
+    rgba(13, 17, 22, 0.94);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(14px);
+}
+
+.tutorial-step-hint span {
+  color: var(--gold-soft);
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.tutorial-step-hint p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.tutorial-step-hint button {
+  width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid rgba(231, 211, 161, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
 .battle-log-panel {
   position: absolute;
   left: 24px;
@@ -2541,6 +2782,51 @@
   }
   100% {
     transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes battle-miss-dodge {
+  0% { transform: translateX(0) translateY(0); }
+  35% { transform: translateX(12px) translateY(-4px); }
+  72% { transform: translateX(-4px) translateY(1px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+
+@keyframes battle-feedback-rise {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(18px) scale(0.78);
+  }
+  16% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.1);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-30px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-52px) scale(0.92);
+  }
+}
+
+@keyframes battle-feedback-miss {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.86) rotate(-2deg);
+  }
+  18% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-4px) scale(1.05) rotate(1deg);
+  }
+  68% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-22px) scale(1) rotate(-1deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-40px) scale(0.94) rotate(0);
   }
 }
 

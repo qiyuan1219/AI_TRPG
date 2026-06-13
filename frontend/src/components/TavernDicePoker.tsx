@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
+import { TutorialOverlay } from './TutorialOverlay';
+import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
 
-type Phase = 'prep' | 'skill_result' | 'rolling' | 'play' | 'round_result' | 'plead' | 'final';
+type Phase = 'prep' | 'skill_result' | 'ready' | 'rolling' | 'play' | 'round_result' | 'plead' | 'final';
 type SkillChoice = 'peek' | 'persuade' | 'none';
 type RoundOutcome = 'win' | 'tie' | 'lose';
 
@@ -35,23 +37,24 @@ export interface TavernDicePokerResult {
 }
 
 interface TavernDicePokerProps {
+  gold?: number;
   onClose: () => void;
   onComplete?: (result: TavernDicePokerResult) => void;
 }
 
 const SELIN_INT = 4;
 const SELIN_CHA = 3;
+const ROUND_LIMIT = 3;
 const BASE_REROLLS = 3;
-const STARTING_STAKE = 50;
-const DIE_PIPS = [
-  [],
-  [4],
-  [0, 8],
-  [0, 4, 8],
-  [0, 2, 6, 8],
-  [0, 2, 4, 6, 8],
-  [0, 2, 3, 5, 6, 8],
-];
+const BASE_STAKE = 50;
+const PIPS: Record<number, number[]> = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8],
+};
 
 function rollDie(sides = 6) {
   return Math.floor(Math.random() * sides) + 1;
@@ -71,6 +74,7 @@ function scoreHand(dice: number[]): HandScore {
   const counts = [...countDice(dice).values()].sort((a, b) => b - a);
   const sorted = [...dice].sort((a, b) => a - b).join('');
   const sum = dice.reduce((total, die) => total + die, 0);
+
   if (counts[0] === 5) return { rank: 8, points: 800 + sum, label: '五骰同点' };
   if (sorted === '12345' || sorted === '23456') return { rank: 7, points: 700 + sum, label: '大顺' };
   if (counts[0] === 4) return { rank: 6, points: 600 + sum, label: '四骰同点' };
@@ -81,53 +85,111 @@ function scoreHand(dice: number[]): HandScore {
   return { rank: 1, points: sum, label: '散点' };
 }
 
-function compareHands(a: number[], b: number[]): RoundOutcome {
-  const player = scoreHand(a);
-  const salo = scoreHand(b);
+function compareHands(playerDice: number[], saloDice: number[]): RoundOutcome {
+  const player = scoreHand(playerDice);
+  const salo = scoreHand(saloDice);
   if (player.points > salo.points) return 'win';
   if (player.points < salo.points) return 'lose';
   return 'tie';
 }
 
-function chooseAdvice(playerDice: number[], visibleSaloDice: Array<number | null>) {
-  const counts = countDice(playerDice);
-  const bestGroup = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
-  const visible = visibleSaloDice.filter((die): die is number => die !== null);
-  const visibleText = visible.length ? `已看见萨洛 ${visible.length} 枚骰：${visible.join('、')}。` : '萨洛的骰面仍然藏着。';
-  if (bestGroup?.[1] >= 3) {
-    return `${visibleText} 瑟琳建议保留所有 ${bestGroup[0]}，只重掷散骰，争取四同或葫芦。`;
-  }
-  if (bestGroup?.[1] === 2) {
-    return `${visibleText} 瑟琳建议保留对子和高点骰，别为了小顺拆掉已经成形的点数。`;
-  }
-  const keep = playerDice.map((die, index) => ({ die, index })).filter(({ die }) => die >= 5).map(({ index }) => index + 1);
-  return `${visibleText} 你手里还没成型，瑟琳建议先留 ${keep.length ? `第 ${keep.join('、')} 枚高点骰` : '一到两枚最高点'}，其余重掷。`;
+function chooseKeepIndexes(dice: number[]) {
+  const counts = [...countDice(dice).entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+  const [bestValue, bestCount] = counts[0] ?? [6, 1];
+  if (bestCount >= 2) return dice.map((die, index) => (die === bestValue ? index : -1)).filter((index) => index >= 0);
+
+  const high = dice.map((die, index) => (die >= 5 ? index : -1)).filter((index) => index >= 0);
+  if (high.length) return high;
+  const max = Math.max(...dice);
+  return [dice.findIndex((die) => die === max)];
 }
 
 function improveOpponentHand(dice: number[]) {
-  const counts = countDice(dice);
-  const best = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] ?? 6;
-  return dice.map((die) => {
-    if (die === best || die >= 5) return die;
-    return Math.random() < 0.65 ? rollDie() : die;
-  });
+  const keep = new Set(chooseKeepIndexes(dice));
+  return dice.map((die, index) => (keep.has(index) ? die : rollDie()));
 }
 
-function PipDie({ value, hidden = false, selected = false, onClick }: { value: number; hidden?: boolean; selected?: boolean; onClick?: () => void }) {
+function getPeekCount(total: number) {
+  if (total < 10) return 0;
+  if (total <= 12) return 1;
+  if (total <= 15) return 2;
+  if (total <= 18) return 3;
+  if (total <= 20) return 4;
+  return 5;
+}
+
+function getPersuadeBonus(total: number) {
+  if (total < 13) return 0;
+  if (total <= 16) return 1;
+  return 2;
+}
+
+function formatDice(dice: number[]) {
+  return dice.join(' ');
+}
+
+function buildAdvice(playerDice: number[], visibleSaloDice: Array<number | null>, rerollsLeft: number) {
+  if (!playerDice.length) return '点击开始投掷后，瑟琳会根据你的骰面与已透露的萨洛骰面给出建议。';
+
+  const score = scoreHand(playerDice);
+  const keep = chooseKeepIndexes(playerDice);
+  const keepText = keep.map((index) => `第${index + 1}枚`).join('、');
+  const visible = visibleSaloDice.filter((die): die is number => die !== null);
+  const saloText = visible.length
+    ? `已知萨洛骰面：${visible.join('、')}。`
+    : '萨洛的未透露骰面仍不可见。';
+
+  if (rerollsLeft <= 0) return `${saloText} 你现在是${score.label}，重投次数已用完，建议直接提交。`;
+  if (score.rank >= 5) return `${saloText} 你现在是${score.label}，牌型已经很强，建议保留全部或只谨慎重投一枚低点骰。`;
+  if (score.rank >= 3) return `${saloText} 你现在是${score.label}，建议保留成型骰和高点骰，尝试冲三同、四同或葫芦。`;
+  return `${saloText} 你现在是${score.label}，建议保留${keepText || '最高点'}，重投其余骰子寻找对子或顺子。`;
+}
+
+function createSkillDice(label: string, roll: number, bonus: number, dc: number, success: boolean): DiceResult {
+  return {
+    type: 'skill_check',
+    data: {
+      骰子: 'D20',
+      掷骰: `D20=${roll}`,
+      加值: bonus,
+      总计: roll + bonus,
+      DC: dc,
+      成功: success,
+      属性: label,
+    },
+  };
+}
+
+function DieFace({
+  value,
+  hidden = false,
+  selected = false,
+  rolling = false,
+  disabled = false,
+  onClick,
+}: {
+  value?: number;
+  hidden?: boolean;
+  selected?: boolean;
+  rolling?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  const shownValue = value ?? 1;
   return (
     <button
       type="button"
-      className={`tavern-die ${selected ? 'selected' : ''} ${hidden ? 'hidden' : ''}`}
+      className={`tavern-die ${selected ? 'selected' : ''} ${hidden ? 'hidden' : ''} ${rolling ? 'rolling' : ''}`}
+      disabled={disabled || hidden || !onClick}
       onClick={onClick}
-      disabled={hidden || !onClick}
-      aria-label={hidden ? '隐藏骰子' : `${value}点`}
+      aria-label={hidden ? '隐藏骰面' : `${shownValue}点`}
     >
       {hidden ? (
-        <span className="die-dots">?</span>
+        <span className="tavern-die-hidden">?</span>
       ) : (
-        <span className="die-dots" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, width: 46, height: 46 }}>
-          {Array.from({ length: 9 }, (_, i) => (
-            <span key={i} style={{ width: 8, height: 8, borderRadius: 999, background: DIE_PIPS[value].includes(i) ? 'currentColor' : 'transparent', alignSelf: 'center', justifySelf: 'center' }} />
+        <span className="tavern-die-grid">
+          {Array.from({ length: 9 }, (_, index) => (
+            <i key={index} className={PIPS[shownValue]?.includes(index) ? 'filled' : ''} />
           ))}
         </span>
       )}
@@ -135,14 +197,55 @@ function PipDie({ value, hidden = false, selected = false, onClick }: { value: n
   );
 }
 
-export function TavernDicePoker({ onClose, onComplete }: TavernDicePokerProps) {
+function RulePanel() {
+  return (
+    <aside className="tavern-rule-panel">
+      <h3>规则说明</h3>
+      <p>三局为限，每局先下注50G。每局初始有3次重投机会。</p>
+      <p>透视与说服各只能使用一次。透视只显示已成功看见的萨洛骰面，未透露骰面不会参与建议。</p>
+      <p>胜1局获得三位队友情报。胜2局或3局，额外获得100G与云苓情报。</p>
+    </aside>
+  );
+}
+
+const TAVERN_DICE_TUTORIAL: TutorialStep[] = [
+  {
+    title: '基本规则',
+    body: '每局你和萨洛各掷五枚骰子。你可以重投任意骰子（最多3次，说服成功增加次数），保留满意的骰面，最终提交一副5骰牌型与萨洛比大小。牌型越高、单骰点数越大，总分越高。',
+    badge: '快艇骰子',
+  },
+  {
+    title: '瑟琳技能① · 透视',
+    body: '每场游戏限用一次。瑟琳对你使用D20检定（INT+3 vs DC10），成功后可看见萨洛部分骰面：≤9=0枚，10~12=1枚，13~15=2枚，16~18=3枚，19~20=4枚，≥20大成功=5枚全揭示。已知骰面会帮助瑟琳提出更精准的策略建议。',
+    badge: 'INT DC10',
+  },
+  {
+    title: '瑟琳技能② · 说服',
+    body: '每场游戏限用一次。瑟琳对萨洛使用魅力检定（CHA+1 vs DC13），成功可为当前局争取额外重投次数：≤12=0次，13~16=+1次，17+=+2次。大成功则翻倍生效。',
+    badge: 'CHA DC13',
+  },
+  {
+    title: '牌型一览（低→高）',
+    body: '散点：无组合，纯点数总和。\n一对（如 2·2·3·5·6）：200分+总和。\n两对（如 2·2·4·4·6）：300分+总和。\n三同点（如 3·3·3·1·5）：400分+总和。\n葫芦·三同+一对（如 3·3·3·5·5）：500分+总和。\n四同点（如 4·4·4·4·2）：600分+总和。\n大顺·1~5或2~6（如 1·2·3·4·5）：700分+总和。\n五同点（如 6·6·6·6·6）：800分+总和。',
+    badge: '牌型',
+  },
+  {
+    title: '高分策略',
+    body: '优先保留已有的对子/三同，重投散点。两对时可冲葫芦（留两对中最高的）、三同时可冲四同或葫芦。顺子听牌（如1·2·3·4·X）值得赌。如果瑟琳透视到萨洛牌型很强，可优先用说服争取重投次数再冲刺。每局重投有限，提交前务必确认是否还有提升空间。',
+    badge: '策略',
+  },
+];
+
+export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDicePokerProps) {
   const [phase, setPhase] = useState<Phase>('prep');
   const [round, setRound] = useState(1);
-  const [stake, setStake] = useState(STARTING_STAKE);
+  const [stake, setStake] = useState(BASE_STAKE);
   const [spent, setSpent] = useState(0);
+  const [earnings, setEarnings] = useState(0);
   const [wins, setWins] = useState(0);
   const [peekUsed, setPeekUsed] = useState(false);
   const [persuadeUsed, setPersuadeUsed] = useState(false);
+  const [pleadUsed, setPleadUsed] = useState(false);
   const [peekCount, setPeekCount] = useState(0);
   const [persuadeBonus, setPersuadeBonus] = useState(0);
   const [rerollsLeft, setRerollsLeft] = useState(BASE_REROLLS);
@@ -150,70 +253,86 @@ export function TavernDicePoker({ onClose, onComplete }: TavernDicePokerProps) {
   const [saloDice, setSaloDice] = useState<number[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [records, setRecords] = useState<RoundRecord[]>([]);
-  const [message, setMessage] = useState('萨洛把五颗骨白色骰子推到桌面中央。每局押金50G，赢下一局就能拿到完整情报；赢两局以上，他还会额外给你们一份黑市药剂商的线索。');
-  const [canStart, setCanStart] = useState(true);
+  const [message, setMessage] = useState('萨洛把五枚骨白色骰子推到桌面中央。每局下注50G，三局为限。赢一局，他说出三名队友的完整情报；赢两局以上，他还会追加一条黑市药剂商的线索。');
   const [skillDice, setSkillDice] = useState<DiceResult | null>(null);
   const [rolling, setRolling] = useState(false);
   const [final, setFinal] = useState<TavernDicePokerResult | null>(null);
+  const [tutorialStep, setTutorialStep] = useState(-1);
 
   const visibleSaloDice = useMemo(
     () => saloDice.map((die, index) => (index < peekCount ? die : null)),
     [saloDice, peekCount],
   );
-  const advice = useMemo(() => (playerDice.length ? chooseAdvice(playerDice, visibleSaloDice) : ''), [playerDice, visibleSaloDice]);
+  const advice = useMemo(
+    () => buildAdvice(playerDice, visibleSaloDice, rerollsLeft),
+    [playerDice, rerollsLeft, visibleSaloDice],
+  );
   const lastRecord = records[records.length - 1];
+  const availableGold = gold - spent + earnings;
+  const projectedGold = availableGold - (phase === 'prep' || phase === 'skill_result' || phase === 'ready' ? stake : 0);
+  const canAffordRound = projectedGold >= 0;
+  const canBuyInfo = availableGold >= 50;
 
-  function showSkillRoll(label: string, roll: number, bonus: number, dc: number, success: boolean) {
-    setSkillDice({
-      type: 'skill_check',
-      data: {
-        骰子: 'D20',
-        掷骰: `D20=${roll}`,
-        加值: bonus,
-        总计: roll + bonus,
-        DC: dc,
-        成功: success,
-        属性: label,
-      },
-    });
+  function resetRoundState(nextRound: number, nextStake: number) {
+    setRound(nextRound);
+    setStake(nextStake);
+    setPeekCount(0);
+    setPersuadeBonus(0);
+    setRerollsLeft(BASE_REROLLS);
+    setPlayerDice([]);
+    setSaloDice([]);
+    setSelected(new Set());
+    setPhase('prep');
+    setMessage(`第${nextRound}局准备开始。萨洛敲了敲桌面，示意先把${nextStake}G押到桌上。`);
   }
 
-  function prepareSkill(choice: SkillChoice) {
-    setCanStart(false);
+  function useSkill(choice: SkillChoice) {
     if (choice === 'none') {
       setPeekCount(0);
       setPersuadeBonus(0);
-      setMessage(`第${round}局准备开始。瑟琳收回银杖，让骰杯里的声音保持原样。`);
-      setPhase('skill_result');
-      window.setTimeout(() => setCanStart(true), 1000);
+      setPhase('ready');
+      setMessage('瑟琳收回银杖，轻声说：「那就按普通规则来。我会只根据你能看到的骰面给建议。」');
       return;
     }
 
     const roll = rollDie(20);
+
     if (choice === 'peek') {
       const total = roll + SELIN_INT;
-      const revealed = total < 10 ? 0 : total <= 12 ? 1 : total <= 15 ? 2 : total <= 18 ? 3 : total <= 20 ? 4 : 5;
+      const revealed = getPeekCount(total);
       setPeekUsed(true);
       setPeekCount(revealed);
-      setMessage(revealed === 0
-        ? `D20=${roll}+${SELIN_INT}=${total}。银杖的光被酒馆铜铃反射打散，瑟琳没能看清萨洛的骰面。`
-        : `D20=${roll}+${SELIN_INT}=${total}。瑟琳的银杖微微发亮，本局开始后可看见萨洛 ${revealed} 枚骰。`);
-      showSkillRoll('瑟琳·透视骰面', roll, SELIN_INT, 10, revealed > 0);
-    } else {
-      const total = roll + SELIN_CHA;
-      const bonus = total < 13 ? 0 : total <= 16 ? 1 : 2;
-      setPersuadeUsed(true);
-      setPersuadeBonus(bonus);
-      setMessage(bonus === 0
-        ? `D20=${roll}+${SELIN_CHA}=${total}。萨洛笑着敲了敲杯沿：「规矩就是规矩，小姑娘。」本局没有额外重掷。`
-        : `D20=${roll}+${SELIN_CHA}=${total}。萨洛被瑟琳说得挑了挑眉，本局额外获得 ${bonus} 次重掷机会。`);
-      showSkillRoll('瑟琳·银杖说服', roll, SELIN_CHA, 13, bonus > 0);
+      setSkillDice(createSkillDice('瑟琳透视', roll, SELIN_INT, 10, revealed > 0));
+      setPhase('skill_result');
+      if (revealed === 0) {
+        setMessage(`D20=${roll}+${SELIN_INT}=${total}。瑟琳低声说：「老板盯得紧，这一局我无法获得任何信息。」`);
+      } else if (revealed === 5) {
+        setMessage(`D20=${roll}+${SELIN_INT}=${total}。瑟琳眼底银光一闪：「大成功，我能看到萨洛的所有骰子。」`);
+      } else {
+        setMessage(`D20=${roll}+${SELIN_INT}=${total}。瑟琳贴近你耳侧：「我能看清萨洛的${revealed}枚骰子，其余还被杯影挡着。」`);
+      }
+      window.setTimeout(() => setPhase('ready'), 1000);
+      return;
     }
+
+    const total = roll + SELIN_CHA;
+    const bonus = getPersuadeBonus(total);
+    setPersuadeUsed(true);
+    setPersuadeBonus(bonus);
+    setSkillDice(createSkillDice('瑟琳说服', roll, SELIN_CHA, 13, bonus > 0));
     setPhase('skill_result');
-    window.setTimeout(() => setCanStart(true), 1000);
+    if (bonus === 0) {
+      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛笑着摇头：「规矩就是规矩，银杖小姐。」`);
+    } else if (bonus === 1) {
+      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛挑眉：「行，看在银杖的面子上，多给你一次机会。」`);
+    } else {
+      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛微微摇了摇头：「看在银杖的面子上，多给你两次机会吧。」`);
+    }
+    window.setTimeout(() => setPhase('ready'), 1000);
   }
 
   function startRound() {
+    if (!canAffordRound || rolling) return;
     setSpent((value) => value + stake);
     setRerollsLeft(BASE_REROLLS + persuadeBonus);
     setSelected(new Set());
@@ -221,16 +340,17 @@ export function TavernDicePoker({ onClose, onComplete }: TavernDicePokerProps) {
     setSaloDice([]);
     setRolling(true);
     setPhase('rolling');
-    setMessage(`第${round}局押下 ${stake}G。骰杯同时扣下，桌边的铜铃轻轻一响。`);
+    setMessage(`第${round}局下注${stake}G。你和萨洛同时扣下骰杯，木桌下方传来沉闷的滚动声。`);
     window.setTimeout(() => {
       setPlayerDice(rollDice(5));
       setSaloDice(rollDice(5));
       setRolling(false);
       setPhase('play');
-    }, 850);
+    }, 900);
   }
 
   function toggleDie(index: number) {
+    if (phase !== 'play' || rolling) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(index)) next.delete(index);
@@ -240,42 +360,49 @@ export function TavernDicePoker({ onClose, onComplete }: TavernDicePokerProps) {
   }
 
   function rerollUnselected() {
-    if (rerollsLeft <= 0 || rolling) return;
+    if (phase !== 'play' || rerollsLeft <= 0 || rolling) return;
+    const kept = new Set(selected);
     setRolling(true);
-    setMessage('骰子在杯底乱撞。萨洛也扣住自己的骰杯，像是在和某个坏习惯谈判。');
+    setMessage('你把未保留的骰子重新扣进杯里。萨洛也眯起眼，挑走几枚骰子重投。');
     window.setTimeout(() => {
-      setPlayerDice((dice) => dice.map((die, index) => (selected.has(index) ? die : rollDie())));
+      setPlayerDice((dice) => dice.map((die, index) => (kept.has(index) ? die : rollDie())));
       setSaloDice((dice) => improveOpponentHand(dice));
       setRerollsLeft((value) => value - 1);
       setSelected(new Set());
       setRolling(false);
-    }, 700);
+    }, 760);
   }
 
   function submitRound() {
+    if (!playerDice.length || !saloDice.length) return;
     const result = compareHands(playerDice, saloDice);
     const playerScore = scoreHand(playerDice);
     const saloScore = scoreHand(saloDice);
     const nextWins = result === 'win' ? wins + 1 : wins;
     const record: RoundRecord = { round, stake, result, playerDice, saloDice, playerScore, saloScore };
-    setRecords((prev) => [...prev, record]);
     setWins(nextWins);
+    setRecords((prev) => [...prev, record]);
     setPhase('round_result');
     setMessage(result === 'win'
-      ? `你以「${playerScore.label}」压过萨洛的「${saloScore.label}」。萨洛吹了声短哨，把酒杯推远了一点。`
+      ? `你以「${playerScore.label}」压过萨洛的「${saloScore.label}」。萨洛吹了声短哨，把你的赢注推回桌边。`
       : result === 'tie'
         ? `你和萨洛同为「${playerScore.label}」。萨洛摊开手：「平局不算赢，但也不算难看。」`
         : `你的「${playerScore.label}」输给萨洛的「${saloScore.label}」。他把骰子一颗颗排齐，笑得很慢。`);
   }
 
-  function completeGame(rawWins: number, extraSpent = 0, paidInfo = false, earnings = 0) {
-    const effectiveWins = Math.max(rawWins, paidInfo ? 1 : 0);
+  function finishGame(
+    rawWins: number,
+    options: { extraSpent?: number; paidInfo?: boolean; extraEarnings?: number; effectiveWins?: number } = {},
+  ) {
+    const paidInfo = Boolean(options.paidInfo);
+    const finalEarnings = earnings + (options.extraEarnings ?? 0);
+    const effectiveWins = Math.max(rawWins, options.effectiveWins ?? 0, paidInfo ? 1 : 0);
     const gift = rawWins >= 2 ? 100 : 0;
     const result: TavernDicePokerResult = {
       wins: rawWins,
       effectiveWins,
-      spent: spent + extraSpent,
-      earnings,
+      spent: spent + (options.extraSpent ?? 0),
+      earnings: finalEarnings,
       gift,
       paidInfo,
       yunlingUnlocked: rawWins >= 2,
@@ -284,42 +411,43 @@ export function TavernDicePoker({ onClose, onComplete }: TavernDicePokerProps) {
     setFinal(result);
     setPhase('final');
     setMessage(rawWins >= 2
-      ? '萨洛承认你们赢得漂亮，除了三名队友的情报，还额外给出黑市药剂商云苓的线索，并拍出100G作为彩头。'
+      ? '萨洛承认你赢得漂亮。除了三名队友的情报，他还拍出100G见面礼，并压低声音提到黑市深处的药剂商云苓。'
+      : effectiveWins >= 1
+        ? '萨洛收起骰子，承认这局情报交易可以按一胜结算。三名队友的信息会给，但云苓的额外线索仍然只属于真正赢下两局以上的人。'
       : '萨洛收起骰子。无论输赢，情报都会给，只是这张桌子会记住你们今晚的手气。');
-    onComplete?.(result);
   }
 
-  function nextRound(doubleStake: boolean) {
-    if (round >= 3) {
-      if (wins > 0) completeGame(wins);
+  function continueAfterRound(doubleStake: boolean) {
+    if (round >= ROUND_LIMIT) {
+      if (wins > 0) finishGame(wins);
       else setPhase('plead');
       return;
     }
-    setRound((value) => value + 1);
-    setStake(doubleStake ? stake * 2 : STARTING_STAKE);
-    setPeekCount(0);
-    setPersuadeBonus(0);
-    setPlayerDice([]);
-    setSaloDice([]);
-    setSelected(new Set());
-    setCanStart(true);
-    setPhase('prep');
-    setMessage(doubleStake
-      ? `萨洛把筹码推高到 ${stake * 2}G。「翻倍，胆子不错。下一局别眨眼。」`
-      : '你暂时收住筹码，继续下一局。瑟琳站在你身侧，银杖光芒压得很低。');
+    resetRoundState(round + 1, doubleStake ? stake * 2 : BASE_STAKE);
+  }
+
+  function cashOutAfterWin() {
+    const payout = stake * 2;
+    setEarnings((value) => value + payout);
+    finishGame(wins, { extraEarnings: payout });
   }
 
   function plead() {
+    if (pleadUsed) return;
+    setPleadUsed(true);
     const roll = rollDie(20);
     const total = roll + SELIN_CHA;
-    showSkillRoll('瑟琳·低声求情', roll, SELIN_CHA, 15, total > 15);
-    if (total > 15) {
-      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。瑟琳没有替你们找借口，只是提醒萨洛：下孢海的人少一个都可能回不来。萨洛沉默片刻，算你们取得一次有效情报胜利。`);
-      window.setTimeout(() => completeGame(1, 0, false), 900);
+    const success = total > 15;
+    setSkillDice(createSkillDice('瑟琳求情', roll, SELIN_CHA, 15, success));
+    if (success) {
+      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。瑟琳没有替你们找借口，只提醒萨洛：下孢海的人少一个都可能回不来。萨洛沉默片刻，算你们取得一次有效情报胜利。`);
+      window.setTimeout(() => finishGame(0, { effectiveWins: 1 }), 900);
     } else {
-      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛摇头：「规矩不能每次都软。」你们必须支付50G买下情报。`);
+      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛摇头：「规矩不能每次都软。」你们只能花50G购买情报。`);
     }
   }
+
+  const canStart = phase === 'ready' || phase === 'skill_result';
 
   return (
     <motion.div
@@ -327,116 +455,177 @@ export function TavernDicePoker({ onClose, onComplete }: TavernDicePokerProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={phase === 'final' ? onClose : undefined}
     >
-      <motion.div
+      <motion.section
         className="tavern-dice-modal"
-        initial={{ opacity: 0, scale: 0.92 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.92 }}
-        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="回声酒馆快艇骰子"
+        initial={{ opacity: 0, scale: 0.94, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 16 }}
       >
-        <div className="tavern-dice-header">
-          <span>快艇骰子 · 萨洛的情报桌</span>
-          <small>第{round}/3局 · {wins}胜 · 押金{stake}G</small>
-          <button type="button" onClick={onClose} className="tavern-dice-close">x</button>
-        </div>
-
-        <div className="tavern-dice-narrative">{message}</div>
-
-        {phase === 'prep' && (
-          <div className="tavern-skill-zone">
-            <p>瑟琳看向你，等你决定这一局是否动用她的帮助。透视和说服各只能使用一次。</p>
-            <div className="tavern-skill-buttons">
-              <button type="button" disabled={peekUsed} onClick={() => prepareSkill('peek')} className="tavern-skill-btn peek-btn">
-                使用透视
-                {peekUsed && '（已用）'}
-              </button>
-              <button type="button" disabled={persuadeUsed} onClick={() => prepareSkill('persuade')} className="tavern-skill-btn persuade-btn">
-                说服萨洛
-                {persuadeUsed && '（已用）'}
-              </button>
-              <button type="button" onClick={() => prepareSkill('none')} className="tavern-skill-btn skip-btn">不用技能</button>
-            </div>
+        <header className="tavern-dice-header">
+          <div>
+            <span>回声酒馆 · 快艇骰子</span>
+            <small>第 {round}/3 局 · 已胜 {wins} 局 · 当前下注 {stake}G</small>
           </div>
-        )}
-
-        {phase === 'skill_result' && (
-          <div className="tavern-round-end">
-            <button type="button" disabled={!canStart} onClick={startRound} className="tavern-btn tavern-btn-gold">
-              开始本局
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button type="button" className="tavern-dice-close" style={{ background: 'rgba(95,183,167,0.15)', border: '1px solid rgba(95,183,167,0.3)', borderRadius: 6, color: '#5fb7a7', fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer' }} onClick={() => setTutorialStep(0)}>
+              ? 规则说明
+            </button>
+            <button type="button" className="tavern-dice-close" onClick={onClose} aria-label="关闭快艇骰子">
+              x
             </button>
           </div>
-        )}
+        </header>
 
-        {(phase === 'rolling' || phase === 'play') && (
-          <div className="tavern-game-zone">
-            <div className="tavern-opponent-info">{phase === 'rolling' || rolling ? '骰杯正在震动...' : advice}</div>
-            <div className="tavern-dice-row">
-              <strong>你</strong>
-              {playerDice.length === 0
-                ? Array.from({ length: 5 }, (_, i) => <PipDie key={i} value={1} hidden />)
-                : playerDice.map((die, index) => (
-                    <PipDie key={index} value={die} selected={selected.has(index)} onClick={() => toggleDie(index)} />
-                  ))}
-            </div>
-            <div className="tavern-dice-row">
-              <strong>萨洛</strong>
-              {saloDice.length === 0
-                ? Array.from({ length: 5 }, (_, i) => <PipDie key={i} value={1} hidden />)
-                : saloDice.map((die, index) => (
-                    <PipDie key={index} value={die} hidden={visibleSaloDice[index] === null} />
-                  ))}
-            </div>
-            <div className="tavern-reroll-buttons">
-              <button type="button" disabled={rolling || rerollsLeft <= 0} onClick={rerollUnselected} className="tavern-btn">
-                重掷未保留骰（{rerollsLeft}）
-              </button>
-              <button type="button" disabled={rolling || playerDice.length === 0} onClick={submitRound} className="tavern-btn tavern-btn-gold">
-                提交本局
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="tavern-dice-board">
+          <div className="tavern-action-zone">
+            {phase === 'prep' && (
+              <>
+                <button type="button" className="tavern-tool-btn" disabled={peekUsed || !canAffordRound} onClick={() => useSkill('peek')}>
+                  使用透视
+                </button>
+                <button type="button" className="tavern-tool-btn" disabled={persuadeUsed || !canAffordRound} onClick={() => useSkill('persuade')}>
+                  说服萨洛
+                </button>
+                <button type="button" className="tavern-tool-btn primary" disabled={!canAffordRound} onClick={() => useSkill('none')}>
+                  不使用技能
+                </button>
+              </>
+            )}
 
-        {phase === 'round_result' && lastRecord && (
-          <div className="tavern-round-end">
-            <p>
-              你：{lastRecord.playerDice.join(' ')}（{lastRecord.playerScore.label}）
-              {' '}vs 萨洛：{lastRecord.saloDice.join(' ')}（{lastRecord.saloScore.label}）
-            </p>
-            {lastRecord.result === 'win' ? (
-              <div className="tavern-plead-buttons">
-                <button type="button" onClick={() => completeGame(wins, 0, false, stake * 2)} className="tavern-btn tavern-btn-gold">收下筹码并结束游戏</button>
-                {round < 3 && <button type="button" onClick={() => nextRound(true)} className="tavern-btn">翻倍进入下一局</button>}
-              </div>
-            ) : (
-              <button type="button" onClick={() => nextRound(false)} className="tavern-btn tavern-btn-gold">
-                {round >= 3 ? '查看最终结果' : '进入下一局'}
+            {(phase === 'ready' || phase === 'skill_result') && (
+              <button type="button" className="tavern-tool-btn primary" disabled={!canStart || !canAffordRound} onClick={startRound}>
+                开始对局
+              </button>
+            )}
+
+            {(phase === 'rolling' || phase === 'play') && (
+              <>
+                <button type="button" className="tavern-tool-btn" disabled={rolling || rerollsLeft <= 0} onClick={rerollUnselected}>
+                  重投未保留骰 ({rerollsLeft})
+                </button>
+                <button type="button" className="tavern-tool-btn primary" disabled={rolling || !playerDice.length} onClick={submitRound}>
+                  提交骰面
+                </button>
+              </>
+            )}
+
+            {phase === 'round_result' && lastRecord && (
+              lastRecord.result === 'win' ? (
+                <>
+                  <button type="button" className="tavern-tool-btn primary" onClick={cashOutAfterWin}>
+                    收走赌注结束
+                  </button>
+                  {round < ROUND_LIMIT && (
+                    <button type="button" className="tavern-tool-btn" onClick={() => continueAfterRound(true)}>
+                      翻倍下一局
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button type="button" className="tavern-tool-btn primary" onClick={() => continueAfterRound(false)}>
+                  {round >= ROUND_LIMIT ? '查看结算' : '进入下一局'}
+                </button>
+              )
+            )}
+
+            {phase === 'plead' && (
+              <>
+                <button type="button" className="tavern-tool-btn primary" disabled={pleadUsed} onClick={plead}>
+                  让瑟琳求情
+                </button>
+                <button type="button" className="tavern-tool-btn" disabled={!canBuyInfo} onClick={() => finishGame(0, { extraSpent: 50, paidInfo: true })}>
+                  花50G买情报
+                </button>
+              </>
+            )}
+
+            {phase === 'final' && final && (
+              <button type="button" className="tavern-tool-btn primary" onClick={() => onComplete?.(final)}>
+                结算并返回剧情
               </button>
             )}
           </div>
+
+          <main className="tavern-table-zone">
+            <section className="tavern-dice-lane">
+              <div className="tavern-lane-label">我方点数</div>
+              <div className="tavern-dice-row">
+                {(playerDice.length ? playerDice : Array.from<number | undefined>({ length: 5 })).map((die, index) => (
+                  <DieFace
+                    key={`player-${index}-${die ?? 'empty'}`}
+                    value={die}
+                    hidden={!die}
+                    selected={selected.has(index)}
+                    rolling={rolling}
+                    disabled={phase !== 'play'}
+                    onClick={die ? () => toggleDie(index) : undefined}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="tavern-dice-lane">
+              <div className="tavern-lane-label">敌方点数</div>
+              <div className="tavern-dice-row">
+                {(saloDice.length ? saloDice : Array.from<number | undefined>({ length: 5 })).map((die, index) => (
+                  <DieFace
+                    key={`salo-${index}-${die ?? 'empty'}`}
+                    value={die}
+                    hidden={!die || (visibleSaloDice[index] === null && phase !== 'round_result' && phase !== 'final')}
+                    rolling={rolling}
+                    disabled
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="tavern-status-row">
+              <span>透视：{peekUsed ? '已使用' : '可用'}{peekCount ? ` · 已透露${peekCount}枚` : ''}</span>
+              <span>说服：{persuadeUsed ? '已使用' : '可用'}{persuadeBonus ? ` · +${persuadeBonus}重投` : ''}</span>
+              <span>预计金币：{projectedGold}G</span>
+            </section>
+
+            <section className="tavern-kp-box">
+              <strong>KP提示</strong>
+              <p>{phase === 'play' && !rolling ? advice : message}</p>
+              {phase === 'round_result' && lastRecord && (
+                <div className="tavern-round-summary">
+                  你：{formatDice(lastRecord.playerDice)}（{lastRecord.playerScore.label}）
+                  <br />
+                  萨洛：{formatDice(lastRecord.saloDice)}（{lastRecord.saloScore.label}）
+                </div>
+              )}
+              {phase === 'final' && final && (
+                <div className="tavern-round-summary">
+                  最终：{final.wins}胜{final.effectiveWins > final.wins ? `（情报按${final.effectiveWins}胜结算）` : ''} · 花费{final.spent}G · 收回{final.earnings}G · 彩头{final.gift}G
+                </div>
+              )}
+            </section>
+          </main>
+
+          <RulePanel />
+        </div>
+
+        {!canAffordRound && (
+          <div className="tavern-dice-warning">金币不足，无法支付本局下注。</div>
         )}
 
-        {phase === 'plead' && (
-          <div className="tavern-plead-zone">
-            <p>三局未胜。瑟琳可以替你们低声求情；若失败，就只能支付50G买下萨洛的情报。</p>
-            <div className="tavern-plead-buttons">
-              <button type="button" onClick={plead} className="tavern-btn tavern-btn-gold">让瑟琳求情</button>
-              <button type="button" onClick={() => completeGame(0, 50, true)} className="tavern-btn">支付50G购买情报</button>
-            </div>
-          </div>
-        )}
-
-        {phase === 'final' && final && (
-          <div className="tavern-final-result">
-            <h2>骰局结束</h2>
-            <p className="tavern-final-score">战绩：{final.wins}胜 · 花费{final.spent}G · 收回{final.earnings}G · 彩头{final.gift}G</p>
-            <p className="tavern-final-info">{final.yunlingUnlocked ? '额外情报：黑市药剂商云苓。' : '获得三名队友的完整情报。'}</p>
-            <button type="button" onClick={onClose} className="tavern-btn tavern-btn-gold">回到酒馆</button>
-          </div>
-        )}
-      </motion.div>
+        <AnimatePresence>
+          {tutorialStep >= 0 && (
+            <TutorialOverlay
+              steps={TAVERN_DICE_TUTORIAL}
+              currentStep={tutorialStep}
+              onClose={() => setTutorialStep(-1)}
+              onPrev={() => setTutorialStep((s) => Math.max(0, s - 1))}
+              onNext={() => setTutorialStep((s) => Math.min(TAVERN_DICE_TUTORIAL.length - 1, s + 1))}
+            />
+          )}
+        </AnimatePresence>
+      </motion.section>
 
       <DiceRollOverlay dice={skillDice} dieType="d20" onClose={() => setSkillDice(null)} />
     </motion.div>

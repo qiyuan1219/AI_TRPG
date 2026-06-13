@@ -15,6 +15,7 @@ interface VisualNovelStageProps {
   autoAdvanceDelay?: number;
   actionPanel?: ReactNode;
   scriptedBgOverride?: string | null;  // 脚本场景直接指定的背景图，绕过文本匹配
+  visualResetKey?: number;
   onAdvance: () => void;
 }
 
@@ -70,12 +71,19 @@ export function VisualNovelStage({
   autoAdvanceDelay = 110,
   actionPanel,
   scriptedBgOverride,
+  visualResetKey = 0,
   onAdvance,
 }: VisualNovelStageProps) {
   const text = line?.text || '';
   const { visible, done, reveal } = useTypewriter(text, autoAdvance ? 0 : 20);
   const [showActionPrompt, setShowActionPrompt] = useState(false);
   const actionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 粘性背景：某行设置了 bgImage 后，后续无 bgImage 的行自动继承
+  const [stickyBg, setStickyBg] = useState<string | null>(null);
+  useEffect(() => {
+    if (line?.bgImage) setStickyBg(line.bgImage);
+  }, [line?.bgImage]);
 
   // 进入行动阶段时显示"选择行动"提示，1秒后自动消失
   useEffect(() => {
@@ -102,13 +110,19 @@ export function VisualNovelStage({
   }, [canAdvance, done, isActionPhase, isStreaming, line]);
 
   // 场景背景图多阶段切换
-  const FALLBACK_TRIGGER = '倒挂在巨大洞穴';  // 子串匹配，兼容AI文本微小差异
+  const FALLBACK_TRIGGER = '双脚重新落地时，一座倒悬于洞穴穹顶之上的城市出现在你面前';  // 子串匹配，兼容AI文本微小差异
   const [bgRevealed, setBgRevealed] = useState(false);
   const [bgStageIndex, setBgStageIndex] = useState(-1);
   const stages = scene.bgStages || [];
   const revealBaseBackgroundImmediately = scene.id !== 'inverse-city';
   // 首触发词：始终用通用触发词展示主背景；后续由 bgStages 的 trigger 独立接管阶段切换
   const firstTrigger = FALLBACK_TRIGGER;
+
+  useEffect(() => {
+    setStickyBg(line?.bgImage || null);
+    setBgRevealed(Boolean(line?.bgImage || scriptedBgOverride || revealBaseBackgroundImmediately));
+    setBgStageIndex(-1);
+  }, [visualResetKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 场景切换时重置
   useEffect(() => {
@@ -145,14 +159,15 @@ export function VisualNovelStage({
     }
   }, [scriptedBgOverride]);
 
-  // 生效背景图：当前台词 > override > stage > 主背景
+  // 生效背景图：当前台词 > override(场景级) > 粘性继承 > stage > 主背景
   const activeBgImage = useMemo(() => {
     if (line?.bgImage) return line.bgImage;
     if (scriptedBgOverride) return scriptedBgOverride;
+    if (stickyBg) return stickyBg;
     if (bgStageIndex > 0 && stages[bgStageIndex - 1]) return stages[bgStageIndex - 1].image;
     if (bgRevealed && scene.backgroundImage) return scene.backgroundImage;
     return null;
-  }, [line?.bgImage, scriptedBgOverride, bgStageIndex, bgRevealed, scene.backgroundImage, stages]);
+  }, [line?.bgImage, stickyBg, scriptedBgOverride, bgStageIndex, bgRevealed, scene.backgroundImage, stages]);
 
   function advance() {
     if (isActionPhase) return;
