@@ -22,6 +22,11 @@ from kp.memory import (
     search_memory,
 )
 from engine.rules_dnd import CLASS_PRESETS, PROFICIENCY_BONUS, modifier, skill_check, validate_character
+from engine.investigation_rewards import (
+    action_check_for_message,
+    apply_investigation_rewards,
+    ensure_investigation_state,
+)
 from engine.state_directives import DirectiveStreamFilter, apply_directive, parse_state_chunk
 from engine.trust_system import canonicalize_trust_state, record_trust_patch_changes, trust_payload
 from logger import get_logger, new_session
@@ -44,6 +49,102 @@ def _apply_state_change(chunk: str, state: dict) -> dict:
     if directive:
         return apply_directive(state, directive)
     return {"type": "unknown"}
+
+
+_PROTOCOL_START_RE = re.compile(
+    r"(?:[ \t]*(?:\[[^\]\r\n]{1,12}\]\s*)?)?[\[【]\s*(HINTS|STATE|SYSTEM|CMD|DIRECTIVE|SCENE)\s*[:：]",
+    re.IGNORECASE,
+)
+_PARTIAL_PROTOCOL_PREFIXES = tuple(
+    prefix[:size]
+    for prefix in (
+        "[HINTS:", "[STATE:", "[SYSTEM:", "[CMD:", "[DIRECTIVE:", "[SCENE:",
+        "【HINTS:", "【STATE:", "【SYSTEM:", "【CMD:", "【DIRECTIVE:", "【SCENE:",
+    )
+    for size in range(1, len(prefix))
+)
+
+
+def _protocol_suffix_to_keep(text: str) -> int:
+    upper = text.upper()
+    return max((len(prefix) for prefix in _PARTIAL_PROTOCOL_PREFIXES if upper.endswith(prefix.upper())), default=0)
+
+
+def _parse_hint_items(raw: str) -> list[str]:
+    body = raw.strip()
+    if body.startswith(("［", "【", "[")):
+        body = body[1:]
+    if body.endswith(("］", "】", "]")):
+        body = body[:-1]
+    if ":" in body:
+        body = body.split(":", 1)[1]
+    elif "：" in body:
+        body = body.split("：", 1)[1]
+    return [
+        item.strip().strip("[]【】")
+        for item in body.split("|")
+        if item.strip().strip("[]【】")
+    ]
+
+
+class PlayerProtocolFilter:
+    """Keeps machine protocol available to code while removing it from player text."""
+
+    def __init__(self) -> None:
+        self._buffer = ""
+
+    def feed(self, chunk: str) -> tuple[str, list[str]]:
+        self._buffer += chunk
+        return self._drain(complete=False)
+
+    def flush(self) -> tuple[str, list[str]]:
+        return self._drain(complete=True)
+
+    def _drain(self, complete: bool) -> tuple[str, list[str]]:
+        visible_parts: list[str] = []
+        hints: list[str] = []
+
+        while self._buffer:
+            match = _PROTOCOL_START_RE.search(self._buffer)
+            if not match:
+                if complete:
+                    visible_parts.append(self._buffer)
+                    self._buffer = ""
+                    break
+                keep = _protocol_suffix_to_keep(self._buffer)
+                if keep:
+                    visible_parts.append(self._buffer[:-keep])
+                    self._buffer = self._buffer[-keep:]
+                else:
+                    visible_parts.append(self._buffer)
+                    self._buffer = ""
+                break
+
+            if match.start() > 0:
+                visible_parts.append(self._buffer[:match.start()])
+                self._buffer = self._buffer[match.start():]
+                continue
+
+            closer = "】" if self._buffer.startswith("【") else "]"
+            end = self._buffer.find(closer)
+            if end < 0:
+                if complete:
+                    self._buffer = ""
+                break
+
+            raw = self._buffer[:end + 1]
+            if match.group(1).upper() == "HINTS":
+                hints.extend(_parse_hint_items(raw))
+            self._buffer = self._buffer[end + 1:]
+
+        return "".join(visible_parts), hints
+
+
+def _strip_player_protocol_text(text: str) -> str:
+    protocol_filter = PlayerProtocolFilter()
+    visible, _ = protocol_filter.feed(text or "")
+    tail, _ = protocol_filter.flush()
+    return (visible + tail).strip()
 
 
 # ============================================================
@@ -202,7 +303,9 @@ def _preroll_if_dc(message: str, state: dict) -> tuple[str | None, str]:
     """Pre-roll a D20 when the player action contains a DC tag."""
     dc_check = _find_dc_check(message)
     if not dc_check:
-        return None, message
+        dc_check = action_check_for_message(message, state)
+        if not dc_check:
+            return None, message
 
     attr_name, dc = dc_check
     check_label, stat_mod, prof_bonus = _resolve_check(attr_name, message, state)
@@ -217,20 +320,64 @@ def _preroll_if_dc(message: str, state: dict) -> tuple[str | None, str]:
         f"{message}\n"
         f"[系统提示：检定已自动完成。D20={result.roll} 加值+{result.bonus}，"
         f"总计={result.total} {operator} DC{dc}，{label}。请基于此结果叙事，"
-        f"不要再调用skill_check工具。]"
+        f"不要再调用skill_check工具。若系统状态更新已经发放调查奖励，只需在叙事中自然承接结果，不要再次发放奖励。]"
     )
     return system_event, enhanced
 
 
-def _fallback_chat_narrative(message: str, state: dict) -> str:
+_SYSTEM_EVENT_RE = re.compile(r"^\[SYSTEM:([^:]+):(.+)\]\s*$", re.DOTALL)
+
+
+def _parse_system_event_payload(raw: str) -> tuple[str, dict] | None:
+    match = _SYSTEM_EVENT_RE.match((raw or "").strip())
+    if not match:
+        return None
+    try:
+        return match.group(1), json.loads(match.group(2))
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def _dice_summary_from_systems(systems: list[str] | None) -> str:
+    for raw in reversed(systems or []):
+        parsed = _parse_system_event_payload(raw)
+        if not parsed:
+            continue
+        event_type, payload = parsed
+        if event_type == "skill_check":
+            roll = str(payload.get("掷骰") or "").replace("D20=", "") or "?"
+            total = payload.get("总计", "?")
+            dc = payload.get("DC", "?")
+            label = payload.get("属性") or "检定"
+            outcome = "成功" if payload.get("成功") else "失败"
+            return f"{label}结果为 D20={roll}，总计 {total} 对 DC{dc}，判定{outcome}。"
+        if event_type == "attack_roll":
+            roll_text = str(payload.get("攻击掷骰") or "")
+            total = payload.get("总计", "?")
+            target = payload.get("目标AC", "?")
+            outcome = "命中" if payload.get("命中") else "未命中"
+            damage = payload.get("伤害")
+            damage_text = f"，造成 {damage} 点伤害" if damage else ""
+            return f"攻击检定{roll_text or f'总计 {total}'} 对 AC{target}，结果{outcome}{damage_text}。"
+    return ""
+
+
+def _fallback_chat_narrative(message: str, state: dict, systems: list[str] | None = None) -> str:
     player = state.get("player_name") or "冒险者"
     area = state.get("current_area") or "当前区域"
     prompt = (message or "").strip()
     action_line = f"你刚才选择了：{prompt}" if prompt else "你停下脚步，重新整理眼前的局势。"
+    dice_line = _dice_summary_from_systems(systems)
+    result_line = (
+        f"{dice_line}瑟琳迅速把这个结果压进判断里，提醒队伍别让一次判定把节奏拖死。"
+        if dice_line
+        else "瑟琳扫过周围的动静，示意队伍先把眼前线索收束，再决定下一步。"
+    )
     return (
         f"{player}在{area}稳住呼吸，远处的荧光在黑暗中明灭，空气中弥漫着潮湿的孢尘。\n"
         f"{action_line}\n"
-        "局势暂时没有发生新的剧烈变化。你可以保存进度、检查角色状态，或从眼前线索中选择下一步行动。\n\n"
+        f"{result_line}\n"
+        "局势继续向前推进。你可以保存进度、检查角色状态，或从眼前线索中选择下一步行动。\n\n"
         "[HINTS:观察周围环境【感知DC12】|回顾任务线索【智力DC12】|和瑟琳确认计划【魅力DC12】]"
     )
 
@@ -283,9 +430,23 @@ async def create_dnd_game(req: CreateDNDRequest):
         "al_hp": 32, "al_trust": 55, "al_alive": True,   # 艾琳
         "kl_hp": 36, "kl_trust": 45, "kl_alive": True,   # 凯娅
         "triggered_events": "",
+        "documents": [],
+        "clues": [],
+        "flags": {},
+        "questLog": {
+            "mainQuest": "investigate_earthcore_gate",
+            "currentObjective": "前往逆穹悬城",
+            "completedObjectives": [],
+            "updates": [],
+        },
+        "sceneState": {
+            "currentScene": "unknown",
+            "visitedScenes": ["unknown"],
+        },
         "last_event": "抵达逆穹悬城入城平台，第一次遭遇裂隙爬兽。",
     }
     canonicalize_trust_state(state)
+    ensure_investigation_state(state)
     save_game_state(gid, state)
     save_memory(gid, f"游戏开始。{req.player_name}，{req.char_class}，接受委托来到逆穹悬城。")
 
@@ -315,6 +476,7 @@ async def get_state(game_id: str):
     if not state:
         raise HTTPException(404, "游戏不存在")
     canonicalize_trust_state(state)
+    ensure_investigation_state(state)
     save_game_state(game_id, state)
     return {"game_id": game_id, "state": state}
 
@@ -325,6 +487,7 @@ async def get_trust(game_id: str):
     if not state:
         raise HTTPException(404, "游戏不存在")
     canonicalize_trust_state(state)
+    ensure_investigation_state(state)
     save_game_state(game_id, state)
     return {"game_id": game_id, **trust_payload(state)}
 
@@ -335,6 +498,7 @@ async def patch_state(game_id: str, req: StatePatchRequest):
     if not state:
         raise HTTPException(404, "游戏不存在")
     canonicalize_trust_state(state)
+    ensure_investigation_state(state)
     old_trust = dict(state.get("companionTrust", {}))
 
     patch = dict(req.patch or {})
@@ -345,6 +509,7 @@ async def patch_state(game_id: str, req: StatePatchRequest):
 
     old_area = state.get("current_area")
     state.update(patch)
+    ensure_investigation_state(state)
     if patch.get("current_area") and patch.get("current_area") != old_area:
         state["actions_in_area"] = int(patch.get("actions_in_area", 0))
 
@@ -381,6 +546,7 @@ async def save_current_game(game_id: str, req: SaveGameRequest):
     if not state:
         raise HTTPException(404, "游戏不存在")
     canonicalize_trust_state(state)
+    ensure_investigation_state(state)
 
     title = (req.title or "").strip()
     if not title:
@@ -415,6 +581,7 @@ async def load_saved_game(slot_key: str):
     game_id = save["game_id"]
     state = dict(save["state"])
     canonicalize_trust_state(state)
+    ensure_investigation_state(state)
     save["state"] = state
     save_game_state(game_id, state)
     replace_game_memories(game_id, save["memories"])
@@ -467,6 +634,7 @@ async def chat_stream(req: ChatRequest):
     if not state:
         raise HTTPException(404, "游戏不存在")
     canonicalize_trust_state(state)
+    ensure_investigation_state(state)
 
     # 閫掑褰撳墠鍖哄煙琛屽姩娆℃暟
     state["actions_in_area"] = int(state.get("actions_in_area", 0)) + 1
@@ -479,6 +647,7 @@ async def chat_stream(req: ChatRequest):
         full = ""
         systems: list[str] = []
         directive_filter = DirectiveStreamFilter()
+        player_protocol_filter = PlayerProtocolFilter()
 
         # 鑾峰彇鏃ュ織鍣ㄥ苟绔嬪嵆鍐欏叆鐜╁杈撳叆
         sid = _session_map.get(req.game_id, req.game_id)
@@ -495,6 +664,12 @@ async def chat_stream(req: ChatRequest):
         if preroll_event:
             systems.append(preroll_event)
             yield f"data: {json.dumps({'type':'system','content':preroll_event}, ensure_ascii=False)}\n\n"
+            parsed_event = _parse_system_event_payload(preroll_event)
+            if parsed_event:
+                _, check_payload = parsed_event
+                reward_change = apply_investigation_rewards(state, req.message, check_payload)
+                if reward_change:
+                    yield f"data: {json.dumps({'type':'state_update','content':reward_change}, ensure_ascii=False)}\n\n"
             user_message = enhanced_msg
         else:
             user_message = req.message
@@ -515,8 +690,12 @@ async def chat_stream(req: ChatRequest):
                         systems.append(directive.raw)
                         yield f"data: {json.dumps({'type':'state_update','content':change}, ensure_ascii=False)}\n\n"
                     if narrative:
-                        full += narrative
-                        yield f"data: {json.dumps({'type':'narrative','content':narrative}, ensure_ascii=False)}\n\n"
+                        visible, hints = player_protocol_filter.feed(narrative)
+                        if hints:
+                            yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                        if visible:
+                            full += visible
+                            yield f"data: {json.dumps({'type':'narrative','content':visible}, ensure_ascii=False)}\n\n"
 
             narrative, directives = directive_filter.flush()
             for directive in directives:
@@ -524,10 +703,34 @@ async def chat_stream(req: ChatRequest):
                 systems.append(directive.raw)
                 yield f"data: {json.dumps({'type':'state_update','content':change}, ensure_ascii=False)}\n\n"
             if narrative:
-                full += narrative
-                yield f"data: {json.dumps({'type':'narrative','content':narrative}, ensure_ascii=False)}\n\n"
+                visible, hints = player_protocol_filter.feed(narrative)
+                if hints:
+                    yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                if visible:
+                    full += visible
+                    yield f"data: {json.dumps({'type':'narrative','content':visible}, ensure_ascii=False)}\n\n"
+
+            visible, hints = player_protocol_filter.flush()
+            if hints:
+                yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+            if visible:
+                full += visible
+                yield f"data: {json.dumps({'type':'narrative','content':visible}, ensure_ascii=False)}\n\n"
+
+            if not _strip_player_protocol_text(full):
+                fallback_filter = PlayerProtocolFilter()
+                fallback = _fallback_chat_narrative(req.message, state, systems)
+                visible, hints = fallback_filter.feed(fallback)
+                tail, tail_hints = fallback_filter.flush()
+                hints.extend(tail_hints)
+                full = _strip_player_protocol_text(visible + tail)
+                if hints:
+                    yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                if full:
+                    yield f"data: {json.dumps({'type':'narrative','content':full}, ensure_ascii=False)}\n\n"
 
             # DM璇村畬涓€娈?鈫?鍐欏叆鏃ュ織锛堥檮甯︾郴缁熶簨浠讹級
+            full = _strip_player_protocol_text(full)
             log.log_dm(full, systems)
 
             # 淇濆瓨瀵硅瘽鍘嗗彶
@@ -543,14 +746,23 @@ async def chat_stream(req: ChatRequest):
             save_game_state(req.game_id, state)
             yield f"data: {json.dumps({'type':'state_snapshot','content':state}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             if full:
-                log.log_dm(full + f"\n[涓柇: {e}]", systems)
+                log.log_dm(_strip_player_protocol_text(full) + f"\n[涓柇: {e}]")
             log.log_error(str(e))
-            fallback = full or _fallback_chat_narrative(req.message, state)
+            fallback = full or _fallback_chat_narrative(req.message, state, systems)
             if not full:
-                full = fallback
-                yield f"data: {json.dumps({'type':'narrative','content':fallback}, ensure_ascii=False)}\n\n"
+                fallback_filter = PlayerProtocolFilter()
+                visible, hints = fallback_filter.feed(fallback)
+                tail, tail_hints = fallback_filter.flush()
+                hints.extend(tail_hints)
+                full = _strip_player_protocol_text(visible + tail)
+                if hints:
+                    yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                if full:
+                    yield f"data: {json.dumps({'type':'narrative','content':full}, ensure_ascii=False)}\n\n"
 
             # 寮傚父鏃朵繚瀛樼姸鎬侊紙闃叉鏈疆鐘舵€佸彉鏇翠涪澶憋級
             try:
@@ -564,7 +776,8 @@ async def chat_stream(req: ChatRequest):
                     save_memory(req.game_id, f"DM: {full[:200]}")
                 state["last_event"] = req.message[:100]
                 save_game_state(req.game_id, state)
-            except: pass
+            except Exception as persist_error:
+                log.log_error(f"fallback persist failed: {persist_error}")
             yield f"data: {json.dumps({'type':'state_snapshot','content':state}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
 

@@ -1,0 +1,395 @@
+.apothecary-shop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 30px 16px 42px;
+  overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(5, 8, 12, 0.9), rgba(7, 10, 15, 0.96)),
+    radial-gradient(circle at 50% 16%, rgba(45, 116, 113, 0.24), transparent 34%),
+    radial-gradient(circle at 74% 78%, rgba(176, 132, 50, 0.12), transparent 32%);
+}
+
+.apothecary-shop-inline {
+  width: 100%;
+}
+
+.apothecary-shop {
+  width: min(760px, 100%);
+  border: 1px solid rgba(190, 147, 62, 0.45);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(25, 31, 41, 0.94), rgba(10, 13, 18, 0.96)),
+    rgba(18, 21, 27, 0.94);
+  box-shadow:
+    0 22px 72px rgba(0, 0, 0, 0.62),
+    inset 0 0 34px rgba(76, 189, 172, 0.08),
+    inset 0 1px 0 rgba(255, 236, 188, 0.08);
+  color: #d9d1bd;
+  padding: 18px;
+}
+
+.apothecary-shop-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 4px 16px;
+  border-bottom: 1px solid rgba(190, 147, 62, 0.24);
+}
+
+.shop-kicker {
+  display: block;
+  color: rgba(93, 199, 181, 0.82);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+}
+
+.apothecary-shop-header h1 {
+  margin: 4px 0 0;
+  color: #f1d58b;
+  font-size: clamp(1.45rem, 4vw, 2.1rem);
+  letter-spacing: 0;
+}
+
+.apothecary-shop-header p {
+  margin: 3px 0 0;
+  color: rgba(217, 209, 189, 0.68);
+  font-size: 0.92rem;
+}
+
+.shop-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.shop-gold-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(219, 175, 72, 0.46);
+  border-radius: 10px;
+  background: rgba(42, 35, 19, 0.58);
+  color: #f1d58b;
+  box-shadow: inset 0 0 18px rgba(219, 175, 72, 0.1);
+}
+
+.shop-gold-pill span {
+  color: #d9a83e;
+}
+
+.shop-gold-pill strong {
+  font-family: Consolas, monospace;
+  font-size: 1rem;
+}
+
+.shop-close-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(217, 209, 189, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(217, 209, 189, 0.82);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.shop-close-button:hover {
+  border-color: rgba(241, 213, 139, 0.5);
+  color: #f1d58b;
+}
+
+.shop-shelf {
+  display: grid;
+  gap: 10px;
+  max-height: min(58vh, 560px);
+  overflow-y: auto;
+  padding: 14px 4px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(190, 147, 62, 0.35) transparent;
+}
+
+.shop-shelf::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shop-shelf::-webkit-scrollbar-thumb {
+  background: rgba(190, 147, 62, 0.35);
+  border-radius: 4px;
+}
+
+.shop-item-card {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 88px;
+  padding: 12px;
+  border: 1px solid rgba(190, 147, 62, 0.22);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(31, 42, 54, 0.84), rgba(18, 23, 32, 0.88)),
+    rgba(18, 21, 27, 0.86);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.shop-item-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(241, 213, 139, 0.48);
+  background:
+    linear-gradient(90deg, rgba(39, 51, 65, 0.94), rgba(21, 28, 38, 0.94)),
+    rgba(18, 21, 27, 0.9);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), inset 0 0 18px rgba(93, 199, 181, 0.06);
+}
+
+.shop-item-card-rare {
+  border-color: rgba(150, 210, 218, 0.42);
+  background:
+    linear-gradient(90deg, rgba(31, 50, 61, 0.9), rgba(26, 22, 38, 0.9)),
+    rgba(18, 21, 27, 0.92);
+  box-shadow: inset 0 0 22px rgba(93, 199, 181, 0.08);
+}
+
+.shop-item-card-rare:hover {
+  border-color: rgba(241, 225, 170, 0.66);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28), inset 0 0 24px rgba(126, 221, 218, 0.12);
+}
+
+.shop-item-icon-frame {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(217, 209, 189, 0.16);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(93, 199, 181, 0.16), transparent 56%),
+    rgba(8, 10, 15, 0.78);
+}
+
+.shop-item-icon {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.shop-item-copy {
+  min-width: 0;
+}
+
+.shop-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.shop-item-title-row h3 {
+  margin: 0;
+  color: #f0e3bd;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.shop-item-card-rare .shop-item-title-row h3 {
+  color: #fff0ba;
+}
+
+.shop-item-kind,
+.shop-item-count {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.shop-item-kind-potion {
+  border: 1px solid rgba(93, 199, 181, 0.28);
+  background: rgba(93, 199, 181, 0.1);
+  color: #79d5c7;
+}
+
+.shop-item-kind-rare {
+  border: 1px solid rgba(241, 213, 139, 0.34);
+  background: rgba(241, 213, 139, 0.12);
+  color: #f1d58b;
+}
+
+.shop-item-count {
+  border: 1px solid rgba(217, 209, 189, 0.18);
+  color: rgba(217, 209, 189, 0.68);
+}
+
+.shop-item-copy p {
+  margin: 6px 0 0;
+  color: rgba(217, 209, 189, 0.64);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.shop-item-buy {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  min-width: 96px;
+}
+
+.shop-item-buy strong {
+  color: #f1d58b;
+  font-family: Consolas, monospace;
+  font-size: 1rem;
+}
+
+.shop-item-buy .shop-price-low {
+  color: rgba(211, 99, 99, 0.8);
+}
+
+.shop-item-buy button {
+  min-width: 88px;
+  min-height: 36px;
+  border: 1px solid rgba(255, 224, 142, 0.5);
+  border-radius: 9px;
+  background: linear-gradient(180deg, #e3bd57, #9c6e24);
+  color: #241806;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.shop-item-buy button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.shop-item-buy button:disabled {
+  border-color: rgba(217, 209, 189, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(217, 209, 189, 0.38);
+  cursor: not-allowed;
+}
+
+.shop-feedback {
+  min-height: 44px;
+  margin: 4px 4px 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.shop-feedback-success {
+  border: 1px solid rgba(93, 199, 181, 0.36);
+  background: rgba(93, 199, 181, 0.1);
+  color: #9be5d7;
+}
+
+.shop-feedback-warning {
+  border: 1px solid rgba(223, 161, 70, 0.38);
+  background: rgba(223, 161, 70, 0.1);
+  color: #f1d58b;
+}
+
+.shop-feedback-info {
+  border: 1px solid rgba(217, 209, 189, 0.14);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(217, 209, 189, 0.78);
+}
+
+.shop-footer-note {
+  margin-top: 12px;
+  padding: 12px 4px 2px;
+  border-top: 1px solid rgba(190, 147, 62, 0.2);
+  color: rgba(217, 209, 189, 0.52);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.shop-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px 4px 2px;
+  border-top: 1px solid rgba(190, 147, 62, 0.2);
+}
+
+.shop-action-row input,
+.shop-action-row button {
+  height: 44px;
+  border-radius: 10px;
+  font: inherit;
+}
+
+.shop-action-row input {
+  min-width: 0;
+  border: 1px solid rgba(217, 209, 189, 0.18);
+  background: rgba(8, 10, 15, 0.78);
+  color: #f0e3bd;
+  padding: 0 14px;
+  outline: none;
+}
+
+.shop-action-row input::placeholder {
+  color: rgba(217, 209, 189, 0.36);
+}
+
+.shop-action-row input:focus {
+  border-color: rgba(93, 199, 181, 0.48);
+  box-shadow: 0 0 0 3px rgba(93, 199, 181, 0.08);
+}
+
+.shop-action-row button {
+  border: 1px solid rgba(255, 224, 142, 0.54);
+  background: linear-gradient(180deg, #f0cf6a, #9f7126);
+  color: #201505;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.shop-action-row button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .apothecary-shop {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .apothecary-shop-header {
+    flex-direction: column;
+  }
+
+  .shop-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .shop-item-card {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  .shop-item-buy {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr 110px;
+    align-items: center;
+    justify-items: stretch;
+    width: 100%;
+  }
+
+  .shop-item-buy strong {
+    text-align: left;
+  }
+}

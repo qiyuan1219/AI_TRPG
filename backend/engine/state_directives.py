@@ -301,7 +301,7 @@ def apply_directive(state: dict, directive: Directive | dict) -> dict:
 
     try:
         return handler(state, data)
-    except Exception as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         return {"type": "unknown", "reason": f"状态指令失败: {exc}"}
 
 
@@ -314,7 +314,7 @@ def parse_cmd(raw: str) -> Directive | None:
             try:
                 name, data_str = body.split(":", 1)
                 return Directive(name=name.strip(), data=json.loads(data_str), raw=raw)
-            except Exception:
+            except (ValueError, json.JSONDecodeError, TypeError):
                 return None
     return None
 
@@ -328,7 +328,7 @@ def parse_state_chunk(raw: str) -> Directive | None:
         _, tool_name, data_str = raw.split(":", 2)
         data = json.loads(data_str[:-1])
         return Directive(name=tool_name.strip(), data=data, raw=raw)
-    except Exception:
+    except (ValueError, json.JSONDecodeError, TypeError):
         return None
 
 

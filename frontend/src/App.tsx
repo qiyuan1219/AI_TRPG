@@ -1,32 +1,21 @@
-import { Component, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, lazy, Suspense, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ActionPanel } from './components/ActionPanel';
-import { BattleTestScreen } from './components/BattleTestScreen';
-import { BargainTestScreen, type BargainCompleteResult } from './components/BargainTestScreen';
-import { CharacterPanel } from './components/CharacterPanel';
-import { CompanionEventTestScreen, type CompanionEventCompleteResult } from './components/CompanionEventTestScreen';
-import { DicePokerGame } from './components/DicePokerGame';
+import type { BargainCompleteResult } from './components/BargainTestScreen';
+import type { CompanionEventCompleteResult } from './components/CompanionEventTestScreen';
 import { DiceRollOverlay } from './components/DiceRollOverlay';
 import type { EventFeedItem } from './components/EventFeed';
-import { LoadGameScreen } from './components/LoadGameScreen';
 import { LoadingScreen } from './components/LoadingScreen';
-import { SaveLoadPanel } from './components/SaveLoadPanel';
-import { StartDND } from './components/StartDND';
-import { TestScreen } from './components/TestScreen';
-import { TitleMenu } from './components/TitleMenu';
 import { VisualNovelStage } from './components/VisualNovelStage';
-import { DialogueLog } from './components/DialogueLog';
-import { DrinkingDiceGame } from './components/DrinkingDiceGame';
-import { OrlanBoxGame, type OrlanBoxResult } from './components/OrlanBoxGame';
-import { ApothecaryShop } from './components/ApothecaryShop';
-import { CityMap } from './components/CityMap';
-import { TavernDicePoker } from './components/TavernDicePoker';
+import type { DrinkingDiceResult } from './components/DrinkingDiceGame';
+import type { OrlanBoxResult } from './components/OrlanBoxGame';
 import { findRegisteredSpeaker, resolveSpeakerName } from './data/characterRegistry';
 import { resolveDndScene } from './data/dndScenes';
 import { getScriptedScene, matchScriptedScene, type ScriptedScene } from './data/scriptedScenes';
 import { getBattleConfigById } from './data/battleConfigs';
 import { getEndingFeedback } from './data/companionSideQuests';
 import type { StoryTestCheckpoint } from './data/storyTestCheckpoints';
+import { shopItems } from './data/shopItems';
 import { listSaves, loadGame, patchGameState, saveGame } from './services/api';
 import { dndRuntime } from './services/dndRuntime';
 import type {
@@ -38,8 +27,29 @@ import type {
   SaveSlotSummary,
   StoryLine,
 } from './types/game';
-import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrativeSegments, splitNarrative } from './utils/narrative';
+import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrativeSegments, splitNarrative, stripAllMachineProtocolText, stripMachineProtocolText } from './utils/narrative';
 import { buildTrustPatch, COMPANION_ID_BY_EVENT_ID, getCompanionTrust, getTrustTier } from './utils/trust';
+
+const TitleMenu = lazy(() => import('./components/TitleMenu').then((module) => ({ default: module.TitleMenu })));
+const StartDND = lazy(() => import('./components/StartDND').then((module) => ({ default: module.StartDND })));
+const LoadGameScreen = lazy(() => import('./components/LoadGameScreen').then((module) => ({ default: module.LoadGameScreen })));
+const TestScreen = lazy(() => import('./components/TestScreen').then((module) => ({ default: module.TestScreen })));
+const BattleTestScreen = lazy(() => import('./components/BattleTestScreen').then((module) => ({ default: module.BattleTestScreen })));
+const CompanionEventTestScreen = lazy(() => import('./components/CompanionEventTestScreen').then((module) => ({ default: module.CompanionEventTestScreen })));
+const BargainTestScreen = lazy(() => import('./components/BargainTestScreen').then((module) => ({ default: module.BargainTestScreen })));
+const DrinkingDiceGame = lazy(() => import('./components/DrinkingDiceGame').then((module) => ({ default: module.DrinkingDiceGame })));
+const OrlanBoxGame = lazy(() => import('./components/OrlanBoxGame'));
+const ApothecaryShop = lazy(() => import('./components/ApothecaryShop'));
+const CharacterPanel = lazy(() => import('./components/CharacterPanel'));
+const DialogueLog = lazy(() => import('./components/DialogueLog').then((module) => ({ default: module.DialogueLog })));
+const DicePokerGame = lazy(() => import('./components/DicePokerGame').then((module) => ({ default: module.DicePokerGame })));
+const CityMap = lazy(() => import('./components/CityMap').then((module) => ({ default: module.CityMap })));
+const TavernDicePoker = lazy(() => import('./components/TavernDicePoker').then((module) => ({ default: module.TavernDicePoker })));
+const SaveLoadPanel = lazy(() => import('./components/SaveLoadPanel').then((module) => ({ default: module.SaveLoadPanel })));
+
+function LazyBoundary({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<LoadingScreen />}>{children}</Suspense>;
+}
 
 type Screen = 'main-menu' | 'new-game' | 'load-game' | 'test' | 'loading' | 'game' | 'tutorial-battle' | 'companion-event' | 'deep-battle';
 type GamePhase = 'narrating' | 'action';
@@ -88,6 +98,7 @@ function resolveBgmTrack(screen: Screen, currentLine: StoryLine | undefined, sta
   if (/孢海/.test(area)) return BGM_TRACKS.fungalSea;
   if (/降渊缆梯/.test(area)) return BGM_TRACKS.elevatorDescent;
   if (/冒险者公会|回声酒馆|静默神殿/.test(area)) return BGM_TRACKS.guildCompanions;
+  if (/逆穹悬城/.test(area)) return BGM_TRACKS.inverseCity;
 
   return '';
 }
@@ -124,19 +135,8 @@ function getTutorialOption(action: string): 1 | 2 | 3 | 4 {
   return 4; // 闪避/敏捷
 }
 
-const YUNLING_POTION_OPTIONS: Array<{ action: string; key: string; label: string; stat?: string; cost: number }> = [
-  { action: '购买力量药水', key: 'str_potion', label: '力量药水', stat: 'str', cost: 100 },
-  { action: '购买敏捷药水', key: 'dex_potion', label: '敏捷药水', stat: 'dex', cost: 100 },
-  { action: '购买体质药水', key: 'con_potion', label: '体质药水', stat: 'con', cost: 100 },
-  { action: '购买智力药水', key: 'int_potion', label: '智力药水', stat: 'int', cost: 100 },
-  { action: '购买感知药水', key: 'wis_potion', label: '感知药水', stat: 'wis', cost: 100 },
-  { action: '购买魅力药水', key: 'cha_potion', label: '魅力药水', stat: 'cha', cost: 100 },
-  { action: '购买治疗药水', key: 'healing_potion', label: '治疗药水', cost: 50 },
-  { action: '购买净化之心', key: 'purification_heart', label: '净化之心', cost: 200 },
-];
-
 const YUNLING_SHOP_HINTS = [
-  ...YUNLING_POTION_OPTIONS.map((option) => option.action),
+  '购买药剂',
   '不购买药水返回公会登记',
 ];
 
@@ -147,10 +147,6 @@ const GUILD_INTEL_NODE_HINTS = [
   '追问赫尔曼最近魔物上涌细节【洞悉DC13】',
 ];
 
-function findYunlingPotion(action: string) {
-  return YUNLING_POTION_OPTIONS.find((option) => action.includes(option.action.replace('购买', '')) || action.includes(option.action));
-}
-
 const AUTO_SAVE_SLOT: SaveSlotKey = 'auto';
 
 const SCRIPTED_PORTRAIT_OVERRIDES: Record<string, Record<string, string>> = {};
@@ -160,7 +156,16 @@ function getScriptedPortraitOverride(sceneId: string, speaker: string) {
   return SCRIPTED_PORTRAIT_OVERRIDES[sceneId]?.[resolvedSpeaker];
 }
 
+function isOpeningTutorialBattleNode(state: GameState) {
+  return Boolean(
+    state.tutorial_battle_pending
+    || state.currentNodeId === 'opening_tutorial_battle'
+    || state.story_test_checkpoint === 'first-choice',
+  );
+}
+
 function isFirstPlayerChoice(story: StoryLine[], state: GameState) {
+  if (!isOpeningTutorialBattleNode(state)) return false;
   if (state.first_choice_resolved || state.tutorial_battle_done) return false;
   return !story.some((line) => line.role === 'player');
 }
@@ -190,6 +195,11 @@ function getDiceMargin(dice: DiceResult | null) {
 
 function hasStateFlag(state: GameState, ...keys: string[]) {
   return keys.some((key) => state[key] === true);
+}
+
+function hasClue(state: GameState, clueId: string) {
+  const clues = Array.isArray(state.clues) ? state.clues : [];
+  return clues.some((clue) => (typeof clue === 'string' ? clue === clueId : clue?.id === clueId));
 }
 
 function getForcedCompanionEventId(state: GameState): string | null {
@@ -295,7 +305,7 @@ function buildTutorialBattleSetup(dice: DiceResult | null, playerAction: string)
 }
 
 function linearRecruitmentHints(state: GameState): string[] {
-  if (!state.tutorial_battle_done && !state.first_choice_resolved) {
+  if (isOpeningTutorialBattleNode(state) && !state.tutorial_battle_done && !state.first_choice_resolved) {
     return [
       '正面迎击裂隙爬兽【力量DC10】',
       '观察弱点寻找破绽【感知DC10】',
@@ -319,7 +329,9 @@ function linearRecruitmentHints(state: GameState): string[] {
         ? ['听萨洛说明三名队友的位置', '向萨洛打听地底堡垒传闻【魅力DC12】', '和瑟琳讨论远征路线']
         : ['和萨洛玩一局快艇骰子', '先在酒馆里转转再说'];
     }
-    return GUILD_INTEL_NODE_HINTS;
+    return hasClue(state, 'expedition_saw_spore_beasts')
+      ? ['追问书记员报告中的孢化地底兽', ...GUILD_INTEL_NODE_HINTS].slice(0, 4)
+      : GUILD_INTEL_NODE_HINTS;
   }
 
   if (state.salo_intel_done && !state.al_recruited) {
@@ -587,7 +599,11 @@ function fallbackSuggestions(state: GameState): ActionSuggestion[] {
     return makeSuggestions(['接受游戏', '付100G购买萨洛的情报']);
   }
   if (area.includes('公会')) {
-    return makeSuggestions(['查看远征档案【调查DC12】', '打听地底堡垒传闻【感知DC12】', '与米娜确认任务细节']);
+    const guildHints = ['查看远征档案【调查DC12】', '打听地底堡垒传闻【感知DC12】', '与米娜确认任务细节'];
+    if (hasClue(state, 'expedition_saw_spore_beasts')) {
+      guildHints.unshift('追问书记员报告中的孢化地底兽');
+    }
+    return makeSuggestions(guildHints.slice(0, 4));
   }
   if (area.includes('孢海') || area.includes('菌林') || area.includes('湿地')) {
     return makeSuggestions(['谨慎探查周围【感知DC14】', '让凯娅检查陷阱【巧手DC15】', '让布洛克辨识真菌生态【自然DC13】']);
@@ -610,7 +626,8 @@ function normalizeStoryLines(lines: StoryLine[]): StoryLine[] {
       const id = Number.isFinite(rawId) && rawId > 0 ? rawId : nextId;
       nextId = Math.max(nextId, id + 1);
       const role = line.role === 'player' || line.role === 'system' ? line.role : 'kp';
-      const text = line.text;
+      const text = stripAllMachineProtocolText(line.text);
+      if (!text) return;
       const previousLine = normalized[normalized.length - 1];
       const previousText = previousLine?.text.trim() ?? '';
       const isDialogue = /^["“「]/.test(text.trim());
@@ -637,6 +654,7 @@ function normalizeStoryLines(lines: StoryLine[]): StoryLine[] {
         portrait: typeof line.portrait === 'string' ? line.portrait : undefined,
         bgImage: typeof line.bgImage === 'string' ? line.bgImage : undefined,
         bgm: typeof line.bgm === 'string' ? line.bgm : undefined,
+        scriptedSceneId: typeof line.scriptedSceneId === 'string' ? line.scriptedSceneId : undefined,
       });
     });
 
@@ -913,6 +931,7 @@ export default function App() {
   const [pendingTutorialBattleSetup, setPendingTutorialBattleSetup] = useState<TutorialBattleSetup | null>(null);
   const [openingFastForward, setOpeningFastForward] = useState(false);
   const [fastForwardMode, setFastForwardMode] = useState(false);
+  const [ctrlKeyHeld, setCtrlKeyHeld] = useState(false);
   const [scriptedBgOverride, setScriptedBgOverride] = useState<string | null>(null);
   const [visualResetKey, setVisualResetKey] = useState(0);
   const [showActionPanel, setShowActionPanel] = useState(false); // 行动面板延迟显示
@@ -928,6 +947,7 @@ export default function App() {
   const bgmRef = useRef<HTMLAudioElement | null>(null);
   const bgmTrackRef = useRef('');
   const parserRef = useRef(createNarrativeStreamParser());
+  const streamSuggestionsRef = useRef<ActionSuggestion[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const stateRef = useRef<GameState>({});
   const kpSpeakerRef = useRef('');
@@ -1058,7 +1078,7 @@ export default function App() {
 
   const appendStoryLines = useCallback(
     (texts: string[], role: StoryLine['role'], speaker: string, focus = false) => {
-      const cleanTexts = texts.map((text) => text.trim()).filter(Boolean);
+      const cleanTexts = texts.map((text) => stripMachineProtocolText(text).trim()).filter(Boolean);
       if (!cleanTexts.length) return;
 
       const nextLines: StoryLine[] = cleanTexts.flatMap((text): StoryLine[] => {
@@ -1142,6 +1162,7 @@ export default function App() {
           portrait: line.portrait || getScriptedPortraitOverride(scene.id, line.speaker),
           bgImage: line.bgImage,
           bgm: line.bgm || scene.bgm,
+          scriptedSceneId: scene.id,
         }));
         const next = [...prev, ...newLines];
         if (options.focus !== false) {
@@ -1339,6 +1360,7 @@ export default function App() {
             portrait: line.portrait,
             bgImage: line.bgImage,
             bgm: line.bgm || openingScene.bgm,
+            scriptedSceneId: openingScene.id,
           }));
           setStory(scriptLines);
           setActiveIndex(0);
@@ -1416,11 +1438,26 @@ export default function App() {
           ...(scene?.statePatch ?? {}),
           ...(scene?.setArea ? { current_area: scene.setArea, actions_in_area: 0 } : {}),
         };
+        const isOpeningTutorialCheckpoint = checkpoint.id === 'first-choice';
+        const tutorialCheckpointDefaults: GameState = isOpeningTutorialCheckpoint
+          ? {
+              first_choice_resolved: false,
+              tutorial_battle_done: false,
+              tutorial_battle_pending: true,
+              currentNodeId: 'opening_tutorial_battle',
+            }
+          : {
+              first_choice_resolved: true,
+              tutorial_battle_done: true,
+              tutorial_battle_pending: false,
+            };
         const statePatch: GameState = {
+          ...tutorialCheckpointDefaults,
           ...checkpoint.statePatch,
           ...scenePatch,
           test_mode: true,
           story_test_checkpoint: checkpoint.id,
+          tutorial_battle_pending: isOpeningTutorialCheckpoint,
           last_event: checkpoint.statePatch.last_event || scene?.lastEvent || `剧情测试：${checkpoint.label}`,
         };
         const nextState = {
@@ -1446,6 +1483,7 @@ export default function App() {
             || (scene ? getScriptedPortraitOverride(scene.id, line.speaker) : undefined),
           bgImage: 'bgImage' in line && typeof line.bgImage === 'string' ? line.bgImage : undefined,
           bgm: ('bgm' in line && typeof line.bgm === 'string' ? line.bgm : undefined) || scene?.bgm,
+          scriptedSceneId: scene?.id || checkpoint.id,
         })));
         setSuggestions(constrainActionSuggestions(nextState, makeSuggestions(checkpoint.hints ?? scene?.hints ?? fallbackSuggestions(nextState).map((item) => item.text))));
         setScriptedBgOverride(scene?.bgImage || null);
@@ -1814,57 +1852,6 @@ export default function App() {
         return;
       }
 
-      const yunlingPotion = findYunlingPotion(action);
-      if ((currentState.yunling_shop_unlocked || areaText.includes('黑市深处')) && (/不购买|返回公会|登记/.test(action) || yunlingPotion)) {
-        appendStoryLines([action], 'player', gameState.player_name || '你', true);
-        if (/不购买|返回公会|登记/.test(action) && !yunlingPotion) {
-          const registration = getScriptedScene('guild-final-registration');
-          if (registration) {
-            playScriptedScene(registration, { focus: false });
-            return;
-          }
-        }
-
-        if (yunlingPotion) {
-          const gold = Number(currentState.gold ?? 200);
-          if (gold < yunlingPotion.cost) {
-            appendStoryLines([`云苓看了一眼你们的金币袋：「这瓶${yunlingPotion.label}要${yunlingPotion.cost}G。等钱够了再谈。」`], 'kp', '云苓', true);
-            setSuggestions(makeSuggestions(YUNLING_SHOP_HINTS));
-            setPhase('narrating');
-            return;
-          }
-
-          const inventoryText = String(currentState.inventory || '长剑,冒险者工具包');
-          const nextInventory = inventoryText.includes(yunlingPotion.label) ? inventoryText : `${inventoryText},${yunlingPotion.label}`;
-          const patch: GameState = {
-            gold: Math.max(0, gold - yunlingPotion.cost),
-            inventory: nextInventory,
-            [`yunling_${yunlingPotion.key}_bought`]: true,
-            last_event: `在云苓处购买${yunlingPotion.label}`,
-          };
-          if (yunlingPotion.stat) patch[yunlingPotion.stat] = Number(currentState[yunlingPotion.stat] ?? 10) + 2;
-          else if (yunlingPotion.key === 'healing_potion') patch.current_hp = Math.min(Number(currentState.max_hp ?? currentState.current_hp ?? 20), Number(currentState.current_hp ?? 20) + 5);
-          else if (yunlingPotion.key === 'purification_heart') patch.purification_heart_owned = true;
-
-          setGameState((prev) => ({ ...prev, ...patch }));
-          if (gameId) {
-            void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || '云苓药水状态同步失败', 'error'));
-          }
-          addEvent(`金币 -${yunlingPotion.cost}`, 'state');
-          addEvent(`获得 ${yunlingPotion.label}`, 'state');
-          appendStoryLines([
-            yunlingPotion.stat
-              ? `云苓将${yunlingPotion.label}推到你面前：「下去之后再喝。药效很冲，能让身体短时间记住更强的状态。」你的${yunlingPotion.label.replace('药水', '')}提升了2点。`
-              : yunlingPotion.key === 'purification_heart'
-                ? '云苓取出一枚被银线缝住的透明晶核：「净化之心不是药，是选择。等你们遇到那个还没完全被黑石吃掉的人，再决定要不要用它。」'
-              : '云苓递来一支温热的红色药剂：「治疗药水别等到快死才喝。它能让伤口闭合，但不能替你判断什么时候该撤。」你恢复了5点生命值。',
-          ], 'kp', '云苓', true);
-          setSuggestions(makeSuggestions(YUNLING_SHOP_HINTS));
-          setPhase('narrating');
-          return;
-        }
-      }
-
       if (areaText.includes('酒馆') && /付\s*100G|付100G|100G购买|购买萨洛的情报|买情报/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
         const currentGold = Number(currentState.gold ?? 200);
@@ -2057,10 +2044,12 @@ export default function App() {
 
       abortRef.current?.abort();
       parserRef.current = createNarrativeStreamParser();
+      streamSuggestionsRef.current = [];
       diceFiredRef.current = false; // 重置骰子锁
       tutorialBattleIntentRef.current = shouldPrepareTutorialBattle;
       tutorialBattleDiceRef.current = null;
       tutorialBattleActionRef.current = shouldPrepareTutorialBattle ? action : '';
+      let streamedNarrativeLineCount = 0;
       setPhase('narrating');
       setStreaming(true);
       setSuggestions([]);
@@ -2070,8 +2059,15 @@ export default function App() {
       abortRef.current = runtime.streamAction(gameId, resolvedAction, {
         onNarrative: (chunk) => {
           const parsed = parserRef.current.push(chunk);
-          if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
-          if (parsed.suggestions.length) setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
+          if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
+          if (parsed.lines.length) {
+            streamedNarrativeLineCount += parsed.lines.length;
+            appendStoryLines(parsed.lines, 'kp', '主持人');
+          }
+        },
+        onSuggestions: (items) => {
+          streamSuggestionsRef.current = items;
+          setSuggestions(constrainActionSuggestions(stateRef.current, items));
         },
         onSystem: (rawEvent) => {
           const parsed = runtime.parseSystemEvent(rawEvent);
@@ -2090,22 +2086,27 @@ export default function App() {
         },
         onDone: () => {
           const parsed = parserRef.current.flush();
-          if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
+          if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
+          if (parsed.lines.length) {
+            streamedNarrativeLineCount += parsed.lines.length;
+            appendStoryLines(parsed.lines, 'kp', '主持人');
+          }
           if (tutorialBattleIntentRef.current) {
             const setup = buildTutorialBattleSetup(tutorialBattleDiceRef.current, tutorialBattleActionRef.current);
             setPendingTutorialBattleSetup(setup);
             // 通过底部对话框告知玩家判定结果和具体效果
-            appendStoryLines(setup.dialogueLines, 'system', '系统', true);
+            appendStoryLines(setup.dialogueLines, 'system', '系统', streamedNarrativeLineCount === 0);
             setGameState((prev) => ({
               ...prev,
               first_choice_resolved: true,
+              tutorial_battle_pending: false,
               current_area: '逆穹悬城·主缆街',
               last_event: '开局判定完成，等待进入教学战斗',
             }));
             setSuggestions(makeSuggestions(['进入教学战斗']));
             addEvent('开局判定将影响战斗', 'state');
           } else {
-            setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
+            setSuggestions(constrainActionSuggestions(stateRef.current, streamSuggestionsRef.current));
           }
 
           // 酒馆区域：瑟琳提示后，显示固定两个选项
@@ -2139,6 +2140,7 @@ export default function App() {
             setGameState((prev) => ({
               ...prev,
               first_choice_resolved: true,
+              tutorial_battle_pending: false,
               current_area: '逆穹悬城·主缆街',
               last_event: '主持人兜底后进入教学战斗',
             }));
@@ -2195,7 +2197,7 @@ export default function App() {
   );
 
   const handleDrinkingDiceComplete = useCallback(
-    (result: import('./components/DrinkingDiceGame').DrinkingDiceResult) => {
+    (result: DrinkingDiceResult) => {
       setShowDrinkingDiceGame(false);
       const outcome = result.playerWins >= 2 ? 'decisive' : result.playerWins >= 1 ? 'narrow' : 'fail';
       const trustBase = outcome === 'decisive' ? 68 : outcome === 'narrow' ? 60 : 50;
@@ -2266,9 +2268,7 @@ export default function App() {
       const inventoryText = String(current.inventory || '长剑,冒险者工具包');
       let nextInventory = inventoryText;
       for (const reward of result.rewards) {
-        if (!nextInventory.includes(reward.name)) {
-          nextInventory = `${nextInventory},${reward.name}`;
-        }
+        nextInventory = nextInventory ? `${nextInventory},${reward.name}` : reward.name;
       }
 
       // 事件消息
@@ -2323,9 +2323,15 @@ export default function App() {
     (itemId: string, name: string, price: number, stat?: string) => {
       const current = stateRef.current;
       const currentGold = Number(current.gold ?? 200);
+      if ((stat || itemId === 'purification_heart') && (current[`yunling_${itemId}_bought`] || (itemId === 'purification_heart' && current.purification_heart_owned))) {
+        return;
+      }
 
       const inventoryText = String(current.inventory || '长剑,冒险者工具包');
-      const nextInventory = inventoryText.includes(name) ? inventoryText : `${inventoryText},${name}`;
+      const nextInventory =
+        itemId === 'purification_heart' && inventoryText.includes(name)
+          ? inventoryText
+          : `${inventoryText},${name}`;
 
       const patch: GameState = {
         gold: Math.max(0, currentGold - price),
@@ -2471,6 +2477,14 @@ export default function App() {
   }, [gameState.current_area]);
 
   const currentLine = story[activeIndex];
+  const currentLineIsScripted = currentLine?.role === 'kp' && Boolean(currentLine.scriptedSceneId || currentLine.bgm || currentLine.bgImage);
+  const ctrlFastForwardActive = ctrlKeyHeld && currentLineIsScripted && screen === 'game' && phase === 'narrating' && !streaming;
+  const toggleFastForwardActive =
+    fastForwardMode &&
+    phase === 'narrating' &&
+    !streaming &&
+    (currentLineIsScripted || !story.some((line) => line.role === 'player'));
+  const autoAdvanceActive = openingFastForward || ctrlFastForwardActive || toggleFastForwardActive;
   const canAdvance = Boolean(currentLine) && (activeIndex < story.length - 1 || !streaming);
   const requestedBgmTrack = useMemo(() => externalBgmTrack || resolveBgmTrack(screen, currentLine, gameState), [externalBgmTrack, screen, currentLine, gameState]);
   const visibleSuggestions = constrainActionSuggestions(gameState, suggestions);
@@ -2507,20 +2521,39 @@ export default function App() {
     }
   }, [openingFastForward, phase, screen, story]);
 
-  // Ctrl+L 剧情加速快捷键
+  // Ctrl+L toggles test fast-forward; holding Ctrl temporarily fast-forwards fixed script scenes.
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
+    function onKeyDown(e: KeyboardEvent) {
+      if (screen === 'game' && (e.key === 'Control' || e.ctrlKey)) {
+        setCtrlKeyHeld(true);
+      }
       if (e.ctrlKey && e.key === 'l' && screen === 'game' && !streaming && phase === 'narrating') {
         e.preventDefault();
         setFastForwardMode((prev) => !prev);
       }
-      // 加速模式下点击或按空格也会自动推进，但按 Ctrl+L 可随时关闭
       if (fastForwardMode && phase === 'action') {
         setFastForwardMode(false);
       }
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+
+    function onKeyUp(e: KeyboardEvent) {
+      if (e.key === 'Control' || !e.ctrlKey) {
+        setCtrlKeyHeld(false);
+      }
+    }
+
+    function onBlur() {
+      setCtrlKeyHeld(false);
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
   }, [screen, streaming, phase, fastForwardMode]);
 
   // 行动面板延迟显示：底部文本全部输出完 1 秒后才可以显示
@@ -2601,6 +2634,7 @@ export default function App() {
     const tutorialStatePatch: GameState = {
       first_choice_resolved: true,
       tutorial_battle_done: true,
+      tutorial_battle_pending: false,
       current_area: '逆穹悬城·主缆街',
       last_event: '击退补给吊箱中的裂隙爬兽',
     };
@@ -2640,7 +2674,7 @@ export default function App() {
 
   if (screen === 'main-menu') {
     return (
-      <>
+      <LazyBoundary>
         <TitleMenu
           onNewGame={() => setScreen('new-game')}
           onLoadGame={openLoadGame}
@@ -2656,53 +2690,59 @@ export default function App() {
           onSfxVolumeChange={setSfxVolume}
           onClose={() => setShowAudioSettings(false)}
         />
-      </>
+      </LazyBoundary>
     );
   }
 
   if (screen === 'new-game') {
     return (
-      <StartDND
-        onStart={startGame}
-        onBack={() => setScreen('main-menu')}
-      />
+      <LazyBoundary>
+        <StartDND
+          onStart={startGame}
+          onBack={() => setScreen('main-menu')}
+        />
+      </LazyBoundary>
     );
   }
 
   if (screen === 'load-game') {
     return (
-      <LoadGameScreen
-        saves={saves}
-        saveBusySlot={saveBusySlot}
-        saveMessage={saveMessage}
-        saveMessageTone={saveMessageTone}
-        onBack={() => setScreen('main-menu')}
-        onRefreshSaves={refreshSaves}
-        onLoadSave={loadSavedGame}
-      />
+      <LazyBoundary>
+        <LoadGameScreen
+          saves={saves}
+          saveBusySlot={saveBusySlot}
+          saveMessage={saveMessage}
+          saveMessageTone={saveMessageTone}
+          onBack={() => setScreen('main-menu')}
+          onRefreshSaves={refreshSaves}
+          onLoadSave={loadSavedGame}
+        />
+      </LazyBoundary>
     );
   }
 
   if (screen === 'test') {
-    return <ErrorBoundary><TestScreen onBack={() => setScreen('main-menu')} onStoryTest={startStoryTest} /></ErrorBoundary>;
+    return <LazyBoundary><ErrorBoundary><TestScreen onBack={() => setScreen('main-menu')} onStoryTest={startStoryTest} /></ErrorBoundary></LazyBoundary>;
   }
 
   if (screen === 'loading') return <LoadingScreen error={loadError} onRetry={() => setScreen('new-game')} />;
 
   if (screen === 'tutorial-battle') {
     return (
-      <ErrorBoundary>
-        <BattleTestScreen
-          mode="tutorial"
-          openingEffects={pendingTutorialBattleSetup?.openingEffects ?? []}
-          onBack={() => {
-            setPendingTutorialBattleSetup(null);
-            setScreen('game');
-          }}
-          onComplete={completeTutorialBattle}
-          onSkip={completeTutorialBattle}
-        />
-      </ErrorBoundary>
+      <LazyBoundary>
+        <ErrorBoundary>
+          <BattleTestScreen
+            mode="tutorial"
+            openingEffects={pendingTutorialBattleSetup?.openingEffects ?? []}
+            onBack={() => {
+              setPendingTutorialBattleSetup(null);
+              setScreen('game');
+            }}
+            onComplete={completeTutorialBattle}
+            onSkip={completeTutorialBattle}
+          />
+        </ErrorBoundary>
+      </LazyBoundary>
     );
   }
 
@@ -2716,17 +2756,19 @@ export default function App() {
     const trustKey = eventTrustKeys[companionEventId] || 'trust_block';
     const companionId = COMPANION_ID_BY_EVENT_ID[companionEventId] || 'brock';
     return (
-      <ErrorBoundary>
-        <CompanionEventTestScreen
-          testMode={false}
-          returnLabel="返回主线"
-          playerName={gameState.player_name || '你'}
-          eventId={companionEventId}
-          initialTrust={getCompanionTrust(gameState, companionId) || Number(gameState[trustKey] ?? 55)}
-          onBack={() => setScreen('game')}
-          onComplete={completeCompanionSideEvent}
-        />
-      </ErrorBoundary>
+      <LazyBoundary>
+        <ErrorBoundary>
+          <CompanionEventTestScreen
+            testMode={false}
+            returnLabel="返回主线"
+            playerName={gameState.player_name || '你'}
+            eventId={companionEventId}
+            initialTrust={getCompanionTrust(gameState, companionId) || Number(gameState[trustKey] ?? 55)}
+            onBack={() => setScreen('game')}
+            onComplete={completeCompanionSideEvent}
+          />
+        </ErrorBoundary>
+      </LazyBoundary>
     );
   }
 
@@ -2737,56 +2779,64 @@ export default function App() {
       return null;
     }
     return (
-      <ErrorBoundary>
-        <BattleTestScreen
-          mode="test"
-          battleConfigOverride={battleConfig}
-          onBack={() => setScreen('game')}
-          onComplete={(result) => handleDeepBattleComplete(result)}
-        />
-      </ErrorBoundary>
+      <LazyBoundary>
+        <ErrorBoundary>
+          <BattleTestScreen
+            mode="test"
+            battleConfigOverride={battleConfig}
+            onBack={() => setScreen('game')}
+            onComplete={(result) => handleDeepBattleComplete(result)}
+          />
+        </ErrorBoundary>
+      </LazyBoundary>
     );
   }
 
   if (showBargainGame) {
-    return <BargainTestScreen onBack={() => setShowBargainGame(false)} onComplete={handleBargainComplete} />;
+    return <LazyBoundary><BargainTestScreen onBack={() => setShowBargainGame(false)} onComplete={handleBargainComplete} /></LazyBoundary>;
   }
 
   if (showDrinkingDiceGame) {
-    return <DrinkingDiceGame onBack={() => setShowDrinkingDiceGame(false)} onComplete={handleDrinkingDiceComplete} />;
+    return <LazyBoundary><DrinkingDiceGame onBack={() => setShowDrinkingDiceGame(false)} onComplete={handleDrinkingDiceComplete} /></LazyBoundary>;
   }
 
   if (showLuckyBoxGame) {
     return (
-      <OrlanBoxGame
-        gold={Number(gameState.gold ?? 200)}
-        onBack={() => setShowLuckyBoxGame(false)}
-        onComplete={handleOrlanBoxComplete}
-      />
+      <LazyBoundary>
+        <OrlanBoxGame
+          gold={Number(gameState.gold ?? 200)}
+          onBack={() => setShowLuckyBoxGame(false)}
+          onComplete={handleOrlanBoxComplete}
+        />
+      </LazyBoundary>
     );
   }
 
   if (showApothecaryShopUI) {
+    const purchasedShopKeys = shopItems
+      .filter((item) => !item.repeatable)
+      .filter((item) => Boolean(gameState[`yunling_${item.id}_bought`] || (item.id === 'purification_heart' && gameState.purification_heart_owned)))
+      .map((item) => item.id);
     return (
-      <ApothecaryShop
-        gold={Number(gameState.gold ?? 200)}
-        inventoryText={String(gameState.inventory || '')}
-        purchasedKeys={gameState.purification_heart_owned ? ['purification_heart'] : []}
-        onPurchase={handleApothecaryPurchase}
-        onExit={() => {
-          setShowApothecaryShopUI(false);
-          handleApothecaryExit();
-        }}
-        onInputAction={(text) => {
-          submitAction(text);
-        }}
-        fullScreen
-      />
+      <LazyBoundary>
+        <ApothecaryShop
+          gold={Number(gameState.gold ?? 200)}
+          inventoryText={String(gameState.inventory || '')}
+          purchasedKeys={purchasedShopKeys}
+          onPurchase={handleApothecaryPurchase}
+          onExit={() => {
+            setShowApothecaryShopUI(false);
+            handleApothecaryExit();
+          }}
+          fullScreen
+        />
+      </LazyBoundary>
     );
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="vn-app">
+    <LazyBoundary>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="vn-app">
       <VisualNovelStage
         key={`vn-stage-${visualResetKey}`}
         scene={scene}
@@ -2795,13 +2845,8 @@ export default function App() {
         isStreaming={streaming}
         isActionPhase={phase === 'action'}
         canAdvance={phase !== 'action' && canAdvance}
-        autoAdvance={
-          (openingFastForward || fastForwardMode) &&
-          phase === 'narrating' &&
-          !streaming &&
-          !story.some((line) => line.role === 'player')
-        }
-        autoAdvanceDelay={fastForwardMode ? 60 : 90}
+        autoAdvance={autoAdvanceActive}
+        autoAdvanceDelay={ctrlFastForwardActive ? 35 : toggleFastForwardActive ? 60 : 90}
         scriptedBgOverride={scriptedBgOverride}
         visualResetKey={visualResetKey}
         onAdvance={advanceLine}
@@ -2854,9 +2899,9 @@ export default function App() {
       </button>
 
       {/* 剧情加速状态指示器 */}
-      {fastForwardMode && (
+      {(fastForwardMode || ctrlFastForwardActive) && (
         <div className="fast-forward-indicator">
-          ⏩ 剧情加速中 · Ctrl+L 关闭
+          剧情加速中
         </div>
       )}
 
@@ -3005,6 +3050,7 @@ export default function App() {
                 setSuggestions([]);
                 abortRef.current?.abort();
                 parserRef.current = createNarrativeStreamParser();
+                streamSuggestionsRef.current = [];
                 diceFiredRef.current = false;
                 tutorialBattleIntentRef.current = false;
                 tutorialBattleDiceRef.current = null;
@@ -3020,8 +3066,12 @@ export default function App() {
                 abortRef.current = runtime.streamAction(gameId, contextualAction, {
                   onNarrative: (chunk) => {
                     const parsed = parserRef.current.push(chunk);
+                    if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
                     if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
-                    if (parsed.suggestions.length) setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
+                  },
+                  onSuggestions: (items) => {
+                    streamSuggestionsRef.current = items;
+                    setSuggestions(constrainActionSuggestions(stateRef.current, items));
                   },
                   onSystem: (rawEvent) => {
                     const parsed = runtime.parseSystemEvent(rawEvent);
@@ -3034,8 +3084,9 @@ export default function App() {
                   },
                   onDone: () => {
                     const parsed = parserRef.current.flush();
+                    if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
                     if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
-                    setSuggestions(constrainActionSuggestions(stateRef.current, parsed.suggestions));
+                    setSuggestions(constrainActionSuggestions(stateRef.current, streamSuggestionsRef.current));
                     setStreaming(false);
                   },
                   onError: (error) => {
@@ -3143,6 +3194,7 @@ export default function App() {
                     portrait: line.portrait || getScriptedPortraitOverride(saloIntel.id, line.speaker),
                     bgImage: line.bgImage,
                     bgm: line.bgm || saloIntel.bgm,
+                    scriptedSceneId: saloIntel.id,
                   }))
                 : [];
               setStory((prev) => {
@@ -3199,6 +3251,7 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+      </motion.div>
+    </LazyBoundary>
   );
 }

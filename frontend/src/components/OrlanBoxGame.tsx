@@ -1,13 +1,10 @@
-import { useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import { TutorialOverlay } from './TutorialOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
-
-// ============================================================
-// 类型定义
-// ============================================================
+import '../styles/orlan-box.css';
 
 interface RewardItem {
   itemId: string;
@@ -15,6 +12,7 @@ interface RewardItem {
   count: number;
   type: string;
   desc: string;
+  icon: string;
   min?: number;
   max?: number;
 }
@@ -30,7 +28,7 @@ interface DrawRecord {
 export interface OrlanBoxResult {
   drawCount: number;
   spent: number;
-  rewards: RewardItem[];        // 所有获得的奖励（用于加入背包）
+  rewards: RewardItem[];
   finalD20: number;
   guaranteed: boolean;
   rewardHistory: DrawRecord[];
@@ -42,144 +40,171 @@ interface OrlanBoxGameProps {
   onComplete: (result: OrlanBoxResult) => void;
 }
 
-// ============================================================
-// 奖励表
-// ============================================================
-
 const ORLAN_REWARD_TABLE: RewardItem[] = [
-  { itemId: 'rusty_copper_ring', name: '生锈铜戒指', count: 1, type: 'junk', min: 1, max: 3, desc: '看起来不值钱，但奥兰坚称它有故事。' },
-  { itemId: 'old_charm_fragment', name: '旧护符碎片', count: 1, type: 'material', min: 4, max: 5, desc: '残缺的护符碎片，或许能卖几个铜币。' },
-  { itemId: 'bandage_powder', name: '止血粉', count: 1, type: 'consumable', min: 6, max: 8, desc: '可用于处理普通流血伤口。' },
-  { itemId: 'weak_antidote', name: '弱效解毒剂', count: 1, type: 'consumable', min: 9, max: 11, desc: '能缓解轻微毒素，但对深层污染效果有限。' },
-  { itemId: 'cold_light_stick', name: '冷光棒', count: 1, type: 'exploration', min: 12, max: 13, desc: '短时间照亮周围环境，不会产生明显热源。' },
-  { itemId: 'sealed_sample_vial', name: '密封样本瓶', count: 1, type: 'exploration', min: 14, max: 15, desc: '可用于保存孢子、菌丝或污染残留。' },
-  { itemId: 'minor_healing_potion', name: '小瓶治疗药水', count: 1, type: 'consumable', min: 16, max: 17, desc: '能恢复少量生命，适合应急。' },
-  { itemId: 'black_market_token', name: '黑市筹码', count: 1, type: 'special', min: 18, max: 18, desc: '黑市流通的小筹码，或许以后能派上用场。' },
+  {
+    itemId: 'copper_ring',
+    name: '生锈铜戒指',
+    count: 1,
+    type: '旧物',
+    min: 1,
+    max: 3,
+    icon: '/assets/prop/aolan_blindbox/copper_ring.png',
+    desc: '边缘磨得发黑，奥兰坚持说它曾经属于一位勇敢的人。',
+  },
+  {
+    itemId: 'old_talisman_fragments',
+    name: '旧护符碎片',
+    count: 1,
+    type: '材料',
+    min: 4,
+    max: 5,
+    icon: '/assets/prop/aolan_blindbox/old_talisman_fragments.png',
+    desc: '残缺的护符碎片，表面还有几道不完整的祈愿纹。',
+  },
+  {
+    itemId: 'hemostatic_powder',
+    name: '止血粉',
+    count: 1,
+    type: '消耗品',
+    min: 6,
+    max: 8,
+    icon: '/assets/prop/aolan_blindbox/hemostatic_powder.png',
+    desc: '可用于处理普通流血伤口，味道像苦涩的铁锈。',
+  },
+  {
+    itemId: 'weakly_effective_detoxifying_agent',
+    name: '弱效解毒剂',
+    count: 1,
+    type: '消耗品',
+    min: 9,
+    max: 11,
+    icon: '/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png',
+    desc: '能缓解轻微毒素，但对深层污染效果有限。',
+  },
+  {
+    itemId: 'cold_light_stick',
+    name: '冷光棒',
+    count: 1,
+    type: '探索',
+    min: 12,
+    max: 13,
+    icon: '/assets/prop/aolan_blindbox/cold_light_stick.png',
+    desc: '短时间照亮周围环境，不会产生明显热源。',
+  },
+  {
+    itemId: 'sealed_sample_bottle',
+    name: '密封样本瓶',
+    count: 1,
+    type: '探索',
+    min: 14,
+    max: 15,
+    icon: '/assets/prop/aolan_blindbox/sealed_sample_bottle.png',
+    desc: '可用于保存孢子、菌丝或污染残留。',
+  },
+  {
+    itemId: 'small_bottle_therapeutic_solution',
+    name: '小瓶治疗药水',
+    count: 1,
+    type: '消耗品',
+    min: 16,
+    max: 17,
+    icon: '/assets/prop/aolan_blindbox/small_bottle_therapeutic_solution.png',
+    desc: '能恢复少量生命，适合应急。',
+  },
+  {
+    itemId: 'blackmarket_chips',
+    name: '黑市筹码',
+    count: 1,
+    type: '特殊',
+    min: 18,
+    max: 18,
+    icon: '/assets/prop/aolan_blindbox/blackmarket_chips.png',
+    desc: '黑市流通的小筹码，也许以后能派上用场。',
+  },
 ];
 
 const DIAMOND_REWARD: RewardItem = {
-  itemId: 'clean_diamond',
+  itemId: 'diamond',
   name: '干净的钻石',
   count: 1,
-  type: 'key',
+  type: '关键道具',
+  icon: '/assets/prop/aolan_blindbox/diamond.png',
   desc: '未经附魔、没有追踪印记的天然钻石。凯娅要的就是它。',
 };
 
 const COST_PER_DRAW = 20;
 const PITY_LIMIT = 8;
-const DIAMOND_THRESHOLD = 18; // D20 > 18 即 19/20
-
-// ============================================================
-// 抽卡文案
-// ============================================================
-
-const ORLAN_DRAW_LINES = {
-  normal: [
-    '奥兰敲了敲盒盖，示意你打开这一格。',
-    '木盒内部传来细碎的金属声。',
-    '盲盒暗格弹开，里面躺着一件小东西。',
-  ],
-  diamond: [
-    '奥兰的笑容僵了一瞬。盒中，一颗钻石在冷光灯下亮了起来。',
-    '周围的黑市摊主安静了一瞬。你抽中了真正值钱的东西。',
-  ],
-  pity: [
-    '奥兰叹了口气，打开盒底的暗格。',
-    '规矩就是规矩。第八次，钻石归你。',
-  ],
-  noGold: [
-    '奥兰按住盒盖，笑着摇头：没金币，就别让幸运为难。',
-  ],
-  alreadyDone: '你已经拿到了钻石，没必要继续抽取。',
-};
-
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-// ============================================================
-// 教程步骤
-// ============================================================
+const DIAMOND_THRESHOLD = 18;
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: '规则说明',
     badge: 'ORLAN BOX',
-    body: '二十金一次。D20 投出 19 或 20 获得钻石。连续 8 次未中获得保底钻石。每次抽取都会获得小道具或钻石。',
+    body: '20G 一次，D20 投出 19 或 20 获得钻石。连续 8 次未中会触发保底；每次抽取都会获得一个小道具或钻石。',
   },
 ];
 
-// ============================================================
-// 核心逻辑函数
-// ============================================================
-
-function rollD20(): number {
+function rollD20() {
   return Math.floor(Math.random() * 20) + 1;
 }
 
-function getRewardByD20(d20: number): RewardItem {
-  const reward = ORLAN_REWARD_TABLE.find(
-    (item) => d20 >= (item.min ?? 1) && d20 <= (item.max ?? 20)
+function getRewardByD20(d20: number) {
+  return ORLAN_REWARD_TABLE.find((item) => d20 >= (item.min ?? 1) && d20 <= (item.max ?? 20)) ?? ORLAN_REWARD_TABLE[0];
+}
+
+function RewardReveal({
+  record,
+  onClose,
+}: {
+  record: DrawRecord;
+  onClose: () => void;
+}) {
+  const isDiamond = record.reward.itemId === 'diamond';
+  return (
+    <motion.div
+      className="orlan-reward-backdrop"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.section
+        className={`orlan-reward-card ${isDiamond ? 'orlan-reward-card-diamond' : ''}`}
+        initial={{ opacity: 0, scale: 0.9, y: 18 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 10 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+      >
+        <span className="orlan-reward-kicker">{record.isPity ? '保底奖励' : `D20 = ${record.d20}`}</span>
+        <div className="orlan-reward-image-frame">
+          <img src={record.reward.icon} alt={record.reward.name} />
+        </div>
+        <h2>{record.reward.name}</h2>
+        <p>{record.reward.desc}</p>
+        <button type="button" onClick={onClose}>
+          收下
+        </button>
+      </motion.section>
+    </motion.div>
   );
-  return reward ?? ORLAN_REWARD_TABLE[0];
 }
-
-function getDrawMessage(
-  d20: number,
-  reward: RewardItem,
-  isPity: boolean,
-  drawCount: number
-): string {
-  if (reward.itemId === 'clean_diamond' && isPity) {
-    return `第 ${drawCount} 次抽取，保底触发。${pickRandom(ORLAN_DRAW_LINES.pity)}`;
-  }
-  if (reward.itemId === 'clean_diamond') {
-    return `${pickRandom(ORLAN_DRAW_LINES.diamond)} D20 投出 ${d20}！`;
-  }
-  return `${pickRandom(ORLAN_DRAW_LINES.normal)} D20 投出 ${d20}。获得：${reward.name}——${reward.desc}`;
-}
-
-// ============================================================
-// 组件
-// ============================================================
 
 export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
   const [drawCount, setDrawCount] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
   const [hasDiamond, setHasDiamond] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
   const [lastD20, setLastD20] = useState<number | null>(null);
   const [lastReward, setLastReward] = useState<RewardItem | null>(null);
-  const [lastDrawMessage, setLastDrawMessage] = useState('');
   const [rewardHistory, setRewardHistory] = useState<DrawRecord[]>([]);
   const [allRewards, setAllRewards] = useState<RewardItem[]>([]);
-
-  // 骰子动画状态
   const [diceResult, setDiceResult] = useState<DiceResult | null>(null);
-  const [pendingDraw, setPendingDraw] = useState<{
-    d20: number;
-    reward: RewardItem;
-    isPity: boolean;
-  } | null>(null);
-
-  // 教程
+  const [pendingDraw, setPendingDraw] = useState<DrawRecord | null>(null);
+  const [revealedDraw, setRevealedDraw] = useState<DrawRecord | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
 
-  // 按钮状态
-  const playerGold = gold - totalCost;
-  const canDraw = !isCompleted && playerGold >= COST_PER_DRAW;
+  const currentGold = Math.max(0, gold - totalCost);
+  const canDraw = !hasDiamond && currentGold >= COST_PER_DRAW;
 
-  let buttonText: string;
-  if (isCompleted) {
-    buttonText = '已获得钻石';
-  } else if (playerGold < COST_PER_DRAW) {
-    buttonText = '金币不足';
-  } else {
-    buttonText = '抽一次 20G';
-  }
-
-  // 执行抽取
   const doDraw = useCallback(() => {
     if (!canDraw) return;
 
@@ -187,110 +212,76 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
     const nextDrawCount = drawCount + 1;
     const isNaturalDiamond = d20 > DIAMOND_THRESHOLD;
     const isPityDiamond = nextDrawCount >= PITY_LIMIT && !hasDiamond;
+    const isPity = isPityDiamond && !isNaturalDiamond;
+    const reward = isNaturalDiamond || isPityDiamond ? { ...DIAMOND_REWARD } : { ...getRewardByD20(d20) };
+    const record: DrawRecord = {
+      index: nextDrawCount,
+      d20,
+      reward,
+      cost: COST_PER_DRAW,
+      isPity,
+    };
 
-    let reward: RewardItem;
-    let gotDiamond = false;
-    let isPity = false;
-
-    if (isNaturalDiamond || isPityDiamond) {
-      reward = { ...DIAMOND_REWARD };
-      gotDiamond = true;
-      isPity = isPityDiamond && !isNaturalDiamond;
-    } else {
-      reward = { ...getRewardByD20(d20) };
-    }
-
-    const message = getDrawMessage(d20, reward, isPity, nextDrawCount);
-
-    // 更新所有状态
     setDrawCount(nextDrawCount);
-    setTotalCost((prev) => prev + COST_PER_DRAW);
+    setTotalCost((value) => value + COST_PER_DRAW);
     setLastD20(d20);
     setLastReward(reward);
-    setLastDrawMessage(message);
     setAllRewards((prev) => [...prev, reward]);
+    setPendingDraw(record);
+    if (reward.itemId === 'diamond') setHasDiamond(true);
 
-    if (gotDiamond) {
-      setHasDiamond(true);
-      setIsCompleted(true);
-    }
-
-    // 先显示骰子动画
-    const diceData: DiceResult = {
+    setDiceResult({
       type: 'skill_check',
       data: {
         掷骰: `D20=${d20}`,
-        总计: String(d20),
-        DC: '18',
-        成功: gotDiamond,
-        描述: gotDiamond ? '获得钻石！' : '未中钻石',
+        总计: d20,
+        DC: DIAMOND_THRESHOLD + 1,
+        成功: reward.itemId === 'diamond',
+        描述: reward.itemId === 'diamond' ? '获得钻石' : `获得${reward.name}`,
         骰子: 'd20',
       },
-    };
-    setDiceResult(diceData);
-    setPendingDraw({ d20, reward, isPity });
+    });
   }, [canDraw, drawCount, hasDiamond]);
 
-  // 骰子动画关闭后处理
   const handleDiceClose = useCallback(() => {
     setDiceResult(null);
     if (pendingDraw) {
-      const { d20, reward, isPity } = pendingDraw;
-      const record: DrawRecord = {
-        index: drawCount,
-        d20,
-        reward,
-        cost: COST_PER_DRAW,
-        isPity,
-      };
-      setRewardHistory((prev) => [...prev, record]);
+      setRewardHistory((prev) => [...prev, pendingDraw]);
+      setRevealedDraw(pendingDraw);
       setPendingDraw(null);
     }
-  }, [pendingDraw, drawCount]);
+  }, [pendingDraw]);
 
-  // 完成按钮
   const handleComplete = useCallback(() => {
     onComplete({
       drawCount,
       spent: totalCost,
       rewards: allRewards,
       finalD20: lastD20 ?? 0,
-      guaranteed: rewardHistory.some((r) => r.isPity),
+      guaranteed: rewardHistory.some((record) => record.isPity),
       rewardHistory,
     });
-  }, [onComplete, drawCount, totalCost, allRewards, lastD20, rewardHistory]);
-
-  const currentGoldDisplay = Math.max(0, gold - totalCost);
+  }, [allRewards, drawCount, lastD20, onComplete, rewardHistory, totalCost]);
 
   return (
-    <main
-      className="test-screen"
-      style={{
-        backgroundImage:
-          'linear-gradient(90deg, rgba(10,8,14,0.88), rgba(10,8,14,0.58)), url(/assets/scenes/10orlan-lucky-box.webp)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
-      {/* 教程覆盖层 */}
+    <main className="orlan-box-screen">
       {showTutorial && (
         <TutorialOverlay
           steps={TUTORIAL_STEPS}
           currentStep={tutorialStep}
           onClose={() => setShowTutorial(false)}
-          onPrev={() => setTutorialStep((s) => Math.max(0, s - 1))}
+          onPrev={() => setTutorialStep((value) => Math.max(0, value - 1))}
           onNext={() => {
             if (tutorialStep >= TUTORIAL_STEPS.length - 1) {
               setShowTutorial(false);
               setTutorialStep(0);
             } else {
-              setTutorialStep((s) => s + 1);
+              setTutorialStep((value) => value + 1);
             }
           }}
         />
       )}
 
-      {/* 骰子动画覆盖层 */}
       <DiceRollOverlay
         dice={diceResult}
         dieType="d20"
@@ -299,205 +290,82 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
         charSkill="奥兰的幸运盲盒"
       />
 
-      <section className="test-layout">
-        {/* 头部 */}
-        <header className="test-header">
+      <AnimatePresence>
+        {revealedDraw && <RewardReveal record={revealedDraw} onClose={() => setRevealedDraw(null)} />}
+      </AnimatePresence>
+
+      <section className="orlan-box-panel">
+        <header className="orlan-box-header">
           <div>
-            <p className="eyebrow">ORLAN BOX</p>
+            <span>ORLAN BOX</span>
             <h1>幸运盲盒</h1>
+            <p>奥兰把木盒推到柜台中央，盒盖下传来细碎的金属声。</p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setShowTutorial(true)}
-              style={{ fontSize: '0.85rem', minHeight: 32, padding: '0 12px' }}
-            >
+          <div className="orlan-box-actions">
+            <button type="button" onClick={() => setShowTutorial(true)}>
               规则
             </button>
-            <button type="button" className="ghost-button" onClick={onBack}>
+            <button type="button" onClick={onBack}>
               返回
             </button>
           </div>
         </header>
 
-        {/* 旁白 */}
-        <p
-          style={{
-            color: 'var(--muted)',
-            fontSize: '0.95rem',
-            lineHeight: 1.65,
-            marginBottom: 18,
-            fontStyle: 'italic',
-          }}
-        >
-          奥兰把盲盒推到柜台中央。
-        </p>
-
-        {/* 规则摘要 */}
-        <div className="test-section-title" style={{ marginBottom: 10 }}>
-          <span>规则</span>
-          <small>
-            二十金一次。D20 大于 18 获得钻石。第 8 次保底。每次都会获得小道具或钻石。
-          </small>
-        </div>
-
-        {/* 主面板 */}
-        <section className="dice-judge-panel">
-          {/* D20 显示区 + 按钮 */}
-          <div className="dice-judge-board">
-            <div className="dice-judge-symbol">
-              {lastD20 !== null ? `D20=${lastD20}` : 'D20'}
-            </div>
-            <div className="dice-judge-copy">
-              <strong>
-                已抽 {drawCount}/{PITY_LIMIT} 次，花费 {totalCost}G
-              </strong>
-              <p style={{ marginTop: 4 }}>
-                当前金币：{currentGoldDisplay}G
-              </p>
-              {lastDrawMessage && (
-                <p
-                  style={{
-                    marginTop: 6,
-                    color: hasDiamond ? 'var(--gold-soft)' : 'var(--muted)',
-                    fontSize: '0.88rem',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {lastDrawMessage}
-                </p>
-              )}
-            </div>
-
-            {isCompleted ? (
-              <button
-                type="button"
-                className="start-button"
-                onClick={handleComplete}
-              >
-                继续剧情
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="start-button"
-                onClick={doDraw}
-                disabled={!canDraw}
-              >
-                {buttonText}
-              </button>
-            )}
+        <div className="orlan-box-main">
+          <div className="orlan-d20-display">
+            <span>{lastD20 ?? 'D20'}</span>
+            <small>{hasDiamond ? '钻石已入手' : `保底 ${drawCount}/${PITY_LIMIT}`}</small>
           </div>
 
-          {/* 如果金币不足 */}
-          {!isCompleted && playerGold < COST_PER_DRAW && (
-            <p
-              style={{
-                color: 'rgba(211, 99, 99, 0.85)',
-                fontSize: '0.88rem',
-                textAlign: 'center',
-                margin: 0,
-              }}
-            >
-              {ORLAN_DRAW_LINES.noGold[0]}
-            </p>
-          )}
-
-          {/* 最近获得 */}
-          {lastReward && (
-            <div
-              style={{
-                padding: '12px 18px',
-                border: '1px solid rgba(231,211,161,0.2)',
-                borderRadius: 8,
-                background: 'rgba(16,19,26,0.82)',
-              }}
-            >
-              <span
-                style={{
-                  color: 'var(--teal)',
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                }}
-              >
-                最近获得
-              </span>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginTop: 6,
-                }}
-              >
-                <strong
-                  style={{
-                    color: lastReward.itemId === 'clean_diamond' ? 'var(--gold-soft)' : 'var(--text)',
-                    fontSize: '1.05rem',
-                  }}
-                >
-                  {lastReward.name}
-                  {lastReward.itemId === 'clean_diamond' ? ' 💎' : ''}
-                </strong>
-                <span
-                  style={{
-                    color: 'var(--muted)',
-                    fontSize: '0.78rem',
-                    background: 'rgba(255,255,255,0.06)',
-                    padding: '2px 10px',
-                    borderRadius: 4,
-                  }}
-                >
-                  {lastReward.type}
+          <div className="orlan-box-status">
+            <strong>当前金币 {currentGold}G</strong>
+            <p>20G 一次。D20 投出 19 或 20 获得钻石，第 8 次未中会触发保底。</p>
+            {lastReward && (
+              <div className="orlan-last-reward">
+                <img src={lastReward.icon} alt={lastReward.name} />
+                <span>
+                  最近获得
+                  <b>{lastReward.name}</b>
                 </span>
               </div>
-              <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: 4 }}>
-                {lastReward.desc}
-              </p>
-            </div>
-          )}
-
-          {/* 抽取记录 */}
-          <div className="dice-history-list">
-            {rewardHistory.length > 0 ? (
-              rewardHistory.map((record) => (
-                <motion.p
-                  key={record.index}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.25 }}
-                  style={{
-                    borderLeft:
-                      record.reward.itemId === 'clean_diamond'
-                        ? '3px solid var(--gold-soft)'
-                        : '3px solid transparent',
-                    paddingLeft: record.reward.itemId === 'clean_diamond' ? 7 : 10,
-                  }}
-                >
-                  <span>
-                    第 {record.index} 次
-                    {record.isPity && (
-                      <span style={{ color: 'var(--gold-soft)', marginLeft: 6, fontSize: '0.75rem' }}>
-                        [保底]
-                      </span>
-                    )}
-                  </span>
-                  <b>
-                    D20={record.d20}{' '}
-                    {record.reward.itemId === 'clean_diamond'
-                      ? '💎 钻石'
-                      : `· ${record.reward.name}`}
-                  </b>
-                </motion.p>
-              ))
-            ) : (
-              <p className="dice-history-empty">尚未抽取</p>
             )}
           </div>
-        </section>
+
+          {hasDiamond ? (
+            <button type="button" className="orlan-primary-button" onClick={handleComplete} disabled={Boolean(revealedDraw)}>
+              继续剧情
+            </button>
+          ) : (
+            <button type="button" className="orlan-primary-button" onClick={doDraw} disabled={!canDraw || Boolean(diceResult) || Boolean(revealedDraw)}>
+              {currentGold < COST_PER_DRAW ? '金币不足' : '抽一次 20G'}
+            </button>
+          )}
+        </div>
+
+        {!hasDiamond && currentGold < COST_PER_DRAW && (
+          <p className="orlan-warning">奥兰按住盒盖，笑着摇头：没金币，就别让幸运为难。</p>
+        )}
+
+        <div className="orlan-history">
+          {rewardHistory.length > 0 ? (
+            rewardHistory.map((record) => (
+              <motion.div
+                key={record.index}
+                className={record.reward.itemId === 'diamond' ? 'orlan-history-row-diamond' : ''}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+              >
+                <img src={record.reward.icon} alt={record.reward.name} />
+                <span>第 {record.index} 次</span>
+                <b>D20={record.d20}</b>
+                <strong>{record.reward.name}</strong>
+                {record.isPity && <em>保底</em>}
+              </motion.div>
+            ))
+          ) : (
+            <p className="orlan-empty">尚未抽取</p>
+          )}
+        </div>
       </section>
     </main>
   );

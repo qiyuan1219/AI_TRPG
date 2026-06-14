@@ -3,10 +3,12 @@
 写入时机: DM说完一段 → 写入 | 玩家说完 → 写入 | 系统事件 → 写入
 """
 import os
+import logging
 from datetime import datetime
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
+_logger = logging.getLogger(__name__)
 
 
 class GameLogger:
@@ -53,8 +55,8 @@ class GameLogger:
             with open(self.path, "a", encoding="utf-8") as f:
                 f.write(text)
                 f.flush()
-        except:
-            pass
+        except OSError as error:
+            _logger.warning("failed to append game log %s: %s", self.path, error)
 
 
 _loggers: dict[str, GameLogger] = {}
@@ -80,5 +82,5 @@ def _get_model() -> str:
     try:
         from config import LLM_MODEL
         return LLM_MODEL
-    except:
+    except ImportError:
         return "unknown"

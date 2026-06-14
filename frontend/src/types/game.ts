@@ -9,6 +9,49 @@ export interface ActionSuggestion {
   text: string;
 }
 
+export interface DocumentSection {
+  heading: string;
+  body: string;
+}
+
+export interface ArchiveDocument {
+  id: string;
+  name: string;
+  type: 'document';
+  category: 'archive';
+  summary: string;
+  source?: string;
+  readable?: boolean;
+  content?: {
+    title: string;
+    sections: DocumentSection[];
+  };
+  tags?: string[];
+  unlocks?: string[];
+  unlockedAt?: string;
+}
+
+export interface InvestigationClue {
+  id: string;
+  name: string;
+  description: string;
+  source?: string;
+  tags?: string[];
+  unlockedAt?: string;
+}
+
+export interface QuestLog {
+  mainQuest?: string;
+  currentObjective?: string;
+  completedObjectives?: string[];
+  updates?: Array<{
+    id?: string;
+    title?: string;
+    objective?: string;
+    createdAt?: string;
+  }>;
+}
+
 export interface StoryLine {
   id: number;
   role: 'kp' | 'player' | 'system';
@@ -17,6 +60,7 @@ export interface StoryLine {
   portrait?: string;
   bgImage?: string;
   bgm?: string;
+  scriptedSceneId?: string;
 }
 
 export interface SceneVisual {
@@ -37,6 +81,14 @@ export interface SceneBgStage {
 
 export interface GameState {
   [key: string]: any;
+  documents?: ArchiveDocument[];
+  clues?: InvestigationClue[];
+  flags?: Record<string, any>;
+  questLog?: QuestLog;
+  sceneState?: {
+    currentScene?: string;
+    visitedScenes?: string[];
+  };
   companionTrust?: Partial<Record<CompanionId, number>>;
   trustLogs?: TrustLog[];
   companionMemories?: CompanionMemory[];
@@ -185,6 +237,7 @@ export interface LoadGameResult {
 export interface StreamCallbacks {
   onNarrative: (chunk: string) => void;
   onSystem: (event: string) => void;
+  onSuggestions?: (suggestions: ActionSuggestion[]) => void;
   onStateUpdate: (change: Record<string, any>) => void;
   onDone: () => void;
   onError: (error: string) => void;

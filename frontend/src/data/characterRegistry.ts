@@ -284,7 +284,14 @@ export function findRegisteredSpeaker(text: string, reverse = false) {
   return bestSpeaker;
 }
 
+const PORTRAIT_TEST_EXCLUDED_IDS = new Set(['liya', 'lelduo']);
+const PORTRAIT_TEST_EXCLUDED_PORTRAITS = new Set([
+  '/assets/characters/yunling/_2026-06-11T14-32-43.png',
+]);
+
 export const PORTRAIT_TEST_CHARACTERS = CHARACTER_PROFILES
+  .filter((profile) => !PORTRAIT_TEST_EXCLUDED_IDS.has(profile.id))
+  .filter((profile) => !profile.portrait || !PORTRAIT_TEST_EXCLUDED_PORTRAITS.has(profile.portrait))
   .filter((profile): profile is CharacterProfile & { portrait: string } => Boolean(profile.portrait))
   .map((profile) => ({
     name: profile.name,

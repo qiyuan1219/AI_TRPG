@@ -676,6 +676,37 @@ EVENT_SYSTEM = """## 随机事件 (根据场景和时机触发)
 # ============================================================
 # 📐 状态构建
 # ============================================================
+def _entry_names(entries, limit: int = 6) -> str:
+    if not isinstance(entries, list) or not entries:
+        return "无"
+    names = []
+    for entry in entries[:limit]:
+        if isinstance(entry, dict):
+            names.append(str(entry.get("name") or entry.get("id") or "").strip())
+        else:
+            names.append(str(entry).strip())
+    return "、".join(item for item in names if item) or "无"
+
+
+def _flag_summary(flags) -> str:
+    if not isinstance(flags, dict) or not flags:
+        return "无"
+    active = [key for key, value in flags.items() if value]
+    return "、".join(active[:8]) if active else "无"
+
+
+def _quest_summary(quest) -> str:
+    if not isinstance(quest, dict) or not quest:
+        return "未记录"
+    objective = quest.get("currentObjective") or "未记录"
+    updates = quest.get("updates")
+    if isinstance(updates, list) and updates:
+        latest = updates[-1]
+        if isinstance(latest, dict) and latest.get("title"):
+            return f"{objective}（最新：{latest.get('title')}）"
+    return str(objective)
+
+
 def _build_state(s: dict) -> str:
     canonicalize_trust_state(s)
     def _m(v): return f"({(v-10)//2:+d})"
@@ -698,6 +729,10 @@ def _build_state(s: dict) -> str:
 力{_m(s.get('str',16))} 敏{_m(s.get('dex',13))} 体{_m(s.get('con',14))} 智{_m(s.get('int',10))} 感{_m(s.get('wis',12))} 魅{_m(s.get('cha',8))}
 HP:{s.get('current_hp',30)}/{s.get('max_hp',30)} AC:{s.get('ac',18)}
 金币:{s.get('gold',200)}GP | 背包:{s.get('inventory','长剑,冒险者工具包')}
+档案:{_entry_names(s.get('documents'))}
+线索:{_entry_names(s.get('clues'))}
+剧情flags:{_flag_summary(s.get('flags'))}
+任务目标:{_quest_summary(s.get('questLog'))}
 {_class_gear_hint(cls)}
 {_class_skill_hint(cls)}
 
@@ -865,8 +900,8 @@ OUTPUT_DND = """## 输出格式
 
 ### HINTS 可见性铁律
 - 叙事正文、舞台提示和 NPC 台词中严禁出现 HINTS、[HINTS]、【HINTS】、提示词、选项协议等元文本。
-- 如果需要给前端行动选项，只能在整段回复最后单独输出一行机器协议：[HINTS: 选项1 | 选项2 | 选项3]。
-- 不要使用中文方括号包装 HINTS，不要把 HINTS 写进角色发言，不要让瑟琳或任何角色朗读行动选项。
+- 如果需要给前端行动选项，只能在整段回复最后单独输出一行机器协议：[HINTS: 选项1 | 选项2 | 选项3]。后端会截获并转成结构化建议，玩家文本里绝不能保留这一行。
+- 不要使用中文方括号包装 HINTS，不要把 HINTS 写进角色发言，不要让瑟琳或任何角色朗读行动选项，也不要解释任何 [STATE:...]、[SYSTEM:...]、[CMD:...] 协议。
 - 玩家可见内容必须是标准剧本形式：人物名：「台词」。舞台提示只写自然叙事，不写协议说明。
 
 ### 步骤0: 元数据行(必须输出,每轮第一行)

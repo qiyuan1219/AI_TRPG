@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 interface LoadingScreenProps {
-  error: string;
-  onRetry: () => void;
+  error?: string;
+  onRetry?: () => void;
 }
 
 export function LoadingScreen({ error, onRetry }: LoadingScreenProps) {

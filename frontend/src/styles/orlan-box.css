@@ -1,0 +1,344 @@
+.orlan-box-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 34px 16px;
+  background:
+    linear-gradient(90deg, rgba(8, 7, 11, 0.9), rgba(9, 10, 15, 0.66)),
+    url('/assets/scenes/10orlan-lucky-box.webp') center / cover no-repeat;
+  color: #dfd3b8;
+}
+
+.orlan-box-panel {
+  width: min(760px, 100%);
+  border: 1px solid rgba(221, 174, 75, 0.36);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(24, 26, 34, 0.94), rgba(11, 12, 18, 0.96));
+  box-shadow: 0 22px 72px rgba(0, 0, 0, 0.58), inset 0 0 30px rgba(221, 174, 75, 0.06);
+  padding: 18px;
+}
+
+.orlan-box-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(221, 174, 75, 0.2);
+}
+
+.orlan-box-header span {
+  display: block;
+  color: rgba(97, 204, 184, 0.82);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+}
+
+.orlan-box-header h1 {
+  margin: 5px 0 0;
+  color: #f0d58b;
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  letter-spacing: 0;
+}
+
+.orlan-box-header p {
+  margin: 5px 0 0;
+  color: rgba(223, 211, 184, 0.66);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.orlan-box-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.orlan-box-actions button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid rgba(223, 211, 184, 0.2);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(223, 211, 184, 0.84);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.orlan-box-actions button:hover {
+  border-color: rgba(240, 213, 139, 0.48);
+  color: #f0d58b;
+}
+
+.orlan-box-main {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 150px;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0;
+}
+
+.orlan-d20-display {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(240, 213, 139, 0.34);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(240, 213, 139, 0.18), transparent 48%),
+    rgba(8, 10, 14, 0.82);
+}
+
+.orlan-d20-display span {
+  color: #f0d58b;
+  font-family: Consolas, monospace;
+  font-size: 2.1rem;
+  font-weight: 900;
+}
+
+.orlan-d20-display small {
+  color: rgba(223, 211, 184, 0.62);
+  font-size: 0.78rem;
+}
+
+.orlan-box-status strong {
+  display: block;
+  color: #f0d58b;
+  font-size: 1.05rem;
+  margin-bottom: 5px;
+}
+
+.orlan-box-status p,
+.orlan-warning {
+  margin: 0;
+  color: rgba(223, 211, 184, 0.68);
+  line-height: 1.6;
+  font-size: 0.92rem;
+}
+
+.orlan-warning {
+  padding: 10px 12px;
+  border: 1px solid rgba(221, 174, 75, 0.24);
+  border-radius: 10px;
+  background: rgba(221, 174, 75, 0.08);
+  color: #f0d58b;
+}
+
+.orlan-last-reward {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid rgba(97, 204, 184, 0.22);
+  border-radius: 10px;
+  background: rgba(97, 204, 184, 0.08);
+}
+
+.orlan-last-reward img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.orlan-last-reward span {
+  display: grid;
+  gap: 2px;
+  color: rgba(223, 211, 184, 0.62);
+  font-size: 0.75rem;
+}
+
+.orlan-last-reward b {
+  color: #dfd3b8;
+  font-size: 0.92rem;
+}
+
+.orlan-primary-button {
+  min-height: 48px;
+  border: 1px solid rgba(255, 224, 142, 0.5);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #e4bf58, #9c6f25);
+  color: #221705;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.orlan-primary-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.orlan-primary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.orlan-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.orlan-history > div {
+  display: grid;
+  grid-template-columns: 38px 78px 78px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 7px 10px;
+  border: 1px solid rgba(223, 211, 184, 0.1);
+  border-radius: 10px;
+  background: rgba(12, 14, 20, 0.68);
+  color: rgba(223, 211, 184, 0.7);
+}
+
+.orlan-history img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.orlan-history b {
+  color: #f0d58b;
+  font-family: Consolas, monospace;
+}
+
+.orlan-history strong {
+  color: #dfd3b8;
+}
+
+.orlan-history em {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(240, 213, 139, 0.12);
+  color: #f0d58b;
+  font-style: normal;
+  font-weight: 900;
+  font-size: 0.72rem;
+}
+
+.orlan-history-row-diamond {
+  border-color: rgba(240, 213, 139, 0.42) !important;
+  box-shadow: inset 0 0 18px rgba(240, 213, 139, 0.08);
+}
+
+.orlan-empty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed rgba(223, 211, 184, 0.16);
+  border-radius: 10px;
+  color: rgba(223, 211, 184, 0.5);
+  text-align: center;
+}
+
+.orlan-reward-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(4, 5, 8, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.orlan-reward-card {
+  width: min(360px, calc(100vw - 32px));
+  border: 1px solid rgba(240, 213, 139, 0.36);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(97, 204, 184, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(28, 34, 44, 0.98), rgba(10, 12, 18, 0.98));
+  box-shadow: 0 24px 78px rgba(0, 0, 0, 0.66), inset 0 0 28px rgba(240, 213, 139, 0.08);
+  padding: 18px;
+  text-align: center;
+  color: #dfd3b8;
+}
+
+.orlan-reward-card-diamond {
+  border-color: rgba(206, 233, 255, 0.58);
+  box-shadow: 0 24px 82px rgba(0, 0, 0, 0.7), inset 0 0 34px rgba(134, 218, 255, 0.14);
+}
+
+.orlan-reward-kicker {
+  display: block;
+  color: rgba(97, 204, 184, 0.84);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  margin-bottom: 12px;
+}
+
+.orlan-reward-image-frame {
+  width: 170px;
+  height: 170px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+  border: 1px solid rgba(240, 213, 139, 0.28);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(240, 213, 139, 0.18), transparent 58%),
+    rgba(4, 6, 10, 0.68);
+}
+
+.orlan-reward-image-frame img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+.orlan-reward-card h2 {
+  margin: 0;
+  color: #f0d58b;
+  font-size: 1.35rem;
+  letter-spacing: 0;
+}
+
+.orlan-reward-card p {
+  margin: 9px 0 16px;
+  color: rgba(223, 211, 184, 0.72);
+  line-height: 1.55;
+  font-size: 0.9rem;
+}
+
+.orlan-reward-card button {
+  min-width: 120px;
+  min-height: 40px;
+  border: 1px solid rgba(255, 224, 142, 0.5);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #e4bf58, #9c6f25);
+  color: #221705;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+@media (max-width: 680px) {
+  .orlan-box-header {
+    flex-direction: column;
+  }
+
+  .orlan-box-main {
+    grid-template-columns: 1fr;
+  }
+
+  .orlan-d20-display {
+    width: min(180px, 70vw);
+    justify-self: center;
+  }
+
+  .orlan-history > div {
+    grid-template-columns: 34px 1fr auto;
+  }
+
+  .orlan-history b,
+  .orlan-history em {
+    display: none;
+  }
+}

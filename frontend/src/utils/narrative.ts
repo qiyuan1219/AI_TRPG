@@ -6,6 +6,11 @@ import {
   resolveSpeakerName,
 } from '../data/characterRegistry';
 
+const ASCII_HINT_RE = /[\[\u3010]\s*HINTS\s*[:\uFF1A]\s*([\s\S]*?)[\]\u3011]/gi;
+const ASCII_HINT_START_RE = /[\[\u3010]\s*HINTS\s*[:\uFF1A]/i;
+const MACHINE_PROTOCOL_RE = /(?:[ \t]*(?:\[[^\]\r\n]{1,12}\]\s*)?)?[\[\u3010]\s*(?:STATE|SYSTEM|CMD|DIRECTIVE|SCENE)\s*[:\uFF1A][\s\S]*?(?:[\]\u3011]|$)/gi;
+const MACHINE_PROTOCOL_START_RE = /(?:[ \t]*(?:\[[^\]\r\n]{1,12}\]\s*)?)?[\[\u3010]\s*(?:STATE|SYSTEM|CMD|DIRECTIVE|SCENE)\s*[:\uFF1A]/i;
+
 const HINT_RE = /[\[【]\s*HINTS\s*[:：]\s*([\s\S]*?)[\]】]/gi;
 const HINT_START_RE = /[\[【]\s*HINTS\s*[:：]/i;
 const SENTENCE_END_CHARS = new Set(['。', '！', '？', '!', '?']);
@@ -76,24 +81,78 @@ function compactText(text: string) {
     .trim();
 }
 
+export function stripMachineProtocolText(input: string) {
+  return String(input || '').replace(MACHINE_PROTOCOL_RE, '').trim();
+}
+
+export function stripAllMachineProtocolText(input: string) {
+  return stripHintBlocks(stripMachineProtocolText(input)).text
+    .replace(/\bHINTS\b\s*[:：].*$/i, '')
+    .trim();
+}
+
+function normalizeHintItem(item: string) {
+  return item.trim().replace(/^[|]+|[|]+$/g, '').trim();
+}
+
+function collectHintBody(body: string, hints: string[]) {
+  body.split('|')
+    .map(normalizeHintItem)
+    .filter(Boolean)
+    .forEach((item) => hints.push(item));
+}
+
 function findHintStart(input: string) {
-  const match = HINT_START_RE.exec(input);
+  const match = ASCII_HINT_START_RE.exec(input) || HINT_START_RE.exec(input);
   return match ? match.index : -1;
 }
 
 function findHintEnd(input: string, start: number) {
-  const squareEnd = input.indexOf(']', start);
-  const chineseEnd = input.indexOf('】', start);
-  if (squareEnd < 0) return chineseEnd;
-  if (chineseEnd < 0) return squareEnd;
-  return Math.min(squareEnd, chineseEnd);
+  for (let index = start; index < input.length; index += 1) {
+    if (input[index] !== ']' && input[index] !== '】') continue;
+    const next = input.slice(index + 1).match(/\S/)?.[0] ?? '';
+    if (next === '|' || next === ']' || next === '】') continue;
+    return index;
+  }
+  return -1;
+}
+
+function stripHintBlocks(input: string, hints: string[] = []) {
+  let cursor = 0;
+  let text = '';
+
+  while (cursor < input.length) {
+    const start = findHintStart(input.slice(cursor));
+    if (start < 0) {
+      text += input.slice(cursor);
+      break;
+    }
+
+    const absoluteStart = cursor + start;
+    text += input.slice(cursor, absoluteStart);
+
+    const end = findHintEnd(input, absoluteStart);
+    if (end < 0) {
+      text += input.slice(absoluteStart);
+      break;
+    }
+
+    const fragment = input.slice(absoluteStart, end + 1);
+    const body = fragment
+      .replace(/^[\[\u3010]\s*HINTS\s*[:\uFF1A]/i, '')
+      .replace(/[\]\u3011]$/, '');
+    collectHintBody(body, hints);
+    cursor = end + 1;
+  }
+
+  return { text, hints };
 }
 
 function collectHintItems(fragment: string, hints: string[]) {
   fragment
-    .replace(/^[\s|\[\]\u3010\u3011]+|[\s|\[\]\u3010\u3011]+$/g, '')
+    .replace(/^[\s|]+|[\s|]+$/g, '')
     .split('|')
-    .map((item) => item.trim().replace(/^[\s\[\]\u3010\u3011]+|[\s\[\]\u3010\u3011]+$/g, ''))
+    .map(normalizeHintItem)
     .filter((item) => item && !/^HINTS\s*[:：]?$/i.test(item))
     .forEach((item) => hints.push(item));
 }
@@ -111,7 +170,8 @@ function findLoosePipeHintStart(input: string) {
 function looksLikeActionSuggestionArtifact(text: string) {
   const trimmed = text.trim();
   if (!trimmed) return false;
-  if (HINT_START_RE.test(trimmed) || /\bHINTS\b/i.test(trimmed)) return true;
+  if (MACHINE_PROTOCOL_START_RE.test(trimmed)) return true;
+  if (ASCII_HINT_START_RE.test(trimmed) || HINT_START_RE.test(trimmed) || /\bHINTS\b/i.test(trimmed)) return true;
 
   const pipeCount = (trimmed.match(/\|/g) || []).length;
   const hasCheckMarker = /(?:DC|ＤＣ)\s*\d{1,3}|[\u3010\u3011]/i.test(trimmed);
@@ -148,10 +208,8 @@ export function makeSuggestions(hints: string[]): ActionSuggestion[] {
 
 export function extractHints(input: string): { text: string; suggestions: ActionSuggestion[] } {
   const hints: string[] = [];
-  const text = normalizeModelText(input).replace(HINT_RE, (_, body: string) => {
-    body.split('|').forEach((item) => hints.push(item));
-    return '';
-  });
+  const withoutMachineProtocol = stripMachineProtocolText(input);
+  const text = stripHintBlocks(normalizeModelText(withoutMachineProtocol), hints).text;
 
   return {
     text: compactText(stripLooseHintArtifacts(text, hints)),

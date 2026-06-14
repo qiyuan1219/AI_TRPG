@@ -1,4 +1,5 @@
 import type {
+  ActionSuggestion,
   CreateGamePayload,
   CreateGameResult,
   GameState,
@@ -8,8 +9,9 @@ import type {
   SaveSlotSummary,
 } from '../types/game';
 
-const BASE = '/api/dnd';
-const BATTLE_BASE = '/api/battles';
+const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '');
+const BASE = `${API_BASE}/dnd`;
+const BATTLE_BASE = `${API_BASE}/battles`;
 const SAFE_SERVICE_MESSAGE = '主持人暂时没有回应，已为本轮处理启用兜底。';
 const CONNECTION_ERROR_PATTERN =
   /(connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|load\s*failed|timeout|timed\s*out|econn|socket|fetch|body\s*stream|terminated|aborted)/i;
@@ -390,6 +392,7 @@ export function chatStream(
   onDone: () => void,
   onError: (error: string) => void,
   onStateUpdate?: (change: Record<string, any>) => void,
+  onSuggestions?: (suggestions: ActionSuggestion[]) => void,
 ) {
   const ctrl = new AbortController();
 
@@ -424,6 +427,16 @@ export function chatStream(
             const event = JSON.parse(line.slice(6));
             if (event.type === 'narrative') onNarrative(event.content);
             else if (event.type === 'system') onSystem(event.content);
+            else if (event.type === 'suggestions') {
+              const suggestions = Array.isArray(event.content)
+                ? event.content.map((item: any, index: number) => (
+                  typeof item === 'string'
+                    ? { id: `${index}-${item}`, label: item, text: item }
+                    : item
+                ))
+                : [];
+              if (suggestions.length) onSuggestions?.(suggestions);
+            }
             else if (event.type === 'state_update') onStateUpdate?.(event.content);
             else if (event.type === 'state_snapshot') onStateUpdate?.({ type: 'snapshot', state: event.content });
             else if (event.type === 'done') {

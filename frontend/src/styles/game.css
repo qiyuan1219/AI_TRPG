@@ -995,6 +995,121 @@
   overflow-wrap: anywhere;
 }
 
+.inventory-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.inventory-list p {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(231, 211, 161, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.inventory-list span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.inventory-list b {
+  color: var(--gold-soft);
+  font-family: Consolas, monospace;
+  font-size: 0.82rem;
+}
+
+.archive-list,
+.clue-list {
+  display: grid;
+  gap: 7px;
+}
+
+.archive-list button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 9px;
+  border: 1px solid rgba(231, 211, 161, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.archive-list button:hover,
+.archive-list button.is-open {
+  border-color: rgba(239, 213, 140, 0.52);
+  background: rgba(212, 168, 67, 0.1);
+}
+
+.archive-list span,
+.clue-list b {
+  color: var(--gold-soft);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.archive-list small,
+.clue-list span,
+.archive-detail p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.42;
+}
+
+.archive-detail {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  margin-top: 10px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid rgba(95, 183, 167, 0.22);
+  border-radius: 6px;
+  background: rgba(5, 8, 12, 0.42);
+}
+
+.archive-detail strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.archive-detail section {
+  display: grid;
+  gap: 3px;
+}
+
+.archive-detail h3 {
+  margin: 0;
+  color: var(--gold-soft);
+  font-size: 0.78rem;
+}
+
+.archive-detail p,
+.clue-list p {
+  margin: 0;
+}
+
+.clue-list p {
+  display: grid;
+  gap: 4px;
+  padding: 8px 9px;
+  border: 1px solid rgba(95, 183, 167, 0.16);
+  border-radius: 6px;
+  background: rgba(95, 183, 167, 0.055);
+}
+
 .vn-canvas {
   position: relative;
   min-width: 0;
@@ -1302,7 +1417,7 @@
   padding: 18px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(18, 21, 28, 0.9), rgba(10, 12, 16, 0.9));
+  background: linear-gradient(180deg, rgba(18, 21, 28, 0.68), rgba(10, 12, 16, 0.68));
   box-shadow: 0 26px 70px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(12px);
 }

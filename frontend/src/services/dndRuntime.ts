@@ -109,6 +109,17 @@ function formatStateChange(change: Record<string, any>) {
   if (change.type === 'xp') return `经验 ${signed}${reason}`;
   if (change.type === 'complete_chapter') return change.reason || '章节完成';
   if (change.type === 'trigger_event') return `剧情事件：${change.event_name}`;
+  if (change.type === 'investigation_reward') {
+    if (change.duplicate) return change.message || '调查已结算';
+    const docs = Array.isArray(change.addedDocuments) ? change.addedDocuments.length : 0;
+    const clues = Array.isArray(change.addedClues) ? change.addedClues.length : 0;
+    const parts = [
+      docs ? `档案 +${docs}` : '',
+      clues ? `线索 +${clues}` : '',
+      change.resultLevel ? `判定：${change.resultLevel}` : '',
+    ].filter(Boolean);
+    return parts.length ? parts.join(' · ') : '调查奖励已记录';
+  }
 
   return '';
 }
@@ -150,6 +161,14 @@ function applyStateChange(state: GameState, change: Record<string, any>): GameSt
   else if (change.type === 'xp') next.xp = change.new;
   else if (change.type === 'complete_chapter') next.cleared_levels = change.new;
   else if (change.type === 'trigger_event') next.triggered_events = change.events;
+  else if (change.type === 'investigation_reward') {
+    if (typeof change.inventory === 'string') next.inventory = change.inventory;
+    if (Array.isArray(change.documents)) next.documents = change.documents;
+    if (Array.isArray(change.clues)) next.clues = change.clues;
+    if (change.flags && typeof change.flags === 'object') next.flags = change.flags;
+    if (change.questLog && typeof change.questLog === 'object') next.questLog = change.questLog;
+    if (change.sceneState && typeof change.sceneState === 'object') next.sceneState = change.sceneState;
+  }
 
   return next;
 }
@@ -167,6 +186,7 @@ export const dndRuntime: GameRuntimeService = {
       callbacks.onDone,
       callbacks.onError,
       callbacks.onStateUpdate,
+      callbacks.onSuggestions,
     );
   },
   applyStateChange,

@@ -17,6 +17,21 @@ def _resolve_project_path(value) -> Path:
         return path.resolve()
     return (PROJECT_ROOT / path).resolve()
 
+
+def _int_env(name: str, fallback: int) -> int:
+    raw = os.getenv(name)
+    if not raw:
+        return fallback
+    try:
+        return int(raw)
+    except ValueError:
+        return fallback
+
+
+def _csv_env(name: str) -> list[str]:
+    raw = os.getenv(name, "")
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
 # ============================================================
 # AI 模型配置
 # ============================================================
@@ -57,11 +72,12 @@ LEVEL_CAP = 20
 # 服务器配置
 # ============================================================
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8000"))
-CORS_ORIGINS = [
+PORT = _int_env("PORT", 8000)
+DEFAULT_CORS_ORIGINS = [
     "http://localhost:5174",
     "http://127.0.0.1:5174",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
 ]
+CORS_ORIGINS = _csv_env("CORS_ORIGINS") or DEFAULT_CORS_ORIGINS

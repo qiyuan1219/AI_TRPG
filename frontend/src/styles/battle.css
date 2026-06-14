@@ -675,12 +675,10 @@
 }
 
 .lisa-sprite-sheet.is-idle {
-  background-image: url("/assets/battle/lisa/lisa-idle-sheet.png");
   animation: lisa-idle-frames 1.2s steps(6) infinite;
 }
 
 .lisa-sprite-sheet.is-cast {
-  background-image: url("/assets/battle/lisa/lisa-cast-sheet.png");
   animation: lisa-cast-frames 980ms steps(10) 1 both;
 }
 
@@ -2207,7 +2205,7 @@
   padding: 16px 20px 14px;
   border: 1px solid var(--vn-accent, rgba(239, 213, 140, 0.38));
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(13, 16, 24, 0.94) 0%, rgba(18, 22, 32, 0.92) 100%);
+  background: linear-gradient(180deg, rgba(13, 16, 24, 0.68) 0%, rgba(18, 22, 32, 0.66) 100%);
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4), 0 0 60px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(16px);
   pointer-events: auto;

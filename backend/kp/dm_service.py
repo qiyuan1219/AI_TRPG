@@ -1,8 +1,9 @@
 """D&D DM 服务"""
 import asyncio
 import json
+import logging
 from typing import AsyncGenerator
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, OpenAIError
 from config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 from engine.rules_dnd import (
     skill_check, attack_roll, death_save,
@@ -11,6 +12,7 @@ from engine.rules_dnd import (
 from kp.prompt_builder_dnd import build_system_prompt
 
 client = AsyncOpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
+logger = logging.getLogger(__name__)
 LLM_MAX_ATTEMPTS = 3
 LLM_RETRY_DELAY = 0.8
 
@@ -20,11 +22,17 @@ async def _create_chat_completion(**kwargs):
     for attempt in range(LLM_MAX_ATTEMPTS):
         try:
             return await client.chat.completions.create(**kwargs)
-        except Exception as error:
+        except OpenAIError as error:
             last_error = error
             if attempt >= LLM_MAX_ATTEMPTS - 1:
                 break
+            logger.warning(
+                "LLM request failed, retrying",
+                extra={"attempt": attempt + 1, "max_attempts": LLM_MAX_ATTEMPTS, "model": kwargs.get("model")},
+            )
             await asyncio.sleep(LLM_RETRY_DELAY * (attempt + 1))
+    if last_error is None:
+        raise RuntimeError("LLM request failed without an SDK error")
     raise last_error
 
 TOOLS = [
@@ -335,27 +343,35 @@ async def dm_chat_stream(
         if acc_tools:
             messages.append({"role":"assistant","content":acc_content or None,"tool_calls":acc_tools})
             for tc in acc_tools:
+                tool = tc.get("function", {})
+                tool_name = str(tool.get("name") or "unknown")
+                tool_call_id = str(tc.get("id") or "")
+                raw_args = str(tool.get("arguments") or "{}")
                 try:
-                    fn_args = json.loads(tc["function"]["arguments"])
-                    result = execute_tool(tc["function"]["name"], fn_args)
+                    fn_args = json.loads(raw_args)
+                    result = execute_tool(tool_name, fn_args)
                     # 状态变更用 STATE 前缀，检定掷骰用 SYSTEM 前缀
                     STATE_TOOLS = ("update_gold","update_inventory","update_hp","update_trust",
                                    "update_area","level_up","update_npc_hp","update_attribute",
                                    "add_xp","complete_chapter","trigger_event")
-                    is_state = tc["function"]["name"] in STATE_TOOLS
+                    is_state = tool_name in STATE_TOOLS
                     prefix = "[STATE:" if is_state else "[SYSTEM:"
-                    yield f"{prefix}{tc['function']['name']}:{json.dumps(result, ensure_ascii=False)}]\n"
-                    messages.append({"role":"tool","tool_call_id":tc["id"],
+                    yield f"{prefix}{tool_name}:{json.dumps(result, ensure_ascii=False)}]\n"
+                    messages.append({"role":"tool","tool_call_id":tool_call_id,
                                      "content": json.dumps(result, ensure_ascii=False)})
                 except json.JSONDecodeError as e:
-                    err_info = {"error": "JSON解析失败", "args": tc["function"]["arguments"][:100], "detail": str(e)}
+                    err_info = {"error": "JSON解析失败", "args": raw_args[:100], "detail": str(e)}
                     yield f"[SYSTEM:error:{json.dumps(err_info, ensure_ascii=False)}]\n"
-                    messages.append({"role":"tool","tool_call_id":tc["id"],
+                    messages.append({"role":"tool","tool_call_id":tool_call_id,
                                      "content": json.dumps(err_info, ensure_ascii=False)})
-                except Exception as e:
-                    err_info = {"error": f"工具执行失败: {tc['function']['name']}", "detail": str(e)}
+                except (KeyError, TypeError, ValueError) as e:
+                    logger.warning(
+                        "tool execution failed",
+                        extra={"tool": tool_name, "tool_call_id": tool_call_id},
+                    )
+                    err_info = {"error": f"工具执行失败: {tool_name}", "detail": str(e)}
                     yield f"[SYSTEM:error:{json.dumps(err_info, ensure_ascii=False)}]\n"
-                    messages.append({"role":"tool","tool_call_id":tc["id"],
+                    messages.append({"role":"tool","tool_call_id":tool_call_id,
                                      "content": json.dumps(err_info, ensure_ascii=False)})
             continue
         return
@@ -485,7 +501,8 @@ async def companion_side_event_feedback(
         )
         content = completion.choices[0].message.content if completion.choices else ""
         return sanitize_companion_side_event_text(content) or fallback
-    except Exception:
+    except OpenAIError as error:
+        logger.warning("companion side-event feedback fell back after LLM error: %s", error)
         return fallback
 
 
@@ -527,7 +544,8 @@ async def companion_side_event_chat(
         )
         content = completion.choices[0].message.content if completion.choices else ""
         return sanitize_companion_side_event_text(content) or fallback
-    except Exception:
+    except OpenAIError as error:
+        logger.warning("companion side-event chat fell back after LLM error: %s", error)
         return fallback
 
 
@@ -652,7 +670,8 @@ boss_reply 必须是奥兰第一人称台词，60-120个中文字符，无论成
         )
         raw = completion.choices[0].message.content if completion.choices else ""
         data = json.loads((raw or "").strip())
-    except Exception:
+    except (OpenAIError, json.JSONDecodeError, TypeError, ValueError) as error:
+        logger.warning("bargain judgement fell back: %s", error)
         data = fallback
 
     agreed = bool(data.get("agreed"))
@@ -760,7 +779,8 @@ async def dm_battle_narrate(
         )
         text = resp.choices[0].message.content
         return _sanitize_battle_narration(text)
-    except Exception:
+    except OpenAIError as error:
+        logger.warning("battle narration fell back after LLM error: %s", error)
         return ""
 
 
@@ -800,6 +820,6 @@ async def dm_judge_advantage(unit_name: str, context: str) -> dict:
                 "advantage": data.get("advantage", "none"),
                 "flavor": data.get("flavor", ""),
             }
-    except Exception:
-        pass
+    except (OpenAIError, json.JSONDecodeError, TypeError, ValueError) as error:
+        logger.warning("advantage judgement fell back: %s", error)
     return {"advantage": "none", "flavor": ""}

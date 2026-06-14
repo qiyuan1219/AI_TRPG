@@ -33,21 +33,22 @@ const OPENING: ScriptedScene = {
   id: 'opening',
   triggers: [],
   setArea: '逆穹悬城·主缆街',
+  bgImage: '/assets/scenes/opening-hunter-back.webp',
   bgm: '/assets/bgm/bgm_02_inverse_city.mp3',
   lastEvent: '抵达逆穹悬城入城平台，第一次遭遇裂隙爬兽',
   lines: [
     // ===== 世界观 =====
-    { speaker: '主持人', text: '地表诸国的历史，不过记载了这个世界最年轻、也最安全的一部分。' },
+    { speaker: '主持人', text: '地表诸国的历史，不过记载了这个世界最年轻、也最安全的一部分。', bgImage: '/assets/scenes/opening/opening01.webp' },
     { speaker: '主持人', text: '在王国疆界之外，在阳光无法抵达的幽暗地域深处，埋藏着一段被刻意封存的往事。' },
-    { speaker: '主持人', text: '一千年前，大地深处出现了一道贯穿位面的裂口。后来的人们将它称为——地心之门。' },
+    { speaker: '主持人', text: '一千年前，大地深处出现了一道贯穿位面的裂口。后来的人们将它称为——地心之门。', bgImage: '/assets/scenes/opening/opening02.webp' },
     { speaker: '主持人', text: '门的另一端，连接着九层地狱的第一层：阿弗纳斯。' },
-    { speaker: '主持人', text: '战争随之降临，炼狱魔物穿过裂口涌入地下，污染矿脉，占据城邦，将大片幽暗地域变成无法通行的死地。' },
-    { speaker: '主持人', text: '最终，三位英雄携带三件圣遗物深入地底，在付出惨重代价后封闭了地心之门。' },
+    { speaker: '主持人', text: '战争随之降临，炼狱魔物穿过裂口涌入地下，污染矿脉，占据城邦，将大片幽暗地域变成无法通行的死地。', bgImage: '/assets/scenes/opening/opening03.webp' },
+    { speaker: '主持人', text: '最终，三位英雄携带三件圣遗物深入地底，在付出惨重代价后封闭了地心之门。', bgImage: '/assets/scenes/opening/opening04.webp' },
     { speaker: '主持人', text: '为了防止封印再次松动，他们在门的上方修建了一座地底堡垒。' },
     { speaker: '主持人', text: '从那以后，最精锐的骑士、法师与工匠世代驻守于此，监视封印，也阻挡任何从深处爬出的东西。' },
 
     // ===== 逆穹悬城 =====
-    { speaker: '主持人', text: '随着驻军、矿工和商队不断聚集，一座前线补给城逐渐出现在堡垒上方的巨大洞窟中。' },
+    { speaker: '主持人', text: '随着驻军、矿工和商队不断聚集，一座前线补给城逐渐出现在堡垒上方的巨大洞窟中。', bgImage: '/assets/scenes/opening/opening05.webp' },
     { speaker: '主持人', text: '那就是逆穹悬城——幽暗地域最深处，也是地表文明最后的一座永久据点。' },
     { speaker: '主持人', text: '整座城市倒悬于洞穴穹顶，街道、房屋与塔楼全都朝向下方深渊。' },
     { speaker: '主持人', text: '九条秘银主缆贯穿城内，支撑街区，稳定重力，也为防御法阵输送能量。' },
@@ -56,7 +57,7 @@ const OPENING: ScriptedScene = {
     { speaker: '主持人', text: '而那座守卫地心之门的地底堡垒，就在缆梯尽头的深渊之下。' },
 
     // ===== 危机 =====
-    { speaker: '主持人', text: '十年前，地底堡垒按惯例发出了最后一次守备信号。内容一切正常，此后便彻底沉默。' },
+    { speaker: '主持人', text: '十年前，地底堡垒按惯例发出了最后一次守备信号。内容一切正常，此后便彻底沉默。', bgImage: '/assets/scenes/opening/opening06.webp' },
     { speaker: '主持人', text: '逆穹城先后派出多支侦察队和远征队，试图恢复联系。但没有一支队伍返回，也没有任何消息从深处传回来。' },
     { speaker: '主持人', text: '最初，人们将这场沉默归咎于塌方、法阵故障，或者深层魔物的袭击。' },
     { speaker: '主持人', text: '直到最近几个月，情况开始急剧恶化。' },
@@ -64,30 +65,30 @@ const OPENING: ScriptedScene = {
     { speaker: '主持人', text: '城里的每个人都明白：深渊之下，一定发生了什么。' },
 
     // ===== 赏金猎人 =====
-    { speaker: '主持人', text: '而今天故事的主角，是你——{name}。一名往来于各大城邦之间的赏金猎人。' },
+    { speaker: '主持人', text: '而今天故事的主角，是你——{name}。一名往来于各大城邦之间的赏金猎人。', bgImage: '/assets/scenes/opening/opening07.webp' },
     { speaker: '主持人', text: '你不是刚在公会登记的新手，也不是为了几枚金币便敢闯进巢穴的亡命徒。' },
     { speaker: '主持人', text: '你曾在北地追踪霜龙，也曾深入南方沼泽，清理被巫妖污染的地下水脉。' },
     { speaker: '主持人', text: '从废弃矿城到边境要塞，这片大陆许多见不得光的地方，都留下过你的脚印。' },
 
     // ===== 指名委托 =====
-    { speaker: '主持人', text: '三个月前，一份来自逆穹城的指名委托被送到你手中。' },
+    { speaker: '主持人', text: '三个月前，一份来自逆穹城的指名委托被送到你手中。', bgImage: '/assets/scenes/opening/opening08.webp' },
     { speaker: '主持人', text: '没有寒暄，没有多余说明，羊皮纸上只有几行经过公会认证的文字。' },
     { speaker: '主持人', text: '「深入幽暗地域，抵达逆穹悬城。调查地底堡垒与历次远征队失联的原因。确认地心之门封印状态。带回生还者、调查记录，或者足以证明真相的证据。」' },
     { speaker: '主持人', text: '委托报酬丰厚，危险等级却没有标注上限。你接下了它。' },
 
     // ===== 旅途 =====
-    { speaker: '主持人', text: '你沿着一条废弃的符文矿道不断下行，起初还能看见锈蚀矿车与熄灭的矮人锻炉。' },
+    { speaker: '主持人', text: '你沿着一条废弃的符文矿道不断下行，起初还能看见锈蚀矿车与熄灭的矮人锻炉。', bgImage: '/assets/scenes/opening/opening09.webp' },
     { speaker: '主持人', text: '越往深处，空气越发潮湿，蓝绿色菌斑开始爬满岩壁。' },
-    { speaker: '主持人', text: '再往下，连矮人的路标也消失了。黑暗中，只剩侏儒工程师留下的发光铆钉，引着你继续深入。' },
+    { speaker: '主持人', text: '再往下，连矮人的路标也消失了。黑暗中，只剩侏儒工程师留下的发光铆钉，引着你继续深入。', bgImage: '/assets/scenes/opening/opening10.webp' },
 
     // ===== 抵达 =====
-    { speaker: '主持人', text: '不久后，矿道尽头终于吹来带着矿尘与孢粉气味的风。' },
+    { speaker: '主持人', text: '不久后，矿道尽头终于吹来带着矿尘与孢粉气味的风。', bgImage: '/assets/scenes/opening/opening11.webp' },
     { speaker: '主持人', text: '脚下岩地逐渐变成刻有防御符文的石板，并一路延伸向前方吊桥。' },
     { speaker: '主持人', text: '吊桥尽头，一扇布满封印咒文的巨大石门挡住去路。' },
     { speaker: '主持人', text: '公会徽记通过核验后，锁链转动，石门在轰鸣声中缓缓开启。逆穹悬城的入城平台，就在门后。' },
 
     // ===== 城市初见 =====
-    { speaker: '主持人', text: '你穿过重力定向法阵，短暂失重后，整个世界在眼前猛然翻转。' },
+    { speaker: '主持人', text: '你穿过重力定向法阵，短暂失重后，整个世界在眼前猛然翻转。' ,bgImage: '/assets/scenes/01city.webp'  },
     { speaker: '主持人', text: '双脚重新落地时，一座倒悬于洞穴穹顶之上的城市出现在你面前。' },
     { speaker: '主持人', text: '房屋紧贴岩层，桥梁横跨街区，尖塔垂向下方无尽的深渊。' },
     { speaker: '主持人', text: '九条秘银主缆贯穿全城，表面的符文随着低沉震动不断明灭。防御弩塔守在街角，数百盏符文灯照亮倒悬的街道。' },
@@ -127,6 +128,12 @@ const OPENING: ScriptedScene = {
     '请求瑟琳施展辅助法术【魅力DC12】',
     '闪避并寻找掩护位置【敏捷DC10】',
   ],
+  statePatch: {
+    first_choice_resolved: false,
+    tutorial_battle_done: false,
+    tutorial_battle_pending: true,
+    currentNodeId: 'opening_tutorial_battle',
+  },
 };
 
 // ============================================================

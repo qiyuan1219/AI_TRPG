@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+dist/
+frontend/dist/
+
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local runtime state
+data/*.db
+data/*.db-*
+data/saves/*.json
+backend/data/*.db
+backend/data/*.db-*
+logs/
+
+# Local secrets and machine config
+.env
+.env.*
+!.env.example
+
+# Tooling caches
+.vite/
+coverage/
+frontend/coverage/
+.playwright-cli/
+
+# Office lock files
+~$*

@@ -35,6 +35,8 @@ export const STORY_TEST_CHECKPOINTS: StoryTestCheckpoint[] = [
       last_event: '剧情测试：开场后第一次行动选择',
       first_choice_resolved: false,
       tutorial_battle_done: false,
+      tutorial_battle_pending: true,
+      currentNodeId: 'opening_tutorial_battle',
     },
     lines: [
       {

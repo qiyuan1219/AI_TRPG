@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryLine } from '../types/game';
+import { stripAllMachineProtocolText } from '../utils/narrative';
 
 interface DialogueLogProps {
   story: StoryLine[];
@@ -12,7 +13,10 @@ interface DialogueLogProps {
 export function DialogueLog({ story, activeIndex, isStreaming, onClose }: DialogueLogProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const wasStreamingRef = useRef(isStreaming);
-  const visibleStory = story.slice(0, Math.min(Math.max(activeIndex + 1, 0), story.length));
+  const visibleStory = story
+    .slice(0, Math.min(Math.max(activeIndex + 1, 0), story.length))
+    .map((line) => ({ ...line, text: stripAllMachineProtocolText(line.text) }))
+    .filter((line) => line.text);
 
   // 自动滚到底部（新对话进入时）
   useEffect(() => {
