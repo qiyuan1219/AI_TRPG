@@ -57,11 +57,11 @@ const OPENING: ScriptedScene = {
     { speaker: '主持人', text: '而那座守卫地心之门的地底堡垒，就在缆梯尽头的深渊之下。' },
 
     // ===== 危机 =====
-    { speaker: '主持人', text: '十年前，地底堡垒按惯例发出了最后一次守备信号。内容一切正常，此后便彻底沉默。', bgImage: '/assets/scenes/opening/opening06.webp' },
+    { speaker: '主持人', text: '十年前，地底堡垒按惯例发出了最后一次守备信号。内容一切正常，此后便彻底沉默。', bgImage: '/assets/scenes/opening/opening05_2.webp' },
     { speaker: '主持人', text: '逆穹城先后派出多支侦察队和远征队，试图恢复联系。但没有一支队伍返回，也没有任何消息从深处传回来。' },
     { speaker: '主持人', text: '最初，人们将这场沉默归咎于塌方、法阵故障，或者深层魔物的袭击。' },
     { speaker: '主持人', text: '直到最近几个月，情况开始急剧恶化。' },
-    { speaker: '主持人', text: '从深层矿道上涌的魔物数量增加了数倍。裂隙爬兽闯入商路，孢化地底兽袭击矿场，连城防记录中从未出现过的生物也开始接近逆穹城。' },
+    { speaker: '主持人', text: '从深层矿道上涌的魔物数量增加了数倍。裂隙爬兽闯入商路，孢化地底兽袭击矿场，连城防记录中从未出现过的生物也开始接近逆穹城。', bgImage: '/assets/scenes/opening/opening06.webp' },
     { speaker: '主持人', text: '城里的每个人都明白：深渊之下，一定发生了什么。' },
 
     // ===== 赏金猎人 =====
@@ -95,7 +95,7 @@ const OPENING: ScriptedScene = {
     { speaker: '主持人', text: '城市中央，一口巨大的深井贯穿层层建筑。深井之下，蓝绿色孢光缓慢起伏，仿佛黑暗中沉睡着一片会呼吸的海洋。' },
 
     // ===== 守卫 =====
-    { speaker: '守卫', text: '「地表来的赏金猎人？」' },
+    { speaker: '守卫', text: '「你就是地表来的赏金猎人？」' },
     { speaker: '守卫', text: '「别盯着深井看太久。第一次进城的人容易失去方向感，上个月还有人吐在自己的通行证上。」' },
     { speaker: '守卫', text: '「公会已经通知过我们。我负责带你通过入城区。穿过吊桥区就是冒险者公会。跟紧一点，也别翻过护栏。」' },
 
@@ -252,6 +252,7 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
   triggers: ['前往静默神殿', '去静默神殿', '前往教堂', '去教堂', '寻找艾琳', '前往静默神殿寻找艾琳'],
   setArea: '逆穹悬城·静默神殿',
   bgImage: '/assets/scenes/05temple-interior.png',
+  bgm: '/assets/bgm/temple.mp3',
   statePatch: {
     al_recruited: true,
     al_trust: 55,
@@ -275,9 +276,10 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
     { speaker: '主持人', text: '她将白枝修会的徽章别在药箱上，又为队伍做了简短祈祷。柔和的光沿着你们的护腕缓缓散开。' },
   ],
   hints: [
-    '回到回声酒馆寻找布洛克',
+    
     '请艾琳检查队伍伤势【医药DC12】',
     '询问神殿保存的牺牲者遗录【宗教DC13】',
+    '回到回声酒馆寻找布洛克',
   ],
 };
 
@@ -319,8 +321,6 @@ const BROCK_RECRUITED: ScriptedScene = {
   bgImage: '/assets/scenes/06tavern-interior.webp',
   statePatch: {
     sl_recruited: true,
-    sl_trust: 50,
-    trust_block: 50,
     brock_recruited: true,
     brock_spore_sample_deal: true,
   },

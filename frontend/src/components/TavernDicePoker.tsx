@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
-import { TutorialOverlay } from './TutorialOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
 
@@ -257,7 +256,8 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
   const [skillDice, setSkillDice] = useState<DiceResult | null>(null);
   const [rolling, setRolling] = useState(false);
   const [final, setFinal] = useState<TavernDicePokerResult | null>(null);
-  const [tutorialStep, setTutorialStep] = useState(-1);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
 
   const visibleSaloDice = useMemo(
     () => saloDice.map((die, index) => (index < peekCount ? die : null)),
@@ -450,6 +450,60 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
   const canStart = phase === 'ready' || phase === 'skill_result';
 
   return (
+    <>
+      {/* 强制教程：进入游戏前必须阅读完整规则（沿用新手战斗教学UI风格） */}
+      {!tutorialCompleted && (
+        <motion.div
+          className="opening-action-tutorial"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="opening-action-tutorial-card"
+            initial={{ opacity: 0, y: -14, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+          >
+            <div className="opening-action-tutorial-progress">
+              <i style={{ width: `${((tutorialStep + 1) / TAVERN_DICE_TUTORIAL.length) * 100}%` }} />
+            </div>
+            <header>
+              <span>{TAVERN_DICE_TUTORIAL[tutorialStep]?.badge}</span>
+              <button type="button" aria-label="关闭规则教程" onClick={() => setTutorialCompleted(true)}>×</button>
+            </header>
+            <h2>{TAVERN_DICE_TUTORIAL[tutorialStep]?.title}</h2>
+            <p>{TAVERN_DICE_TUTORIAL[tutorialStep]?.body}</p>
+            <footer>
+              <button
+                type="button"
+                className="opening-action-tutorial-prev"
+                disabled={tutorialStep <= 0}
+                onClick={() => setTutorialStep((s) => Math.max(0, s - 1))}
+              >
+                上一步
+              </button>
+              <small>{tutorialStep + 1} / {TAVERN_DICE_TUTORIAL.length}</small>
+              <button
+                type="button"
+                className="opening-action-tutorial-next"
+                onClick={() => {
+                  if (tutorialStep >= TAVERN_DICE_TUTORIAL.length - 1) {
+                    setTutorialCompleted(true);
+                  } else {
+                    setTutorialStep((s) => s + 1);
+                  }
+                }}
+              >
+                {tutorialStep >= TAVERN_DICE_TUTORIAL.length - 1 ? '开始游戏' : '下一步'}
+              </button>
+            </footer>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* 游戏本体：教程完成后显示 */}
+      {tutorialCompleted && (
     <motion.div
       className="tavern-dice-backdrop"
       initial={{ opacity: 0 }}
@@ -471,9 +525,6 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
             <small>第 {round}/3 局 · 已胜 {wins} 局 · 当前下注 {stake}G</small>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button type="button" className="tavern-dice-close" style={{ background: 'rgba(95,183,167,0.15)', border: '1px solid rgba(95,183,167,0.3)', borderRadius: 6, color: '#5fb7a7', fontSize: '0.8rem', padding: '4px 10px', cursor: 'pointer' }} onClick={() => setTutorialStep(0)}>
-              ? 规则说明
-            </button>
             <button type="button" className="tavern-dice-close" onClick={onClose} aria-label="关闭快艇骰子">
               x
             </button>
@@ -613,21 +664,11 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
         {!canAffordRound && (
           <div className="tavern-dice-warning">金币不足，无法支付本局下注。</div>
         )}
-
-        <AnimatePresence>
-          {tutorialStep >= 0 && (
-            <TutorialOverlay
-              steps={TAVERN_DICE_TUTORIAL}
-              currentStep={tutorialStep}
-              onClose={() => setTutorialStep(-1)}
-              onPrev={() => setTutorialStep((s) => Math.max(0, s - 1))}
-              onNext={() => setTutorialStep((s) => Math.min(TAVERN_DICE_TUTORIAL.length - 1, s + 1))}
-            />
-          )}
-        </AnimatePresence>
       </motion.section>
 
       <DiceRollOverlay dice={skillDice} dieType="d20" onClose={() => setSkillDice(null)} />
     </motion.div>
+      )}
+    </>
   );
 }

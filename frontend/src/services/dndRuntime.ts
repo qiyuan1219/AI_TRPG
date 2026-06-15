@@ -113,9 +113,21 @@ function formatStateChange(change: Record<string, any>) {
     if (change.duplicate) return change.message || '调查已结算';
     const docs = Array.isArray(change.addedDocuments) ? change.addedDocuments.length : 0;
     const clues = Array.isArray(change.addedClues) ? change.addedClues.length : 0;
+    const rewards = Array.isArray(change.appliedRewards) ? change.appliedRewards : [];
+    const statParts = rewards
+      .map((reward: Record<string, any>) => {
+        const amount = Number(reward.change || 0);
+        const signed = amount > 0 ? `+${amount}` : String(amount);
+        if (reward.type === 'gold' && amount) return `金币 ${signed}`;
+        if (reward.type === 'hp' && amount) return `HP ${signed}`;
+        if (reward.type === 'attribute' && reward.attr && amount) return `${reward.attr} ${signed}`;
+        return '';
+      })
+      .filter(Boolean);
     const parts = [
       docs ? `档案 +${docs}` : '',
       clues ? `线索 +${clues}` : '',
+      ...statParts,
       change.resultLevel ? `判定：${change.resultLevel}` : '',
     ].filter(Boolean);
     return parts.length ? parts.join(' · ') : '调查奖励已记录';
@@ -165,6 +177,14 @@ function applyStateChange(state: GameState, change: Record<string, any>): GameSt
     if (typeof change.inventory === 'string') next.inventory = change.inventory;
     if (Array.isArray(change.documents)) next.documents = change.documents;
     if (Array.isArray(change.clues)) next.clues = change.clues;
+    if (Number.isFinite(Number(change.gold))) next.gold = Number(change.gold);
+    if (Number.isFinite(Number(change.current_hp))) next.current_hp = Number(change.current_hp);
+    if (Number.isFinite(Number(change.max_hp))) next.max_hp = Number(change.max_hp);
+    if (change.attributes && typeof change.attributes === 'object') {
+      Object.entries(change.attributes).forEach(([attr, value]) => {
+        if (Number.isFinite(Number(value))) next[attr] = Number(value);
+      });
+    }
     if (change.flags && typeof change.flags === 'object') next.flags = change.flags;
     if (change.questLog && typeof change.questLog === 'object') next.questLog = change.questLog;
     if (change.sceneState && typeof change.sceneState === 'object') next.sceneState = change.sceneState;

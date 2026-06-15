@@ -5,7 +5,7 @@ export interface TutorialStep {
   badge?: string;
   body: string;
   targetSelector?: string;
-  placement?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+  placement?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'center';
 }
 
 interface TutorialOverlayProps {
@@ -37,6 +37,7 @@ export function TutorialOverlay({ steps, currentStep, onClose, onPrev, onNext }:
       case 'top-left':  return { top: 20, left: 60 };
       case 'bottom-left':  return { bottom: 20, left: 60 };
       case 'bottom-right': return { bottom: 20, right: 60 };
+      case 'center':       return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
       default:             return { top: 20, right: 60 };
     }
   };
@@ -60,7 +61,7 @@ export function TutorialOverlay({ steps, currentStep, onClose, onPrev, onNext }:
       <motion.div
         className="absolute"
         style={getPosition()}
-        initial={{ opacity: 0, y: -12, scale: 0.97 }}
+        initial={place === 'center' ? { opacity: 0, scale: 0.95 } : { opacity: 0, y: -12, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 320, damping: 30, delay: 0.05 }}
       >

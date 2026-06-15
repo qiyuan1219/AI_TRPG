@@ -55,12 +55,10 @@ const SPEECH_VERBS = [
 
 function normalizeModelText(text: string) {
   return text
-    .replace(/「/g, '"')
-    .replace(/」/g, '"')
-    .replace(/[“”]/g, '"')   // 弯引号 → 直引号
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\[SCENE:[^\]]*\]\n?/g, '')
-    .replace(/[\r\n]+/g, '')   // 去掉所有换行，防止LLM分行导致逗号误断句
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]{2,}/g, '') // 多余空格压缩
 }
 
@@ -79,6 +77,33 @@ function joinSegmentText(...parts: string[]) {
 function compactText(text: string) {
   return normalizeModelText(text)
     .trim();
+}
+
+function closingQuoteFor(char: string) {
+  if (char === '「') return '」';
+  if (char === '“') return '”';
+  if (char === '"') return '"';
+  return '';
+}
+
+function isQuoteClose(char: string, expectedClose: string) {
+  return Boolean(expectedClose) && char === expectedClose;
+}
+
+function isDanglingClosingQuoteLine(text: string) {
+  return /^[」”』]+[。！？.!?]*$/.test(text.trim());
+}
+
+function mergeOrDropDanglingClosingQuotes(lines: string[]) {
+  const result: string[] = [];
+  for (const line of lines) {
+    if (isDanglingClosingQuoteLine(line)) {
+      if (result.length > 0) result[result.length - 1] += line.trim();
+      continue;
+    }
+    result.push(line);
+  }
+  return result;
 }
 
 export function stripMachineProtocolText(input: string) {
@@ -237,6 +262,39 @@ function findSpeaker(text: string, reverse = false): string {
   return findRegisteredSpeaker(text, reverse);
 }
 
+function findExactRegisteredSpeaker(candidate: string) {
+  const normalizedCandidate = candidate.trim().replace(/[「」『』“”"']/g, '').replace(/\s+/g, '');
+  if (!normalizedCandidate) return '';
+
+  for (const alias of Object.keys(SPEAKER_ALIASES)) {
+    const normalizedAlias = alias.replace(/[「」『』“”"']/g, '').replace(/\s+/g, '');
+    if (normalizedAlias === normalizedCandidate) {
+      return SPEAKER_ALIASES[alias];
+    }
+  }
+  return '';
+}
+
+function stripSpeechVerbSuffix(candidate: string) {
+  let cleaned = candidate.trim();
+  for (const verb of SPEECH_VERBS.slice().sort((a, b) => b.length - a.length)) {
+    if (cleaned.endsWith(verb)) {
+      cleaned = cleaned.slice(0, -verb.length).trim();
+      break;
+    }
+  }
+  return cleaned;
+}
+
+function explicitDialogueSpeaker(candidate: string) {
+  const suffix = candidate.trim().split(/[。！？.!?；;\n]/).pop()?.trim() ?? '';
+  if (!suffix || /[，,、]/.test(suffix)) return '';
+
+  const cleaned = stripSpeechVerbSuffix(suffix);
+  if (!cleaned || /^(他|她|它|他们|她们|有人|对方|那人|她们俩|他们俩)$/.test(cleaned)) return '';
+  return findExactRegisteredSpeaker(cleaned);
+}
+
 function findSpeakerNearQuote(before: string, after: string) {
   // 优先搜索引号前整个文本（从后往前），不限36字符
   const beforeSpeaker = findSpeaker(before, true);
@@ -358,6 +416,7 @@ function pushNarration(segments: NarrativeSegment[], text: string, speaker: stri
   if (isPureSpeechAttribution(text)) return;
 
   const raw = text.trim();
+  if (isDanglingClosingQuoteLine(raw)) return;
   // 舞台提示保留【】，只清洗普通叙述
   const cleaned = raw.includes('【')
     ? normalizeNarrationPiece(raw)
@@ -372,6 +431,7 @@ function pushNarration(segments: NarrativeSegment[], text: string, speaker: stri
 function pushDialogue(segments: NarrativeSegment[], text: string, speaker: string) {
   const cleaned = text.trim();
   if (looksLikeActionSuggestionArtifact(cleaned)) return;
+  if (isDanglingClosingQuoteLine(cleaned)) return;
   if (!cleaned) return;
   segments.push({ speaker, text: `"${cleaned}"` });
 }
@@ -485,38 +545,38 @@ export function parseNarrativeSegments(
 
   const blocks = text.split(/\n+/).map((block) => block.trim()).filter(Boolean);
 
+  // 合并孤立的 「」 后引号：AI 偶尔在引号内换行导致 」 单独成行
+  for (let i = blocks.length - 1; i > 0; i -= 1) {
+    if (isDanglingClosingQuoteLine(blocks[i])) {
+      blocks[i - 1] += blocks[i];
+      blocks.splice(i, 1);
+    }
+  }
+  while (blocks.length && isDanglingClosingQuoteLine(blocks[0])) {
+    blocks.shift();
+  }
+
   for (const block of blocks) {
-    const quoteRe = /"([^"]*)"/g;
+    const dialogueRe = /([^「」“”\n。！？.!?]+?)\s*[:：]\s*([「“])([\s\S]*?)([」”])/g;
     let cursor = 0;
-    let hasQuote = false;
+    let hasDialogue = false;
     let match: RegExpExecArray | null;
 
-    while ((match = quoteRe.exec(block))) {
-      hasQuote = true;
-      const before = block.slice(cursor, match.index);
-      const after = block.slice(match.index + match[0].length);
-      const actor = findSpeaker(before);
-
-      if (actor) lastSpeaker = actor;
-      // 舞台提示用人物名作为speaker，而非KP
-      const narrationSpeaker = before.includes('【') && actor ? actor : defaultSpeaker;
-      const narrationText = stripTrailingSpeakerMarker(before);
-
-      if (isNonSpeechQuoteContext(before)) {
-        pushNarration(segments, `${narrationText}"${match[1]}"`, narrationSpeaker);
+    while ((match = dialogueRe.exec(block))) {
+      const speaker = explicitDialogueSpeaker(match[1]);
+      if (!speaker) {
+        pushNarration(segments, block.slice(cursor, match.index + match[0].length), defaultSpeaker);
         cursor = match.index + match[0].length;
         continue;
       }
 
-      pushNarration(segments, narrationText, narrationSpeaker);
-
-      // 三层回退搜索说话人
-      let speaker = findSpeakerNearQuote(before, after);
-      if (!speaker) speaker = findLastSpeakerInBlock(block, match.index);
-      if (!speaker) speaker = lastSpeaker;
-      if (!speaker) speaker = defaultSpeaker;
-      pushDialogue(segments, match[1], speaker);
-      if (speaker !== defaultSpeaker) lastSpeaker = speaker;
+      hasDialogue = true;
+      const before = block.slice(cursor, match.index);
+      const actor = findSpeaker(before);
+      const narrationSpeaker = before.includes('【') && actor ? actor : defaultSpeaker;
+      pushNarration(segments, before, narrationSpeaker);
+      pushDialogue(segments, match[3], speaker);
+      lastSpeaker = speaker;
 
       cursor = match.index + match[0].length;
     }
@@ -529,7 +589,7 @@ export function parseNarrativeSegments(
     const tailHasExplicitMarker = findSpeakerBySpeechPattern(tail);
     if (tailHasExplicitMarker) lastSpeaker = tailHasExplicitMarker;
 
-    if (!hasQuote) {
+    if (!hasDialogue) {
       const explicitMarker = findSpeakerBySpeechPattern(block);
       if (explicitMarker) lastSpeaker = explicitMarker;
     }
@@ -539,26 +599,33 @@ export function parseNarrativeSegments(
 }
 
 function lastCompleteBoundary(input: string) {
-  let inQuote = false;
+  let quoteClose = '';
   let lastEnd = -1;
 
   for (let i = 0; i < input.length; i += 1) {
     const char = input[i];
-    if (char === '"' || char === '"' || char === '"' || char === '"') {
-      inQuote = !inQuote;
+    if (!quoteClose) {
+      const close = closingQuoteFor(char);
+      if (close) {
+        quoteClose = close;
+        continue;
+      }
+    } else if (isQuoteClose(char, quoteClose)) {
+      quoteClose = '';
       continue;
     }
+
     if (!SENTENCE_END_CHARS.has(char)) continue;
 
-    if (inQuote) {
+    if (quoteClose) {
       // 中文标点在引号内，向前看是否紧接后引号
       let cursor = i + 1;
       while (cursor < input.length && (input[cursor] === ' ' || input[cursor] === '\t' || input[cursor] === '\u3000')) {
         cursor += 1;
       }
-      if (cursor < input.length && (input[cursor] === '"' || input[cursor] === '"' || input[cursor] === '"' || input[cursor] === '"')) {
+      if (cursor < input.length && isQuoteClose(input[cursor], quoteClose)) {
         lastEnd = cursor + 1;
-        inQuote = false;
+        quoteClose = '';
         i = cursor; // 跳过后引号
       }
       continue;
@@ -577,32 +644,38 @@ export function splitNarrative(input: string): string[] {
 
   const raw: string[] = [];
   let start = 0;
-  let inQuote = false;
+  let quoteClose = '';
 
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
 
     // 追踪引号状态（用于判断句子边界是否需要包含后引号）
-    if (char === '"' || char === '"' || char === '"' || char === '"') {
-      inQuote = !inQuote;
+    if (!quoteClose) {
+      const close = closingQuoteFor(char);
+      if (close) {
+        quoteClose = close;
+        continue;
+      }
+    } else if (isQuoteClose(char, quoteClose)) {
+      quoteClose = '';
       continue;
     }
 
     // 句子结束字符 — 不跳过引号内的，而是检查引号是否即将闭合
     if (SENTENCE_END_CHARS.has(char)) {
-      if (inQuote) {
+      if (quoteClose) {
         // 中文标点规矩：句号/问号/叹号在引号内部
         // 向前看：紧接在句末标点后的是否是后引号？
         let cursor = i + 1;
         while (cursor < text.length && (text[cursor] === ' ' || text[cursor] === '\t' || text[cursor] === '\u3000')) {
           cursor += 1;
         }
-        if (cursor < text.length && (text[cursor] === '"' || text[cursor] === '"' || text[cursor] === '"' || text[cursor] === '"')) {
+        if (cursor < text.length && isQuoteClose(text[cursor], quoteClose)) {
           // 句子结束 → 后引号紧随其后 → 整个 "..." 作为一句切出
           const line = text.slice(start, cursor + 1).trim();
           if (line) raw.push(line);
           start = cursor + 1;
-          inQuote = false;
+          quoteClose = '';
           i = cursor;
           continue;
         }
@@ -619,16 +692,18 @@ export function splitNarrative(input: string): string[] {
   const tail = text.slice(start).trim();
   if (tail) raw.push(tail);
 
-  // 合并过短的行(<3字符)到上一句, 避免孤立的括号/标点
+  // 合并孤立引号/过短行到上一句
   const result: string[] = [];
   for (const line of raw) {
-    if (line.length < 3 && result.length > 0) {
+    if (isDanglingClosingQuoteLine(line)) {
+      if (result.length > 0) result[result.length - 1] += line.trim();
+    } else if (result.length > 0 && line.length < 3) {
       result[result.length - 1] += line;
     } else {
       result.push(line);
     }
   }
-  return result;
+  return mergeOrDropDanglingClosingQuotes(result);
 }
 
 function splitCompleteSentences(input: string): { complete: string[]; tail: string } {
@@ -643,7 +718,8 @@ function splitCompleteSentences(input: string): { complete: string[]; tail: stri
   let tail = normalized.slice(lastEnd);
   const readyLines = splitNarrative(ready);
 
-  if (readyLines.length && isShortText(readyLines[readyLines.length - 1])) {
+  const lastReadyLine = readyLines[readyLines.length - 1] || '';
+  if (readyLines.length && isShortText(lastReadyLine) && !/[」”』]$/.test(lastReadyLine.trim())) {
     const shortTail = readyLines.pop() || '';
     const shortIndex = ready.lastIndexOf(shortTail);
     if (shortIndex >= 0) {
@@ -653,7 +729,7 @@ function splitCompleteSentences(input: string): { complete: string[]; tail: stri
   }
 
   return {
-    complete: splitNarrative(ready),
+    complete: mergeOrDropDanglingClosingQuotes(splitNarrative(ready)),
     tail,
   };
 }
@@ -671,7 +747,7 @@ export function createNarrativeStreamParser() {
         const hintEnd = findHintEnd(buffer, hintStart);
         const beforeHint = buffer.slice(0, hintStart);
         const split = splitCompleteSentences(beforeHint);
-        lines.push(...split.complete);
+        lines.push(...mergeOrDropDanglingClosingQuotes(split.complete));
 
         if (hintEnd < 0) {
           buffer = split.tail + buffer.slice(hintStart);
@@ -685,7 +761,7 @@ export function createNarrativeStreamParser() {
       }
 
       const split = splitCompleteSentences(buffer);
-      lines.push(...split.complete);
+      lines.push(...mergeOrDropDanglingClosingQuotes(split.complete));
       buffer = split.tail;
       break;
     }
@@ -700,7 +776,7 @@ export function createNarrativeStreamParser() {
     },
     flush() {
       const parsed = extractHints(buffer);
-      const lines = splitNarrative(parsed.text);
+      const lines = mergeOrDropDanglingClosingQuotes(splitNarrative(parsed.text));
       if (parsed.suggestions.length) {
         latestSuggestions = parsed.suggestions;
       }

@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { abilityModifier, DND_CLASSES, DND_COMPANIONS } from '../data/dndClasses';
-import type { ArchiveDocument, GameState, InvestigationClue, SkillEntry } from '../types/game';
+import type { GameState, SkillEntry } from '../types/game';
 import { COMPANION_ID_BY_UI_ID, getCompanionTrust, getTrustTier, recentTrustLogs } from '../utils/trust';
 
 interface CharacterPanelProps {
@@ -27,58 +27,10 @@ function isCompanionJoined(id: string, state: GameState) {
   return false;
 }
 
-function summarizeInventory(inventoryText: string) {
-  const items = inventoryText
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-  return Array.from(
-    items.reduce((map, item) => {
-      map.set(item, (map.get(item) ?? 0) + 1);
-      return map;
-    }, new Map<string, number>()),
-  );
-}
-
-function normalizeDocuments(value: unknown): ArchiveDocument[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      if (typeof item === 'string') {
-        return {
-          id: item,
-          name: item,
-          type: 'document' as const,
-          category: 'archive' as const,
-          summary: '',
-        };
-      }
-      return item as ArchiveDocument;
-    })
-    .filter((item) => item?.id && item?.name);
-}
-
-function normalizeClues(value: unknown): InvestigationClue[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      if (typeof item === 'string') {
-        return { id: item, name: item, description: '' };
-      }
-      return item as InvestigationClue;
-    })
-    .filter((item) => item?.id && item?.name);
-}
-
 export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
-  const [openDocumentId, setOpenDocumentId] = useState('');
   const currentHp = Number(state.current_hp ?? 30);
   const maxHp = Number(state.max_hp ?? 30);
   const hpPercent = Math.max(0, Math.min(100, (currentHp / Math.max(maxHp, 1)) * 100));
-  const inventorySummary = summarizeInventory(String(state.inventory || ''));
-  const documents = useMemo(() => normalizeDocuments(state.documents), [state.documents]);
-  const clues = useMemo(() => normalizeClues(state.clues), [state.clues]);
-  const openDocument = documents.find((document) => document.id === openDocumentId) || null;
   const classPreset = DND_CLASSES.find((item) => item.name === state.char_class || item.id === state.char_class);
   const visibleCompanions = DND_COMPANIONS.filter((companion) => ACTIVE_COMPANION_IDS.has(companion.id));
   const trustLogs = recentTrustLogs(state, 5);
@@ -192,70 +144,6 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
             </div>
           );
         })}
-      </div>
-
-      <div className="panel-block inventory-block">
-        <h2>背包</h2>
-        {inventorySummary.length > 0 ? (
-          <div className="inventory-list">
-            {inventorySummary.map(([item, count]) => (
-              <p key={item}>
-                <span>{item}</span>
-                {count > 1 && <b>x{count}</b>}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p>暂无物品</p>
-        )}
-      </div>
-
-      <div className="panel-block archive-block">
-        <h2>档案</h2>
-        {documents.length > 0 ? (
-          <div className="archive-list">
-            {documents.map((document) => (
-              <button
-                key={document.id}
-                type="button"
-                className={openDocumentId === document.id ? 'is-open' : ''}
-                onClick={() => setOpenDocumentId((current) => (current === document.id ? '' : document.id))}
-              >
-                <span>{document.name}</span>
-                {document.summary && <small>{document.summary}</small>}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p>暂无档案</p>
-        )}
-        {openDocument && (
-          <div className="archive-detail">
-            <strong>{openDocument.content?.title || openDocument.name}</strong>
-            {openDocument.content?.sections?.map((section) => (
-              <section key={`${openDocument.id}-${section.heading}`}>
-                <h3>{section.heading}</h3>
-                <p>{section.body}</p>
-              </section>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="panel-block clue-block">
-        <h2>线索</h2>
-        {clues.length > 0 ? (
-          <div className="clue-list">
-            {clues.map((clue) => (
-              <p key={clue.id}>
-                <b>{clue.name}</b>
-                {clue.description && <span>{clue.description}</span>}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p>暂无线索</p>
-        )}
       </div>
     </aside>
   );

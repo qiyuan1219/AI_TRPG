@@ -1,0 +1,110 @@
+const DEFAULT_ITEM_ICON = '/assets/icons/items/default.png';
+
+export const ITEM_ICON_PATHS: Record<string, string> = {
+  'scroll-sealed': '/assets/icons/items/scroll-sealed.png',
+  'book-open': '/assets/icons/items/book-open..png',
+  'note-pencil': '/assets/icons/items/note-pencil.png',
+  'scroll-quill': '/assets/icons/items/scroll-quill.png',
+  cards: '/assets/icons/items/cards.png',
+  'note-pin': '/assets/icons/items/note-pin.png',
+  'book-prayer': '/assets/icons/items/book-prayer.png',
+  'scroll-holy': '/assets/icons/items/scroll-holy.png',
+  'book-accounts': '/assets/icons/items/book-accounts.png',
+  'map-tunnel': '/assets/icons/items/map-tunnel.png',
+  'scroll-log': '/assets/icons/items/scroll-log.png',
+  'scroll-list': '/assets/icons/items/scroll-list.png',
+  'map-parchment': '/assets/icons/items/map-parchment.png',
+  'note-blood': '/assets/icons/items/note-blood.png',
+  'journal-leaf': '/assets/icons/items/journal-leaf.png',
+  'scroll-torn': '/assets/icons/items/scroll-torn.png',
+  'scroll-dark': '/assets/icons/items/scroll-dark.png',
+  'book-skull': '/assets/icons/items/book-skull.png',
+  'scroll-star': '/assets/icons/items/scroll-star.png',
+  'note-torn': '/assets/icons/items/note-torn.png',
+  'scroll-medicine': '/assets/icons/items/scroll-medicine.png',
+  clue: '/assets/icons/items/clue.png',
+  document: '/assets/icons/items/default.png',
+  item: DEFAULT_ITEM_ICON,
+  default: DEFAULT_ITEM_ICON,
+
+  'potion-red': '/assets/prop/yuling_shop/healing_potion.png',
+  healing_potion: '/assets/prop/yuling_shop/healing_potion.png',
+  powder: '/assets/prop/aolan_blindbox/hemostatic_powder.png',
+  hemostatic_powder: '/assets/prop/aolan_blindbox/hemostatic_powder.png',
+  'vial-green': '/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png',
+  weakly_effective_detoxifying_agent: '/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png',
+  'heart-vial': '/assets/prop/yuling_shop/purifyingheart.png',
+  purification_heart: '/assets/prop/yuling_shop/purifyingheart.png',
+  purifyingheart: '/assets/prop/yuling_shop/purifyingheart.png',
+  cold_light_stick: '/assets/prop/aolan_blindbox/cold_light_stick.png',
+  sealed_sample_bottle: '/assets/prop/aolan_blindbox/sealed_sample_bottle.png',
+  small_bottle_therapeutic_solution: '/assets/prop/aolan_blindbox/small_bottle_therapeutic_solution.png',
+  blackmarket_chips: '/assets/prop/aolan_blindbox/blackmarket_chips.png',
+  copper_ring: '/assets/prop/aolan_blindbox/copper_ring.png',
+  old_talisman_fragments: '/assets/prop/aolan_blindbox/old_talisman_fragments.png',
+  gem: '/assets/prop/aolan_blindbox/diamond.png',
+  diamond: '/assets/prop/aolan_blindbox/diamond.png',
+  strength_potion: '/assets/prop/yuling_shop/power_potion.png',
+  intelligence_potion: '/assets/prop/yuling_shop/wisdom_potion.png',
+  dexterity_potion: '/assets/prop/yuling_shop/agile_potion.png',
+  constitution_potion: '/assets/prop/yuling_shop/constitution_potion.png',
+  wisdom_potion: '/assets/prop/yuling_shop/perception_potion.png',
+  charisma_potion: '/assets/prop/yuling_shop/charm_potion.png',
+};
+
+const ITEM_NAME_ICON_TOKENS: Record<string, string> = {
+  治疗药水: 'healing_potion',
+  小瓶治疗药水: 'small_bottle_therapeutic_solution',
+  止血粉: 'hemostatic_powder',
+  解毒剂: 'weakly_effective_detoxifying_agent',
+  弱效解毒剂: 'weakly_effective_detoxifying_agent',
+  净化之心: 'purification_heart',
+  冷光灯: 'cold_light_stick',
+  冷光棒: 'cold_light_stick',
+  密封样本瓶: 'sealed_sample_bottle',
+  黑市筹码: 'blackmarket_chips',
+  生锈铜戒指: 'copper_ring',
+  旧护符碎片: 'old_talisman_fragments',
+  钻石: 'diamond',
+  干净的钻石: 'diamond',
+  力量药水: 'strength_potion',
+  智力药水: 'intelligence_potion',
+  敏捷药水: 'dexterity_potion',
+  体质药水: 'constitution_potion',
+  感知药水: 'wisdom_potion',
+  魅力药水: 'charisma_potion',
+};
+
+const ITEM_NAME_SUMMARIES: Record<string, string> = {
+  治疗药水: '恢复少量生命值，是深层探索中最可靠的应急补给。',
+  小瓶治疗药水: '能恢复少量生命，适合在危险地带应急。',
+  止血粉: '可用于处理普通流血伤口，味道像苦涩的铁锈。',
+  解毒剂: '缓解常见毒素与孢粉刺激。',
+  弱效解毒剂: '能缓解轻微毒素，但对深层污染效果有限。',
+  净化之心: '特殊道具。可用于对抗黑石侵蚀，也许能救回还未完全异化的人。',
+  冷光灯: '不会引燃孢粉的冷光照明工具。',
+  冷光棒: '短时间照亮周围环境，不会产生明显热源。',
+  密封样本瓶: '可用于保存孢子、菌丝或污染残留。',
+  黑市筹码: '黑市流通的小筹码，也许以后能派上用场。',
+  生锈铜戒指: '边缘磨得发黑，奥兰坚持说它曾经属于一位勇敢的人。',
+  旧护符碎片: '残缺的护符碎片，表面还有几道不完整的祈愿纹。',
+  钻石: '可作为交易、施法或黑市议价筹码的贵重宝石。',
+  干净的钻石: '未经附魔、没有追踪印记的天然钻石。凯娅要的就是它。',
+  力量药水: '临时提升力量相关检定，适合破门、攀爬和近战爆发。',
+  智力药水: '临时提升智力相关检定，适合调查符文、机关和古代文本。',
+  敏捷药水: '临时提升敏捷相关检定，适合闪避、潜行和拆陷阱。',
+  体质药水: '增强身体耐受力，适合体质豁免、抗毒和长时间探索。',
+  感知药水: '提高警觉与直觉，适合察觉埋伏、幻觉和异常气息。',
+  魅力药水: '增强谈判气势，适合说服、威吓、欺瞒和交涉。',
+};
+
+export function resolveItemIconPath(iconOrPath?: string, itemName?: string) {
+  if (iconOrPath?.startsWith('/')) return iconOrPath;
+  const token = ITEM_NAME_ICON_TOKENS[itemName || ''] || iconOrPath || 'default';
+  return ITEM_ICON_PATHS[token] || DEFAULT_ITEM_ICON;
+}
+
+export function getItemSummaryByName(itemName: string) {
+  return ITEM_NAME_SUMMARIES[itemName] || '尚未登记详细资料的物品。';
+}
+

@@ -673,6 +673,9 @@ async def chat_stream(req: ChatRequest):
             user_message = enhanced_msg
         else:
             user_message = req.message
+            reward_change = apply_investigation_rewards(state, req.message, None)
+            if reward_change:
+                yield f"data: {json.dumps({'type':'state_update','content':reward_change}, ensure_ascii=False)}\n\n"
 
         try:
             async for chunk in dm_chat_stream(user_message, state, history, ctx + recent):

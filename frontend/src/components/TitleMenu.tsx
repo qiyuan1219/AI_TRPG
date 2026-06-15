@@ -16,9 +16,21 @@ const MENU_ITEMS = [
   { label: '测试', action: 'test' },
 ] as const;
 
+const TITLE_VIDEO = '/assets/scenes/title-bg.mp4';
+
 export function TitleMenu({ onNewGame, onLoadGame, onSettings, onTest, onPrimeAudio }: TitleMenuProps) {
   return (
     <main className="title-menu-screen" onPointerDownCapture={onPrimeAudio} onKeyDownCapture={onPrimeAudio}>
+      <video
+        className="title-video-bg"
+        src={TITLE_VIDEO}
+        autoPlay
+        loop
+        muted
+        playsInline
+        disablePictureInPicture
+        onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+      />
       <div className="title-menu-shade" />
       <motion.section
         className="title-menu-layout"

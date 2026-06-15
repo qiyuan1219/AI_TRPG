@@ -18,9 +18,9 @@ export function LoadingScreen({ error, onRetry }: LoadingScreenProps) {
     <div className="loading-screen">
       <div className="loading-panel">
         <motion.div initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="loading-sigil">
-          SC
+          地
         </motion.div>
-        <h1>碎冠之影</h1>
+        <h1>地心之门</h1>
         <div className="loading-rule" />
         {error ? (
           <>

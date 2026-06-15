@@ -20,6 +20,8 @@ export interface ArchiveDocument {
   type: 'document';
   category: 'archive';
   summary: string;
+  icon?: string;
+  rarity?: 'common' | 'uncommon' | 'rare' | 'key' | 'quest';
   source?: string;
   readable?: boolean;
   content?: {
@@ -28,6 +30,7 @@ export interface ArchiveDocument {
   };
   tags?: string[];
   unlocks?: string[];
+  relatedDocuments?: string[];
   unlockedAt?: string;
 }
 
@@ -37,6 +40,7 @@ export interface InvestigationClue {
   description: string;
   source?: string;
   tags?: string[];
+  relatedDocuments?: string[];
   unlockedAt?: string;
 }
 
@@ -89,6 +93,7 @@ export interface GameState {
     currentScene?: string;
     visitedScenes?: string[];
   };
+  equipment?: Partial<Record<'weapon' | 'shield' | 'armor' | 'accessory', string | null>>;
   companionTrust?: Partial<Record<CompanionId, number>>;
   trustLogs?: TrustLog[];
   companionMemories?: CompanionMemory[];
