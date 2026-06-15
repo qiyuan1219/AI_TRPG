@@ -1,20 +1,30 @@
 .orlan-box-screen {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  z-index: 76;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 34px 16px;
+  padding: 22px;
   background:
-    linear-gradient(90deg, rgba(8, 7, 11, 0.9), rgba(9, 10, 15, 0.66)),
-    url('/assets/scenes/10orlan-lucky-box.webp') center / cover no-repeat;
+    linear-gradient(180deg, rgba(7, 8, 12, 0.68), rgba(7, 8, 12, 0.9)),
+    rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(8px);
   color: #dfd3b8;
 }
 
 .orlan-box-panel {
-  width: min(760px, 100%);
+  width: min(920px, calc(100vw - 34px));
+  max-height: min(680px, calc(100vh - 34px));
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  overflow: hidden;
   border: 1px solid rgba(221, 174, 75, 0.36);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(24, 26, 34, 0.94), rgba(11, 12, 18, 0.96));
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(8, 7, 11, 0.48), rgba(9, 10, 15, 0.2)),
+    url('/assets/scenes/10orlan-lucky-box.webp') center / cover no-repeat,
+    linear-gradient(180deg, rgba(24, 26, 34, 0.98), rgba(11, 12, 18, 0.98));
   box-shadow: 0 22px 72px rgba(0, 0, 0, 0.58), inset 0 0 30px rgba(221, 174, 75, 0.06);
   padding: 18px;
 }
@@ -176,10 +186,19 @@
   cursor: not-allowed;
 }
 
+.orlan-primary-button.danger {
+  border-color: rgba(248, 128, 101, 0.48);
+  background: linear-gradient(180deg, #d77954, #7a3325);
+  color: #fff2df;
+}
+
 .orlan-history {
   display: grid;
   gap: 8px;
   margin-top: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .orlan-history > div {

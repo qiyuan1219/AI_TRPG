@@ -63,6 +63,8 @@ const ITEM_NAME_ICON_TOKENS: Record<string, string> = {
   冷光棒: 'cold_light_stick',
   密封样本瓶: 'sealed_sample_bottle',
   黑市筹码: 'blackmarket_chips',
+  黑市暗号纸条: 'note-pin',
+  凯娅的暗号: 'note-pin',
   生锈铜戒指: 'copper_ring',
   旧护符碎片: 'old_talisman_fragments',
   钻石: 'diamond',
@@ -86,6 +88,8 @@ const ITEM_NAME_SUMMARIES: Record<string, string> = {
   冷光棒: '短时间照亮周围环境，不会产生明显热源。',
   密封样本瓶: '可用于保存孢子、菌丝或污染残留。',
   黑市筹码: '黑市流通的小筹码，也许以后能派上用场。',
+  黑市暗号纸条: '写有“断缆不问来路”的窄纸条，能让凯娅愿意听完你的来意。',
+  凯娅的暗号: '米娜交代的黑市暗号：“断缆不问来路”。',
   生锈铜戒指: '边缘磨得发黑，奥兰坚持说它曾经属于一位勇敢的人。',
   旧护符碎片: '残缺的护符碎片，表面还有几道不完整的祈愿纹。',
   钻石: '可作为交易、施法或黑市议价筹码的贵重宝石。',
@@ -107,4 +111,3 @@ export function resolveItemIconPath(iconOrPath?: string, itemName?: string) {
 export function getItemSummaryByName(itemName: string) {
   return ITEM_NAME_SUMMARIES[itemName] || '尚未登记详细资料的物品。';
 }
-

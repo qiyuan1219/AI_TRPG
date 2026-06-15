@@ -323,10 +323,14 @@ async def dm_chat_stream(
 
         stream = await _create_chat_completion(
             model=LLM_MODEL, messages=messages, tools=TOOLS,
-            tool_choice="auto", temperature=0.7, max_tokens=1024, stream=True,
+            tool_choice="auto", temperature=0.7, max_tokens=1400, stream=True,
         )
+        finish_reason = None
         async for chunk in stream:
-            d = chunk.choices[0].delta if chunk.choices else None
+            choice = chunk.choices[0] if chunk.choices else None
+            if choice and choice.finish_reason:
+                finish_reason = choice.finish_reason
+            d = choice.delta if choice else None
             if not d: continue
             if d.content:
                 acc_content += d.content
@@ -374,16 +378,70 @@ async def dm_chat_stream(
                     messages.append({"role":"tool","tool_call_id":tool_call_id,
                                      "content": json.dumps(err_info, ensure_ascii=False)})
             continue
+        if finish_reason == "length" and acc_content:
+            messages.append({"role": "assistant", "content": acc_content})
+            messages.append({
+                "role": "user",
+                "content": (
+                    "上一段叙事因为长度限制被截断。请不要重复已经输出过的文字，"
+                    "从未完成的句子后自然续写，2到4句内完整收束；"
+                    "如需要行动选项，只能在最后单独输出一行 [HINTS: 选项1 | 选项2 | 选项3]。"
+                    "不要调用函数。"
+                ),
+            })
+            continuation = await _create_chat_completion(
+                model=LLM_MODEL,
+                messages=messages,
+                temperature=0.65,
+                max_tokens=520,
+                stream=True,
+            )
+            async for chunk in continuation:
+                choice = chunk.choices[0] if chunk.choices else None
+                d = choice.delta if choice else None
+                if d and d.content:
+                    yield d.content
+            return
         return
 
     final = await _create_chat_completion(
         model=LLM_MODEL,
         messages=messages + [{"role":"user","content":"继续叙事，不要调用函数。"}],
-        temperature=0.7, max_tokens=768, stream=True,
+        temperature=0.7, max_tokens=960, stream=True,
     )
+    final_content = ""
+    final_finish_reason = None
     async for chunk in final:
-        d = chunk.choices[0].delta if chunk.choices else None
-        if d and d.content: yield d.content
+        choice = chunk.choices[0] if chunk.choices else None
+        if choice and choice.finish_reason:
+            final_finish_reason = choice.finish_reason
+        d = choice.delta if choice else None
+        if d and d.content:
+            final_content += d.content
+            yield d.content
+
+    if final_finish_reason == "length" and final_content:
+        continuation = await _create_chat_completion(
+            model=LLM_MODEL,
+            messages=messages + [
+                {"role": "assistant", "content": final_content},
+                {
+                    "role": "user",
+                    "content": (
+                        "上一段叙事因为长度限制被截断。请不要重复已经输出过的文字，"
+                        "从未完成的句子后自然续写，2到4句内完整收束。不要调用函数。"
+                    ),
+                },
+            ],
+            temperature=0.65,
+            max_tokens=520,
+            stream=True,
+        )
+        async for chunk in continuation:
+            choice = chunk.choices[0] if chunk.choices else None
+            d = choice.delta if choice else None
+            if d and d.content:
+                yield d.content
 
 
 async def dm_narrate_stream(prompt: str, state: dict) -> AsyncGenerator[str, None]:
@@ -396,6 +454,127 @@ async def dm_narrate_stream(prompt: str, state: dict) -> AsyncGenerator[str, Non
     async for chunk in stream:
         d = chunk.choices[0].delta if chunk.choices else None
         if d and d.content: yield d.content
+
+
+def _fallback_ailin_recruit_judgement(player_answer: str) -> dict:
+    text = (player_answer or "").strip()
+    compact = text.replace(" ", "")
+    positive_words = (
+        "同伴", "伙伴", "修女", "人", "尊重", "选择", "意愿", "名字", "牺牲", "死者",
+        "遗体", "伤者", "救", "不放弃", "带回", "真相", "恐惧", "心", "噩梦", "孢毒",
+        "净化", "治疗", "同行", "一起", "不是药箱", "不是工具",
+    )
+    negative_words = (
+        "药箱", "工具", "听命", "闭嘴", "只要治疗", "只需要治疗", "不用想", "别问",
+        "负担", "拖后腿", "死人没用", "数字", "效率", "浪费时间", "少废话", "雇佣",
+    )
+    score = 50
+    for word in positive_words:
+        if word in compact:
+            score += 7
+    for word in negative_words:
+        if word in compact:
+            score -= 10
+    if len(compact) < 8:
+        score -= 12
+    if "药箱" in compact and ("不是" in compact or "不只是" in compact):
+        score += 12
+    if "名字" in compact and ("带回" in compact or "记住" in compact):
+        score += 10
+    score = max(0, min(100, score))
+    trust_delta = max(-10, min(10, round((score - 50) / 5)))
+    reply = (
+        "艾琳安静听完，指尖从药箱锁扣上移开。"
+        if trust_delta >= 0
+        else "艾琳没有立刻反驳，只是把药箱往身侧收了半寸。"
+    )
+    reply += (
+        "「我听见了。愿你记住今天说过的话，尤其是在下面不得不做艰难决定的时候。」"
+        if trust_delta >= 5
+        else "「答案不必完美，但我会看你们之后如何对待伤者、死者和还在恐惧里的人。」"
+        if trust_delta >= 0
+        else "「我会同行，因为下面还有人需要帮助。但请别把救治当作可以随意消耗的工具。」"
+    )
+    return {
+        "score": score,
+        "trust_delta": trust_delta,
+        "reason": "根据玩家回答对生命、伤者、死者与艾琳主体性的尊重程度结算。",
+        "reply": reply,
+    }
+
+
+async def judge_ailin_recruit_answer(
+    player_name: str,
+    player_answer: str,
+    current_trust: int = 55,
+) -> dict:
+    fallback = _fallback_ailin_recruit_judgement(player_answer)
+    prompt = f"""
+你是《地心之门》第一幕的静默神殿招募节点评审器。场景中，白枝修女艾琳问玩家：
+“你们需要的是一名修女，还是一个随队药箱？”
+
+玩家名称：{player_name or "冒险者"}
+艾琳当前信任：{current_trust}
+玩家回答：{player_answer}
+
+请分析玩家回答，并给出艾琳对这句话的即时反应。注意：
+1. 无论玩家回答好坏，艾琳最终都会入队；本次只影响艾琳信任度 -10 到 +10。
+2. 高分回答应尊重艾琳是有判断和信念的同伴，理解她关心伤者、死者姓名、孢毒造成的恐惧与心灵创伤。
+3. 中等回答可以务实但不恶意。
+4. 低分回答会把她当工具、药箱、消耗品，或轻视伤者、死者、恐惧和牺牲。
+5. reply 只写艾琳对玩家回答的回应，不要写入队尾声，不要写“她将徽章别在药箱上”等后续固定剧情。
+6. reply 使用艾琳温和但有底线的语气，80-160 个中文字符。
+
+必须只输出严格 JSON，不要输出解释文本。JSON 字段：
+score: integer，0 到 100
+trust_delta: integer，-10 到 10
+reason: string，20-60 个中文字符
+reply: string，艾琳的回应
+"""
+    try:
+        completion = await asyncio.wait_for(
+            _create_chat_completion(
+                model=LLM_MODEL,
+                messages=[
+                    {"role": "system", "content": "你只输出严格 JSON。"},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.55,
+                max_tokens=360,
+                stream=False,
+            ),
+            timeout=10,
+        )
+        raw = completion.choices[0].message.content if completion.choices else ""
+        data = json.loads((raw or "").strip())
+    except (OpenAIError, asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError) as error:
+        logger.warning("ailin recruit judgement fell back: %s", error)
+        data = fallback
+
+    try:
+        score = int(data.get("score", fallback["score"]))
+    except (TypeError, ValueError):
+        score = fallback["score"]
+    try:
+        trust_delta = int(data.get("trust_delta", fallback["trust_delta"]))
+    except (TypeError, ValueError):
+        trust_delta = fallback["trust_delta"]
+
+    score = max(0, min(100, score))
+    trust_delta = max(-10, min(10, trust_delta))
+    reply = str(data.get("reply") or fallback["reply"]).strip()
+    reason = str(data.get("reason") or fallback["reason"]).strip()
+    if not reply:
+        reply = fallback["reply"]
+    if not reason:
+        reason = fallback["reason"]
+
+    return {
+        "score": score,
+        "trust_delta": trust_delta,
+        "reason": reason[:120],
+        "reply": reply[:260],
+    }
 
 
 def _fallback_companion_feedback(event: dict, state: dict, choice: dict) -> str:

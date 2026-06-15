@@ -776,7 +776,12 @@ export function createNarrativeStreamParser() {
     },
     flush() {
       const parsed = extractHints(buffer);
-      const lines = mergeOrDropDanglingClosingQuotes(splitNarrative(parsed.text));
+      // End-of-stream can still leave a clipped sentence when the model hits a
+      // token limit or the transport closes after a partial chunk. Only publish
+      // complete sentence boundaries here; otherwise the UI shows broken prose
+      // immediately before deferred system messages.
+      const split = splitCompleteSentences(parsed.text);
+      const lines = mergeOrDropDanglingClosingQuotes(split.complete);
       if (parsed.suggestions.length) {
         latestSuggestions = parsed.suggestions;
       }

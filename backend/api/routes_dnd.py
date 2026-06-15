@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from kp.dm_service import dm_chat_stream, dm_narrate_stream, judge_black_market_bargain, dm_battle_narrate, dm_judge_advantage
+from kp.dm_service import dm_chat_stream, dm_narrate_stream, judge_black_market_bargain, dm_battle_narrate, dm_judge_advantage, judge_ailin_recruit_answer
 from kp.memory import (
     get_game_memories,
     get_recent_memories,
@@ -177,6 +177,13 @@ class BargainJudgeRequest(BaseModel):
     total: int
     player_words: str
     history: list[dict] = Field(default_factory=list)
+
+
+class AilinRecruitAnswerRequest(BaseModel):
+    game_id: str | None = None
+    player_name: str = "冒险者"
+    player_answer: str
+    current_trust: int = 55
 
 
 class SaveGameRequest(BaseModel):
@@ -626,6 +633,26 @@ async def judge_bargain(req: BargainJudgeRequest):
         history=req.history[-5:],
     )
     return result
+
+
+@router_dnd.post("/ailin/recruit-answer")
+async def judge_ailin_recruit(req: AilinRecruitAnswerRequest):
+    player_answer = req.player_answer.strip()
+    if not player_answer:
+        raise HTTPException(400, "回答不能为空")
+
+    player_name = req.player_name.strip() or "冒险者"
+    current_trust = max(0, min(int(req.current_trust or 55), 100))
+    if req.game_id:
+        state = load_game_state(req.game_id)
+        if state:
+            player_name = str(state.get("player_name") or player_name)
+
+    return await judge_ailin_recruit_answer(
+        player_name=player_name,
+        player_answer=player_answer,
+        current_trust=current_trust,
+    )
 
 
 @router_dnd.post("/chat/stream")

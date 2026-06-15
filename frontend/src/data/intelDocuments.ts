@@ -272,7 +272,7 @@ export const INTEL_DATABASE: IntelDocument[] = [
       },
       {
         heading: '卡片三：凯娅 · 黑市猎手',
-        body: '"黑市，找奥兰——护符摊位。暗号：「白契账本缺了一页」，回答「缺页最值钱」。她曾是地下怪物猎人，懂机关和暗道。要钻石，从奥兰的幸运盲盒抽——二十金一次，出不出看骰子。"',
+        body: '"黑市，找奥兰——护符摊位。米娜的暗号：「断缆不问来路」。她曾是地下怪物猎人，懂机关和暗道。要钻石，从奥兰的幸运盲盒抽——二十金一次，出不出看骰子。"',
       },
       {
         heading: '卡片四：额外情报 · 云苓（高胜局奖励）',
@@ -405,7 +405,7 @@ export const INTEL_DATABASE: IntelDocument[] = [
     source: '黑市 · 奥兰摊位',
     acquisition: [
       {
-        method: '盲盒抽取8次后，奥兰打开暗格时可见',
+        method: '盲盒抽取10次后，奥兰打开暗格时可见',
         check: { skill: '洞察', dc: 13 },
         location: 'blackmarket',
         hints: ['趁奥兰开暗格时瞥向账本'],

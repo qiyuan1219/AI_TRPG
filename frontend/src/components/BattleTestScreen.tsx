@@ -993,12 +993,12 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
         name: "孢尘喷吐",
         resource: "战斗技能",
         source: "敌方技能",
-        formula: "目标 CON 豁免 DC11；1d4 毒素",
-        effect: "小怪吐出浅绿色孢尘，目标用体质豁免抵抗。成功半效，失败会受到完整影响。",
+        formula: "无需命中；所有敌对目标 1d4 毒素",
+        effect: "小怪吐出浅绿色孢尘，对所有敌对目标造成 1D4 毒素伤害，不进行命中或豁免。",
         cooldown: "每回合 1 次",
-        rule: "敌方豁免技能",
-        roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "目标 CON 豁免" },
-        tags: ["豁免", "毒素", "减益"],
+        rule: "自动群体伤害",
+        roll: { kind: "damage", dieType: "d4", diceCount: 1, bonus: 0, label: "孢尘喷吐伤害" },
+        tags: ["群体", "毒素", "自动命中"],
       },
       {
         id: "CR3A",
@@ -1019,7 +1019,7 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
     id: "tutorial-crawler-b",
     name: "裂隙爬兽B",
     faction: "enemy",
-    role: "小怪 / 豁免教学",
+    role: "小怪 / 群体伤害教学",
     portrait: "爬B",
     model: "crawler",
     hp: 28,
@@ -1028,21 +1028,21 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
     speed: 25,
     proficiency: 2,
     abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
-    resourceProfile: ["低伤害豁免", "怕光", "被击败即退出战斗"],
+    resourceProfile: ["自动群体伤害", "怕光", "被击败即退出战斗"],
     statuses: ["惊慌", "孢尘", "教学敌人"],
-    traits: ["HP28 / AC12", "CON +1", "伤害已降低", "用孢尘展示豁免机制"],
+    traits: ["HP28 / AC12", "自动命中", "伤害已降低", "用孢尘展示群体伤害"],
     skills: [
       {
         id: "CR2B",
         name: "孢尘喷吐",
         resource: "战斗技能",
         source: "敌方技能",
-        formula: "目标 CON 豁免 DC11；1d4 毒素",
-        effect: "教学重点：敌人也会使用让你豁免的技能。体质高的冒险者更容易抵抗，瑟琳则需要小心。",
+        formula: "无需命中；所有敌对目标 1d4 毒素",
+        effect: "教学重点：敌人也会使用自动群体伤害技能。所有我方角色都会受到 1D4 毒素伤害，无需命中或豁免。",
         cooldown: "每回合 1 次",
-        rule: "敌方豁免技能",
-        roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "目标 CON 豁免" },
-        tags: ["豁免", "毒素", "减益"],
+        rule: "自动群体伤害",
+        roll: { kind: "damage", dieType: "d4", diceCount: 1, bonus: 0, label: "孢尘喷吐伤害" },
+        tags: ["群体", "毒素", "自动命中"],
       },
       {
         id: "CR1B",
@@ -1105,12 +1105,12 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
         name: "孢尘喷吐",
         resource: "战斗技能",
         source: "敌方技能",
-        formula: "目标 CON 豁免 DC11；1d4 毒素",
-        effect: "配合其他小怪攻击，让我方承受足够伤害以展示治疗的重要性。",
+        formula: "无需命中；所有敌对目标 1d4 毒素",
+        effect: "配合其他小怪攻击，让我方全体承受 1D4 毒素伤害，以展示治疗的重要性。",
         cooldown: "每回合 1 次",
-        rule: "敌方豁免技能",
-        roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "目标 CON 豁免" },
-        tags: ["豁免", "毒素", "减益"],
+        rule: "自动群体伤害",
+        roll: { kind: "damage", dieType: "d4", diceCount: 1, bonus: 0, label: "孢尘喷吐伤害" },
+        tags: ["群体", "毒素", "自动命中"],
       },
       {
         id: "CR3C",
@@ -1190,10 +1190,10 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     id: "test-crawler-a", name: "裂隙爬兽A", faction: "enemy", role: "小怪", portrait: "爬A", model: "crawler",
     hp: 28, maxHp: 28, ac: 12, speed: 25, proficiency: 2,
     abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
-    resourceProfile: ["攻击", "豁免"], statuses: ["怕光"], traits: ["HP28/AC12"],
+    resourceProfile: ["攻击", "群体伤害"], statuses: ["怕光"], traits: ["HP28/AC12"],
     skills: [
       { id: "CA1", name: "畏光爪击", resource: "战斗技能", source: "敌方技能", formula: "DEX+熟练 vs AC；1d4+2", effect: "近战攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击" }, tags: ["攻击"] },
-      { id: "CA2", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "CON豁免DC11；1d4毒素", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免技能", roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "孢尘喷吐" }, tags: ["豁免"] },
+      { id: "CA2", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "无需命中；全体敌对目标 1d4毒素", effect: "自动群体伤害", cooldown: "每回合1次", rule: "自动伤害", roll: { kind: "damage", dieType: "d4", diceCount: 1, bonus: 0, label: "孢尘喷吐伤害" }, tags: ["群体", "毒素", "自动命中"] },
       { id: "CA3", name: "惊慌缩伏", resource: "战斗技能", source: "敌方技能", formula: "剧情表现", effect: "受伤后退缩", cooldown: "剧情", rule: "行为", roll: { kind: "none" }, tags: ["行为"] },
     ], nonCombatSkills: [],
   },
@@ -1201,9 +1201,9 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     id: "test-crawler-b", name: "裂隙爬兽B", faction: "enemy", role: "小怪", portrait: "爬B", model: "crawler",
     hp: 28, maxHp: 28, ac: 12, speed: 25, proficiency: 2,
     abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
-    resourceProfile: ["豁免", "攻击"], statuses: ["孢尘"], traits: ["HP28/AC12"],
+    resourceProfile: ["群体伤害", "攻击"], statuses: ["孢尘"], traits: ["HP28/AC12"],
     skills: [
-      { id: "CB1", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "CON豁免DC11；1d4毒素", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免技能", roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "孢尘喷吐" }, tags: ["豁免"] },
+      { id: "CB1", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "无需命中；全体敌对目标 1d4毒素", effect: "自动群体伤害", cooldown: "每回合1次", rule: "自动伤害", roll: { kind: "damage", dieType: "d4", diceCount: 1, bonus: 0, label: "孢尘喷吐伤害" }, tags: ["群体", "毒素", "自动命中"] },
       { id: "CB2", name: "畏光爪击", resource: "战斗技能", source: "敌方技能", formula: "DEX+熟练 vs AC；1d4+2", effect: "近战攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击" }, tags: ["攻击"] },
       { id: "CB3", name: "惊慌缩伏", resource: "战斗技能", source: "敌方技能", formula: "剧情表现", effect: "被压制后退缩", cooldown: "剧情", rule: "行为", roll: { kind: "none" }, tags: ["行为"] },
     ], nonCombatSkills: [],
@@ -1215,7 +1215,7 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     resourceProfile: ["混合"], statuses: ["畏光"], traits: ["HP28/AC12"],
     skills: [
       { id: "CC1", name: "畏光爪击", resource: "战斗技能", source: "敌方技能", formula: "DEX+熟练 vs AC；1d4+2", effect: "近战攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "dex", targetAc: 16, label: "畏光爪击" }, tags: ["攻击"] },
-      { id: "CC2", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "CON豁免DC11；1d4毒素", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免技能", roll: { kind: "save", dc: 11, targetSaveBonus: 2, label: "孢尘喷吐" }, tags: ["豁免"] },
+      { id: "CC2", name: "孢尘喷吐", resource: "战斗技能", source: "敌方技能", formula: "无需命中；全体敌对目标 1d4毒素", effect: "自动群体伤害", cooldown: "每回合1次", rule: "自动伤害", roll: { kind: "damage", dieType: "d4", diceCount: 1, bonus: 0, label: "孢尘喷吐伤害" }, tags: ["群体", "毒素", "自动命中"] },
       { id: "CC3", name: "惊慌缩伏", resource: "战斗技能", source: "敌方技能", formula: "剧情表现", effect: "同伴倒下后畏缩", cooldown: "剧情", rule: "行为", roll: { kind: "none" }, tags: ["行为"] },
     ], nonCombatSkills: [],
   },
@@ -1249,7 +1249,7 @@ const TUTORIAL_BATTLE_CONFIG: BattleConfig = {
   initiativeNote: "5 位单位同时进行 1D20 判定：D20 + 敏捷调整值 + 其他加值。数值最高者先行动。",
   winTitle: "教学战斗胜利",
   loseTitle: "教学战斗失败",
-  winText: "三只裂隙爬兽已经失去战斗能力。你掌握了先攻、攻击、豁免、治疗和回合推进。",
+  winText: "三只裂隙爬兽已经失去战斗能力。你掌握了先攻、攻击、自动伤害、治疗和回合推进。",
   loseText: "本场是教学战斗，可以重投先攻重新练习；敌人伤害较低，优先让冒险者承伤。",
   completeLabel: "继续剧情",
   tutorialIntro: {
@@ -1264,9 +1264,9 @@ const TUTORIAL_BATTLE_CONFIG: BattleConfig = {
       { title: "⑥ 治疗时机", text: "回气和逆钟愈合恢复 HP。受伤后用治疗维持血量，不要等 HP 过低才动手。" },
     ],
     enemySkills: [
-      { name: "裂隙爬兽A", skills: ["畏光爪击：D20 + 敏捷 vs AC，低伤害近战。", "孢尘喷吐：目标体质豁免 DC11，成功半效。", "惊慌缩伏：展示怪物受伤后的退缩行为。"] },
-      { name: "裂隙爬兽B", skills: ["孢尘喷吐：优先展示豁免与半效。", "畏光爪击：展示瑟琳 AC 较低、前排更适合承伤。", "惊慌缩伏：被光照或重击压制时会畏缩。"] },
-      { name: "裂隙爬兽C", skills: ["畏光爪击：多只小怪轮番攻击，体会回合交替的压力。", "孢尘喷吐：毒素持续消耗我方血量，治疗的重要性。", "惊慌缩伏：同伴倒下后更加畏缩。"] },
+      { name: "裂隙爬兽A", skills: ["畏光爪击：D20 + 敏捷 vs AC，低伤害近战。", "孢尘喷吐：无需命中，所有敌对目标受到 1D4 毒素。", "惊慌缩伏：展示怪物受伤后的退缩行为。"] },
+      { name: "裂隙爬兽B", skills: ["孢尘喷吐：优先展示自动群体伤害。", "畏光爪击：展示瑟琳 AC 较低、前排更适合承伤。", "惊慌缩伏：被光照或重击压制时会畏缩。"] },
+      { name: "裂隙爬兽C", skills: ["畏光爪击：多只小怪轮番攻击，体会回合交替的压力。", "孢尘喷吐：毒素持续消耗我方全体血量，治疗的重要性。", "惊慌缩伏：同伴倒下后更加畏缩。"] },
     ],
   },
 };
@@ -1940,6 +1940,26 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
     };
   }
 
+  if (dice.type === "dice_test" && skill.roll.kind === "damage") {
+    const finalAmount = tunedAmount;
+    const damageFormula = formatDamageFormulaForPlayer(skill.formula);
+    const groupText = isGroupDamageSkill(skill) ? "所有敌对目标" : target.name;
+    const narration = buildKpNarration({ actor, target, skill, dice, amount: finalAmount, outcome: "hit" });
+    return {
+      id: Number(dice.data.id ?? Date.now()),
+      actorName: actor.name,
+      targetName: target.name,
+      skillName: skill.name,
+      title: "自动伤害",
+      formula: `伤害：${damageFormula}`,
+      resultLine: diceLine(dice),
+      amount: finalAmount,
+      success: Boolean(finalAmount),
+      detail: `${skill.name} 无需命中或豁免，${groupText} 受到 ${finalAmount ?? 0} 点伤害。${displayEffect}`,
+      narration,
+    };
+  }
+
   if (dice.type === "skill_check" && skill.roll.kind === "save") {
     const targetSaved = Boolean(dice.data["成功"]);
     const finalAmount = tunedAmount ? Math.max(1, Math.round(tunedAmount * (targetSaved ? 0.5 : 1))) : undefined;
@@ -2337,6 +2357,7 @@ export function BattleTestScreen({
   const [battleLog, setBattleLog] = useState<string[]>([...openingLogLines, config.initialLog].slice(0, 4));
   const [showTutorialIntro, setShowTutorialIntro] = useState(() => Boolean(config.tutorialIntro));
   const [tutorialIntroStep, setTutorialIntroStep] = useState(0);
+  const [initiativeAutoStartToken, setInitiativeAutoStartToken] = useState(0);
   const [showQuickRules, setShowQuickRules] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(-2);
   const [tutorialHint, setTutorialHint] = useState<string | null>(null);
@@ -2394,6 +2415,13 @@ export function BattleTestScreen({
     setPhase("battle");
     advanceTutorialStep(0);
     showTutorialHint("📊 先攻完成！看左侧行动条，高亮的是当前行动角色。等轮到你时，点击下方技能面板选择一个技能", 8000);
+  }, [advanceTutorialStep, showTutorialHint]);
+
+  const startTutorialInitiative = useCallback(() => {
+    setShowTutorialIntro(false);
+    setInitiativeAutoStartToken((token) => token + 1);
+    advanceTutorialStep(-1);
+    showTutorialHint("正在投掷行动顺序。结果出现后点击“进入第一回合”。", 4500);
   }, [advanceTutorialStep, showTutorialHint]);
 
   function pushBattleLog(line: string) {
@@ -2462,6 +2490,7 @@ export function BattleTestScreen({
     setUsedResources({});
     setShowTutorialIntro(Boolean(config.tutorialIntro));
     setTutorialIntroStep(0);
+    setInitiativeAutoStartToken(0);
     setShowQuickRules(false);
     setTutorialStep(-2);
     setTutorialHint(null);
@@ -2794,7 +2823,7 @@ export function BattleTestScreen({
 
     const currentAllies = [...unitMap.values()].filter((unit) => unit.faction === "ally" && unit.hp > 0);
     const currentEnemies = [...unitMap.values()].filter((unit) => unit.faction === "enemy" && unit.hp > 0);
-    const skill = actingUnit.skills.find((item) => item.roll.kind === "attack" || item.roll.kind === "save") ?? actingUnit.skills[0];
+    const skill = actingUnit.skills.find((item) => item.roll.kind === "attack" || item.roll.kind === "save" || item.roll.kind === "damage") ?? actingUnit.skills[0];
     const targetPool = getTargetCandidates(actingUnit, skill, currentAllies, currentEnemies);
     if (!targetPool.length) {
       advanceTurn();
@@ -3064,7 +3093,8 @@ export function BattleTestScreen({
           activeDice?.type === "skill_check" ?
             (activeDice.data["成功"] !== undefined && activeDice.data["DC"] ? "豁免掷骰" : "检定掷骰") :
           activeDice?.data["骰子"]?.includes("D") && Number(activeDice.data["总计"]) > 0 ?
-            (activeDice.data["属性"]?.includes("治疗") || activeDice.data["属性"]?.includes("恢复") ? "治疗掷骰" : "投骰结果") :
+            (activeDice.data["属性"]?.includes("治疗") || activeDice.data["属性"]?.includes("恢复") ? "治疗掷骰" :
+              activeDice.data["属性"]?.includes("伤害") ? "伤害掷骰" : "投骰结果") :
           "投骰结果"
         }
         charSkill={
@@ -3162,15 +3192,9 @@ export function BattleTestScreen({
                 setTutorialIntroStep((step) => Math.min(config.tutorialIntro!.steps.length - 1, step + 1));
                 return;
               }
-              setShowTutorialIntro(false);
-              advanceTutorialStep(-1);
-              showTutorialHint("点击下方“投掷行动顺序”，观察每名角色的先攻结果。", 6000);
+              startTutorialInitiative();
             }}
-            onClose={() => {
-              setShowTutorialIntro(false);
-              advanceTutorialStep(-1);
-              showTutorialHint("点击下方“投掷行动顺序”，观察每名角色的先攻结果。", 6000);
-            }}
+            onClose={startTutorialInitiative}
           />
         )}
       </AnimatePresence>
@@ -3178,11 +3202,12 @@ export function BattleTestScreen({
       <AnimatePresence>
         {phase === "initiative" && !showTutorialIntro && (
           <InitiativeRollOverlay
-            key={rollRunId}
+            key={`${rollRunId}-${initiativeAutoStartToken}`}
             entries={initiative}
             unitMap={unitMap}
             unitOrder={battleBaseUnits}
             note={config.initiativeNote}
+            autoStart={initiativeAutoStartToken > 0}
             onComplete={completeInitiative}
           />
         )}
@@ -3255,29 +3280,35 @@ function InitiativeRollOverlay({
   unitMap,
   unitOrder,
   note,
+  autoStart = false,
   onComplete,
 }: {
   entries: InitiativeEntry[];
   unitMap: Map<string, BattleUnit>;
   unitOrder: BattleUnit[];
   note: string;
+  autoStart?: boolean;
   onComplete: () => void;
 }) {
   const [settled, setSettled] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(autoStart);
   const orderedResults = useMemo(() => sortInitiative(entries, unitMap, unitOrder), [entries, unitMap, unitOrder]);
 
   useEffect(() => {
+    if (autoStart) setStarted(true);
+  }, [autoStart]);
+
+  useEffect(() => {
     if (!started) return;
-    const settleTimer = window.setTimeout(() => setSettled(true), 1300);
-    const revealTimer = window.setTimeout(() => setRevealed(true), 2200);
+    const settleTimer = window.setTimeout(() => setSettled(true), autoStart ? 180 : 650);
+    const revealTimer = window.setTimeout(() => setRevealed(true), autoStart ? 360 : 950);
 
     return () => {
       window.clearTimeout(settleTimer);
       window.clearTimeout(revealTimer);
     };
-  }, [started]);
+  }, [autoStart, started]);
 
   return (
     <motion.section

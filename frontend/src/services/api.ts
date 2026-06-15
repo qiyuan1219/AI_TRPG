@@ -38,6 +38,20 @@ export interface BargainJudgeResult {
   boss_reply: string;
 }
 
+export interface AilinRecruitAnswerPayload {
+  game_id?: string;
+  player_name: string;
+  player_answer: string;
+  current_trust: number;
+}
+
+export interface AilinRecruitAnswerResult {
+  score: number;
+  trust_delta: number;
+  reason: string;
+  reply: string;
+}
+
 export interface CompanionSideEventChoice {
   id: string;
   label: string;
@@ -197,6 +211,20 @@ export async function judgeBargain(payload: BargainJudgePayload): Promise<Bargai
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, '讲价判定失败'));
+  }
+
+  return response.json();
+}
+
+export async function judgeAilinRecruitAnswer(payload: AilinRecruitAnswerPayload): Promise<AilinRecruitAnswerResult> {
+  const response = await apiFetch(`${BASE}/ailin/recruit-answer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }, '艾琳回答判定失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '艾琳回答判定失败'));
   }
 
   return response.json();

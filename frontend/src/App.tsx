@@ -18,7 +18,7 @@ import { getEndingFeedback } from './data/companionSideQuests';
 import { getItemSummaryByName, resolveItemIconPath } from './data/itemIconPaths';
 import type { StoryTestCheckpoint } from './data/storyTestCheckpoints';
 import { shopItems } from './data/shopItems';
-import { listSaves, loadGame, patchGameState, saveGame } from './services/api';
+import { judgeAilinRecruitAnswer, listSaves, loadGame, patchGameState, saveGame } from './services/api';
 import { dndRuntime } from './services/dndRuntime';
 import type {
   ActionSuggestion,
@@ -238,6 +238,24 @@ function inventoryCounts(inventoryText: string) {
   return counts;
 }
 
+function formatInventoryCounts(counts: Map<string, number>) {
+  return Array.from(counts.entries())
+    .map(([name, quantity]) => (quantity > 1 ? `${name}x${quantity}` : name))
+    .join(',');
+}
+
+function addInventoryQuantity(inventoryText: string, itemName: string, quantity: number) {
+  const counts = inventoryCounts(inventoryText);
+  counts.set(itemName, (counts.get(itemName) ?? 0) + Math.max(1, quantity));
+  return formatInventoryCounts(counts);
+}
+
+function randomIntInclusive(min: number, max: number) {
+  const low = Math.ceil(min);
+  const high = Math.floor(max);
+  return Math.floor(Math.random() * (high - low + 1)) + low;
+}
+
 function collectRewardNotices(previous: GameState, next: GameState, nextId: () => number): RewardNotice[] {
   const notices: RewardNotice[] = [];
   const prevInventory = inventoryCounts(String(previous.inventory || ''));
@@ -276,12 +294,14 @@ function collectRewardNotices(previous: GameState, next: GameState, nextId: () =
   (Array.isArray(next.clues) ? next.clues : []).forEach((raw: any) => {
     const id = rewardEntryId(raw);
     if (!id || prevClues.has(id)) return;
+    const name = String(raw?.name || id);
+    const icon = String(raw?.icon || 'clue');
     notices.push({
       id: nextId(),
       kind: 'clue',
-      name: String(raw?.name || id),
-      icon: 'clue',
-      image: resolveItemIconPath('clue', String(raw?.name || id)),
+      name,
+      icon,
+      image: resolveItemIconPath(icon, name),
       summary: String(raw?.description || raw?.source || ''),
     });
   });
@@ -292,6 +312,59 @@ function collectRewardNotices(previous: GameState, next: GameState, nextId: () =
 function hasClue(state: GameState, clueId: string) {
   const clues = Array.isArray(state.clues) ? state.clues : [];
   return clues.some((clue) => (typeof clue === 'string' ? clue === clueId : clue?.id === clueId));
+}
+
+function mergeClues(existing: GameState['clues'], additions: any[] = []) {
+  const current = Array.isArray(existing) ? [...existing] : [];
+  const seen = new Set(current.map(rewardEntryId).filter(Boolean));
+  const unlockedAt = new Date().toISOString();
+
+  additions.forEach((raw) => {
+    const id = rewardEntryId(raw);
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    current.push({
+      ...raw,
+      unlockedAt: raw?.unlockedAt || unlockedAt,
+    });
+  });
+
+  return current;
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(numeric)));
+}
+
+function fallbackAilinRecruitAnswer(playerAnswer: string) {
+  const text = playerAnswer.replace(/\s/g, '');
+  const positiveWords = ['同伴', '伙伴', '修女', '尊重', '选择', '意愿', '名字', '牺牲', '伤者', '救', '不放弃', '带回', '真相', '恐惧', '心', '孢毒', '同行', '一起', '不是药箱', '不是工具'];
+  const negativeWords = ['药箱', '工具', '听命', '闭嘴', '只要治疗', '只需要治疗', '别问', '负担', '拖后腿', '死人没用', '数字', '效率', '浪费时间', '少废话'];
+  let score = 50;
+  positiveWords.forEach((word) => {
+    if (text.includes(word)) score += 7;
+  });
+  negativeWords.forEach((word) => {
+    if (text.includes(word)) score -= 10;
+  });
+  if (text.length < 8) score -= 12;
+  if (text.includes('药箱') && (text.includes('不是') || text.includes('不只是'))) score += 12;
+  if (text.includes('名字') && (text.includes('带回') || text.includes('记住'))) score += 10;
+  score = clampNumber(score, 0, 100, 50);
+  const trustDelta = clampNumber((score - 50) / 5, -10, 10, 0);
+  const reply = trustDelta >= 5
+    ? '艾琳安静听完，眼神终于柔和了一点。「我听见了。愿你记住今天说过的话，尤其是在下面不得不做艰难决定的时候。」'
+    : trustDelta >= 0
+      ? '艾琳轻轻点头。「答案不必完美，但我会看你们之后如何对待伤者、死者和还在恐惧里的人。」'
+      : '艾琳没有立刻反驳，只是把药箱往身侧收了半寸。「我会同行，因为下面还有人需要帮助。但请别把救治当作可以随意消耗的工具。」';
+  return {
+    score,
+    trust_delta: trustDelta,
+    reason: '根据回答对生命、伤者、死者与艾琳主体性的尊重程度结算。',
+    reply,
+  };
 }
 
 function hasDocument(state: GameState, documentId: string) {
@@ -402,6 +475,8 @@ function buildTutorialBattleSetup(dice: DiceResult | null, playerAction: string)
 }
 
 function linearRecruitmentHints(state: GameState): string[] {
+  if (state.kaiya_passphrase_pending) return [];
+
   if (isOpeningTutorialBattleNode(state) && !state.tutorial_battle_done && !state.first_choice_resolved) {
     return [
       '正面迎击裂隙爬兽【力量DC10】',
@@ -467,7 +542,6 @@ function linearRecruitmentHints(state: GameState): string[] {
     const area = String(state.current_area || '');
     if (area.includes('黑市') || area.includes('补给市场') || area.includes('市场')) {
       return [
-        '用米娜给的暗号邀请凯娅入队',
         '购买奥兰的幸运盲盒',
         '趁奥兰开暗格查看盲盒账本【洞察DC13】',
         '和凯娅确认她能处理的陷阱类型【巧手DC13】',
@@ -648,6 +722,8 @@ function uniqueHints(hints: string[]) {
 }
 
 function getActionChoiceStage(state: GameState, hints: string[]): ActionNodeConfig | null {
+  if (state.ailin_answer_pending) return null;
+  if (state.kaiya_passphrase_pending) return null;
   const node = getActiveActionNode(state);
   if (node) return node;
   if (state.core_choice_pending && !state.bossCoreChoice) return null;
@@ -682,6 +758,8 @@ function filterNodeSuggestions(state: GameState, hints: string[]) {
 }
 
 function constrainActionSuggestions(state: GameState, incoming: ActionSuggestion[] = []) {
+  if (state.ailin_answer_pending) return [];
+  if (state.kaiya_passphrase_pending) return [];
   const linearHints = linearRecruitmentHints(state);
   if (linearHints.length) return makeSuggestions(filterNodeSuggestions(state, linearHints));
   const hints = incoming.length ? incoming.map((item) => item.text || item.label) : fallbackSuggestions(state).map((item) => item.text);
@@ -689,6 +767,17 @@ function constrainActionSuggestions(state: GameState, incoming: ActionSuggestion
 }
 
 function actionChoiceStatusText(state: GameState, visibleSuggestions: ActionSuggestion[]) {
+  if (state.ailin_answer_pending) {
+    return '回答艾琳的问题：本次只能通过自由输入行动，回答后艾琳仍会入队，但会影响信任度';
+  }
+
+  if (state.kaiya_passphrase_pending) {
+    if (state.kaiya_passphrase_failed) {
+      return '暗号不对。请再次输入凯娅的暗号，输入正确才会推进剧情';
+    }
+    return '输入凯娅的暗号：本次只能通过自由输入行动';
+  }
+
   const hints = visibleSuggestions.map((item) => item.text || item.label).filter(Boolean);
   const stage = getActionChoiceStage(state, hints);
   if (!stage) return '';
@@ -1204,6 +1293,9 @@ export default function App() {
   const eventTimersRef = useRef<number[]>([]);
   const rewardNoticeIdRef = useRef(1);
   const rewardBaselineRef = useRef<GameState | null>(null);
+  const rewardNoticeDeferRef = useRef(false);
+  const queuedRewardNoticesRef = useRef<RewardNotice[]>([]);
+  const deferredSystemEventsRef = useRef<Array<{ message: string; tone: EventFeedItem['tone'] }>>([]);
   const diceFiredRef = useRef(false); // 防重复投骰
   const tutorialBattleIntentRef = useRef(false);
   const tutorialBattleDiceRef = useRef<DiceResult | null>(null);
@@ -1219,6 +1311,9 @@ export default function App() {
   }, []);
 
   const clearRewardNotices = useCallback(() => {
+    rewardNoticeDeferRef.current = false;
+    queuedRewardNoticesRef.current = [];
+    deferredSystemEventsRef.current = [];
     setRewardNotices([]);
   }, []);
 
@@ -1231,14 +1326,38 @@ export default function App() {
     setRewardNotices((prev) => [...prev, ...notices].slice(-6));
   }, []);
 
+  const flushDeferredRewardNotices = useCallback(() => {
+    const pending = queuedRewardNoticesRef.current.splice(0);
+    rewardNoticeDeferRef.current = false;
+    pushRewardNotices(pending);
+  }, [pushRewardNotices]);
+
   useEffect(() => {
     const previous = rewardBaselineRef.current;
     stateRef.current = gameState;
     if (previous && screen === 'game') {
-      pushRewardNotices(collectRewardNotices(previous, gameState, () => rewardNoticeIdRef.current++));
+      const notices = collectRewardNotices(previous, gameState, () => rewardNoticeIdRef.current++);
+      if (rewardNoticeDeferRef.current && notices.length) {
+        queuedRewardNoticesRef.current = [...queuedRewardNoticesRef.current, ...notices].slice(-6);
+      } else {
+        pushRewardNotices(notices);
+      }
     }
     rewardBaselineRef.current = gameState;
   }, [gameState, pushRewardNotices, screen]);
+
+  useEffect(() => {
+    if (!rewardNoticeDeferRef.current) return;
+    if (screen !== 'game' || streaming || diceRoll || phase !== 'action') return;
+
+    if (!queuedRewardNoticesRef.current.length) {
+      rewardNoticeDeferRef.current = false;
+      return;
+    }
+
+    const timer = window.setTimeout(() => flushDeferredRewardNotices(), 250);
+    return () => window.clearTimeout(timer);
+  }, [diceRoll, flushDeferredRewardNotices, phase, screen, streaming]);
 
   useEffect(
     () => () => {
@@ -1391,6 +1510,14 @@ export default function App() {
     eventTimersRef.current.push(timer);
   }, []);
 
+  const flushDeferredSystemEvents = useCallback(() => {
+    const pending = deferredSystemEventsRef.current.splice(0);
+    if (!pending.length) return;
+
+    appendStoryLines(pending.map((event) => event.message), 'system', '系统');
+    pending.forEach((event) => addEvent(event.message, event.tone));
+  }, [addEvent, appendStoryLines]);
+
   const applyRuntimeStateChange = useCallback(
     (change: Record<string, any>) => {
       const nextState = runtime.applyStateChange(stateRef.current, change);
@@ -1433,15 +1560,21 @@ export default function App() {
       const shouldShowPreDescentTrust =
         scene.id === 'elevator-descent' && !stateRef.current.pre_descent_trust_feedback_done;
       const injectedLines = shouldShowPreDescentTrust ? getPreDescentTrustLines(stateRef.current) : [];
+      const sceneClues = Array.isArray(scene.clues) ? scene.clues : [];
       const statePatch: GameState = {
         ...(scene.statePatch ?? {}),
         ...(options.extraStatePatch ?? {}),
+        ...(sceneClues.length ? { clues: mergeClues(stateRef.current.clues, sceneClues) } : {}),
         ...(shouldShowPreDescentTrust ? { pre_descent_trust_feedback_done: true } : {}),
         ...(scene.setArea ? { current_area: scene.setArea, actions_in_area: 0 } : {}),
         last_event: options.extraStatePatch?.last_event || scene.lastEvent || playerAction || '固定剧情推进',
       };
 
       if (Object.keys(statePatch).length) {
+        if (sceneClues.length) {
+          rewardNoticeDeferRef.current = true;
+          queuedRewardNoticesRef.current = [];
+        }
         const nextState = { ...stateRef.current, ...statePatch };
         stateRef.current = nextState;
         setGameState(nextState);
@@ -1938,6 +2071,100 @@ export default function App() {
         }
       };
 
+      if (currentState.ailin_answer_pending) {
+        const submittedAnswer = action;
+        appendStoryLines([submittedAnswer], 'player', gameState.player_name || '你', true);
+        setPhase('narrating');
+        setStreaming(true);
+        setSuggestions([]);
+        setDiceRoll(null);
+        abortRef.current?.abort();
+
+        const completeAilinRecruitAnswer = (rawResult: ReturnType<typeof fallbackAilinRecruitAnswer>) => {
+          const score = clampNumber(rawResult.score, 0, 100, 50);
+          const trustDelta = clampNumber(rawResult.trust_delta, -10, 10, 0);
+          const reply = stripAllMachineProtocolText(rawResult.reply || '').trim() || fallbackAilinRecruitAnswer(submittedAnswer).reply;
+          const current = stateRef.current;
+          const currentTrust = getCompanionTrust(current, 'ailin');
+          const nextTrust = clampNumber(currentTrust + trustDelta, 0, 100, currentTrust);
+          const trustPatch = buildTrustPatch(current, { ailin: nextTrust });
+          const signedDelta = trustDelta > 0 ? `+${trustDelta}` : String(trustDelta);
+          const extraPatch: GameState = {
+            ...trustPatch,
+            ailin_answer_pending: false,
+            ailin_answer_score: score,
+            ailin_answer_delta: trustDelta,
+            ailin_answer_text: submittedAnswer,
+            ailin_answer_reason: rawResult.reason || '艾琳根据玩家回答调整了信任。',
+            last_event: `回应艾琳关于修女与药箱的问题，艾琳信任${signedDelta}`,
+          };
+
+          appendStoryLines([reply], 'kp', '艾琳', true);
+          if (trustDelta !== 0) addEvent(`艾琳信任 ${signedDelta}`, 'state');
+          else addEvent('艾琳信任维持不变', 'state');
+
+          const finale = getScriptedScene('cathedral-ailin-recruit-finale');
+          if (finale) {
+            playScriptedScene(finale, { focus: false, extraStatePatch: extraPatch });
+          } else {
+            patchStateNow({
+              ...extraPatch,
+              al_recruited: true,
+              temple_ailin_recruited: true,
+              current_area: '逆穹悬城·静默神殿',
+              actions_in_area: 0,
+            }, '艾琳入队状态同步失败');
+            setSuggestions(makeSuggestions(['回到回声酒馆找布洛克']));
+          }
+          setStreaming(false);
+        };
+
+        judgeAilinRecruitAnswer({
+          game_id: gameId,
+          player_name: gameState.player_name || '冒险者',
+          player_answer: submittedAnswer,
+          current_trust: getCompanionTrust(currentState, 'ailin'),
+        })
+          .then((result) => {
+            completeAilinRecruitAnswer({
+              score: result.score,
+              trust_delta: result.trust_delta,
+              reason: result.reason,
+              reply: result.reply,
+            });
+          })
+          .catch((error: any) => {
+            addEvent(error?.message || '艾琳回答判定失败，已使用兜底结算', 'state');
+            completeAilinRecruitAnswer(fallbackAilinRecruitAnswer(submittedAnswer));
+          });
+        return;
+      }
+
+      if (currentState.kaiya_passphrase_pending) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        const saidPassphrase = normalizeNodeAction(action).includes(normalizeNodeAction('断缆不问来路'));
+        if (saidPassphrase) {
+          const kaiyaContact = getScriptedScene('blackmarket-kaiya-contact');
+          if (kaiyaContact) {
+            playScriptedScene(kaiyaContact, { focus: false });
+            return;
+          }
+        }
+
+        appendStoryLines([
+          '「没有暗号，没有筹码，还想让我听公会的委托？你们是不是走错地方了？」',
+        ], 'kp', '凯娅', true);
+        patchStateNow({
+          kaiya_passphrase_pending: true,
+          kaiya_passphrase_failed: true,
+          kaiya_passphrase_attempts: Number(currentState.kaiya_passphrase_attempts ?? 0) + 1,
+          last_event: '凯娅拒绝错误暗号，等待重新输入',
+        }, '凯娅暗号状态同步失败');
+        setSuggestions([]);
+        setPhase('narrating');
+        return;
+      }
+
       const currentVisibleSuggestions = constrainActionSuggestions(currentState, suggestions);
       const activeNode = getActionChoiceStage(currentState, currentVisibleSuggestions.map((item) => item.text || item.label));
       const matchedNodeHint = activeNode ? findNodeHint(action, activeNode) : null;
@@ -2363,6 +2590,9 @@ export default function App() {
       const baseResolvedAction = shouldPrepareTutorialBattle ? ensureFirstBattleCheck(forcedBattleAction) : action;
       const resolvedAction = phaseLimitPrompt ? `${baseResolvedAction}\n${phaseLimitPrompt}` : baseResolvedAction;
 
+      rewardNoticeDeferRef.current = true;
+      queuedRewardNoticesRef.current = [];
+      deferredSystemEventsRef.current = [];
       abortRef.current?.abort();
       parserRef.current = createNarrativeStreamParser();
       streamSuggestionsRef.current = [];
@@ -2394,7 +2624,13 @@ export default function App() {
         onSystem: (rawEvent) => {
           const parsed = runtime.parseSystemEvent(rawEvent);
           if (!parsed) return;
-          addEvent(runtime.formatSystemEvent(parsed), parsed.type === 'error' ? 'error' : 'dice');
+          const message = runtime.formatSystemEvent(parsed);
+          if (message) {
+            deferredSystemEventsRef.current.push({
+              message,
+              tone: parsed.type === 'error' ? 'error' : 'dice',
+            });
+          }
           // 骰子动画：每轮最多触发一次
           if (!diceFiredRef.current && (parsed.type === 'skill_check' || parsed.type === 'attack_roll')) {
             diceFiredRef.current = true;
@@ -2412,6 +2648,7 @@ export default function App() {
             streamedNarrativeLineCount += parsed.lines.length;
             appendStoryLines(parsed.lines, 'kp', '主持人');
           }
+          flushDeferredSystemEvents();
           if (tutorialBattleIntentRef.current) {
             const setup = buildTutorialBattleSetup(tutorialBattleDiceRef.current, tutorialBattleActionRef.current);
             setPendingTutorialBattleSetup(setup);
@@ -2453,6 +2690,7 @@ export default function App() {
             : rawMessage || '主持人暂时没有回应，已为本轮处理启用兜底。';
           setStreaming(false);
           addEvent(message, 'state');
+          flushDeferredSystemEvents();
           appendStoryLines([message], 'system', '系统');
           if (tutorialBattleIntentRef.current) {
             const fallbackSetup = buildTutorialBattleSetup(null, tutorialBattleActionRef.current);
@@ -2472,7 +2710,7 @@ export default function App() {
         },
       });
     },
-    [addEvent, appendStoryLines, applyRuntimeStateChange, gameId, gameState.player_name, playScriptedScene, runtime, story, streaming, suggestions],
+    [addEvent, appendStoryLines, applyRuntimeStateChange, flushDeferredSystemEvents, gameId, gameState.player_name, playScriptedScene, runtime, story, streaming, suggestions],
   );
 
   const handleBargainComplete = useCallback(
@@ -2520,10 +2758,10 @@ export default function App() {
   const handleDrinkingDiceComplete = useCallback(
     (result: DrinkingDiceResult) => {
       setShowDrinkingDiceGame(false);
-      const outcome = result.playerWins >= 2 ? 'decisive' : result.playerWins >= 1 ? 'narrow' : 'fail';
+      const outcome = result.trustGain >= 10 ? 'decisive' : result.trustGain >= 5 ? 'narrow' : 'fail';
       const current = stateRef.current;
       const currentTrust = getCompanionTrust(current, 'brock');
-      const delta = outcome === 'decisive' ? 15 : outcome === 'narrow' ? 8 : 0;
+      const delta = Number(result.trustGain || 0);
 
       // 使用 buildTrustPatch 确保所有别名同步
       const trustPatch = buildTrustPatch(current, { brock: currentTrust + delta });
@@ -2532,10 +2770,12 @@ export default function App() {
         sl_recruited: true,
         brock_recruited: true,
         brock_drinking_done: true,
-        brock_drinking_wins: result.playerWins,
+        brock_drinking_rounds: result.totalRounds,
+        brock_drinking_trust_gain: delta,
+        brock_drinking_logs: result.logs,
         brock_drinking_outcome: outcome,
         brock_spore_sample_deal: true,
-        last_event: `与布洛克喝酒骰子：${result.playerWins}胜${result.brockWins}负${delta > 0 ? `，布洛克信任${delta > 0 ? '+' : ''}${delta}` : ''}`,
+        last_event: `与布洛克喝酒挑战：${result.totalRounds}回合喝完${delta > 0 ? `，布洛克信任+${delta}` : ''}`,
       };
       setGameState((prev) => ({ ...prev, ...patch }));
       addEvent('布洛克加入队伍', 'state');
@@ -2543,32 +2783,25 @@ export default function App() {
 
       // 根据胜负展示不同对话（含信任反馈）
       const trustNote = outcome === 'decisive'
-        ? '布洛克对你另眼相看——不是每个公会来的人都扛得住他的铁锅酒。'
+        ? '布洛克对你另眼相看——不是每个公会来的人都能这么快压住他的铁锅烈酒。'
         : outcome === 'narrow'
         ? '布洛克嘴上挑刺，但心里已经把你从"普通公会蠢货"的名单里划掉了。'
         : '布洛克没多夸你，但他也没多骂——对一个刚认识的外来人，这已经是他的尊重。';
 
-      const lines: Array<{ speaker: string; text: string }> = outcome === 'decisive' ? [
-        { speaker: '主持人', text: '第三轮骰子停下时，酒桌旁短暂安静了一瞬。布洛克看着你的点数，又看了看你还算清醒的眼神，终于咧嘴笑了。' },
-        { speaker: '布洛克', text: '「行。能喝，能扛，骰运也不差。至少你进孢海以后，不会第一天就让我背回来。」' },
+      const logLines = result.logs.map((log) => ({
+        id: lineId.current++,
+        role: 'system' as const,
+        speaker: '系统',
+        text: log.message,
+      }));
+
+      const lines: Array<{ speaker: string; text: string }> = [
+        { speaker: '主持人', text: `最后一口烈酒落下时，酒桌旁短暂安静了一瞬。你用了 ${result.totalRounds} 回合把布洛克推来的酒喝见底。` },
+        { speaker: '布洛克', text: result.finalDialogue },
         { speaker: '布洛克', text: '「我跟你们走。条件再说一遍：采集三份活性孢子，不准焚烧菌巢，也不准把活样本扔进城市排水沟。」' },
         { speaker: '瑟琳', text: '「报酬由公会结算，样本归属也会写进附约。」' },
-        { speaker: '布洛克', text: '「你说话像本账册，不过账册至少可靠。好，进了孢海以后听我指挥，别看见发光的东西就伸手。」' },
+        { speaker: '布洛克', text: outcome === 'fail' ? '「酒量就先不夸了。不过你至少没把杯子扣我桌上。下去以后听我指挥，别看见发光的东西就伸手。」' : '「好，进了孢海以后听我指挥，别看见发光的东西就伸手。」' },
         { speaker: '主持人', text: `布洛克收起菌片，将铁锅挂在背包外侧。${trustNote}` },
-      ] : outcome === 'narrow' ? [
-        { speaker: '主持人', text: '最后一轮结束时，你已经能感觉到酒劲顶上额角，但骰子的结果仍然压过了布洛克。' },
-        { speaker: '布洛克', text: '「赢得不漂亮，但赢了就是赢了。」' },
-        { speaker: '布洛克', text: '「记住这种感觉。孢海里很多时候也一样，活下来不需要漂亮，只需要够稳。」' },
-        { speaker: '布洛克', text: '「我跟你们走。采集活性孢子、不准烧菌巢，规矩等下细说。」' },
-        { speaker: '瑟琳', text: '「能赢过布洛克已经不易。先整理队伍状态，然后去黑市找凯娅。」' },
-        { speaker: '主持人', text: `${trustNote}` },
-      ] : [
-        { speaker: '主持人', text: '最后一轮骰子落定，布洛克的点数再次压过你。酒馆里响起几声压低的笑。' },
-        { speaker: '布洛克', text: '「酒量一般，骰运也一般。」' },
-        { speaker: '布洛克', text: '「不过你至少没嘴硬说自己没醉，这点比很多公会蠢货强。」' },
-        { speaker: '布洛克', text: '「我可以跟你们走。但下去以后，听我的。尤其是你。」' },
-        { speaker: '瑟琳', text: '「能让他点头已经不容易了。先去黑市找凯娅，路上再商量报酬细节。」' },
-        { speaker: '主持人', text: `${trustNote}` },
       ];
 
       const storyLines = lines.map((line) => ({
@@ -2577,7 +2810,7 @@ export default function App() {
         speaker: line.speaker,
         text: line.text,
       }));
-      setStory((prev) => [...prev, ...storyLines]);
+      setStory((prev) => [...prev, ...logLines, ...storyLines]);
       setActiveIndex((prev) => prev);
       setSuggestions(makeSuggestions([
         '前往黑市寻找凯娅',
@@ -2598,6 +2831,7 @@ export default function App() {
       setShowLuckyBoxGame(false);
       const current = stateRef.current;
       const currentGold = Number(current.gold ?? 200);
+      const hasDiamond = Boolean(result.hasDiamond || result.rewards.some((reward) => reward.itemId === 'diamond'));
 
       // 从 rewards 构建背包物品列表
       const inventoryText = String(current.inventory || '长剑,冒险者工具包');
@@ -2610,9 +2844,9 @@ export default function App() {
       for (const reward of result.rewards) {
         addEvent(`获得 ${reward.name}`, 'state');
       }
-      addEvent(`金币 -${result.spent}`, 'state');
+      if (result.spent) addEvent(`金币 -${result.spent}`, 'state');
 
-      const patch: GameState = {
+      const basePatch: GameState = {
         gold: Math.max(0, currentGold - result.spent),
         inventory: nextInventory,
         lucky_box_done: true,
@@ -2620,8 +2854,55 @@ export default function App() {
         lucky_box_spent: result.spent,
         lucky_box_final_roll: result.finalD20,
         lucky_box_guaranteed: result.guaranteed,
-        gotDiamondForKaiya: true,
-        kaiya_diamond_paid: true,
+      };
+
+      if (result.failedNoGoldNoDiamond && !hasDiamond) {
+        const currentTrust = getCompanionTrust(current, 'kaiya');
+        const trustPatch = buildTrustPatch(current, { kaiya: currentTrust - 40 });
+        const patch: GameState = {
+          ...basePatch,
+          ...trustPatch,
+          orlanBoxFailedNoGoldNoDiamond: true,
+          lucky_box_failed_no_gold_no_diamond: true,
+          gotDiamondForKaiya: false,
+          kaiya_diamond_paid: false,
+          kaiya_joined_with_debt: true,
+          last_event: `奥兰幸运盲盒失败，金币耗尽且没有获得钻石；凯娅负债入队，信任-40`,
+        };
+
+        addEvent('凯娅信任 -40', 'state');
+        const debtScene = getScriptedScene('kaiya-recruited-with-debt');
+        if (debtScene) {
+          playScriptedScene(debtScene, { extraStatePatch: patch });
+          if (current.tavern_yunling_unlocked) {
+            const yunlingScene = getScriptedScene('yunling-black-market');
+            if (yunlingScene) {
+              const yunlingInventory = `${nextInventory},治疗药水x3`;
+              playScriptedScene(yunlingScene, {
+                focus: false,
+                extraStatePatch: {
+                  inventory: yunlingInventory,
+                  yunling_free_healing_potions: 3,
+                  last_event: '根据萨洛额外情报找到云苓并获得三瓶治疗药水',
+                },
+                dynamicHints: YUNLING_SHOP_HINTS,
+              });
+            }
+          }
+          return;
+        }
+
+        setGameState((prev) => ({ ...prev, ...patch, kl_recruited: true, kaiya_recruited: true }));
+        if (gameId) {
+          void patchGameState(gameId, { ...patch, kl_recruited: true, kaiya_recruited: true }).catch((error: any) => addEvent(error.message || '凯娅负债入队状态同步失败', 'error'));
+        }
+        return;
+      }
+
+      const patch: GameState = {
+        ...basePatch,
+        gotDiamondForKaiya: hasDiamond,
+        kaiya_diamond_paid: hasDiamond,
         last_event: `奥兰幸运盲盒抽到钻石，共${result.drawCount}次，花费${result.spent}金`,
       };
 
@@ -2824,8 +3105,14 @@ export default function App() {
   const requestedBgmTrack = useMemo(() => externalBgmTrack || resolveBgmTrack(screen, currentLine, gameState), [externalBgmTrack, screen, currentLine, gameState]);
   const visibleSuggestions = constrainActionSuggestions(gameState, suggestions);
   const choiceHelperText = actionChoiceStatusText(gameState, visibleSuggestions);
+  const actionInputPlaceholder = gameState.ailin_answer_pending
+    ? '回答艾琳：你们需要的是修女，还是随队药箱？'
+    : gameState.kaiya_passphrase_pending
+      ? '输入凯娅的暗号……'
+      : '输入你的行动……';
   const areaText = String(gameState.current_area || '');
-  const showLuckyBoxEntry = /黑市|补给市场|市场|奥兰|凯娅/.test(areaText) && Boolean(gameState.kaiya_intro_seen && !gameState.kaiya_recruited);
+  const showLuckyBoxEntry = /黑市|补给市场|市场|奥兰|凯娅/.test(areaText)
+    && Boolean(gameState.kaiya_intro_seen && !gameState.kaiya_passphrase_pending && !gameState.kaiya_recruited);
   const cityAreaVisited = /冒险者公会|回声酒馆|酒馆|黑市|补给市场|市场|静默神殿|神殿|降渊缆梯|缆梯/.test(areaText);
   const canUseCityMap = CITY_MAP_ENABLED && Boolean(gameState.city_map_unlocked || gameState.guild_registered || cityAreaVisited);
   const showOpeningActionTutorial =
@@ -2973,18 +3260,34 @@ export default function App() {
     // 防止重复触发
     if (stateRef.current.tutorial_battle_done) return;
 
+    const rewardGold = randomIntInclusive(100, 200);
+    const potionCount = randomIntInclusive(1, 2);
+    const current = stateRef.current;
+    const nextGold = Number(current.gold ?? 200) + rewardGold;
+    const nextInventory = addInventoryQuantity(String(current.inventory || '长剑,冒险者工具包'), '治疗药水', potionCount);
+
     const tutorialStatePatch: GameState = {
       first_choice_resolved: true,
       tutorial_battle_done: true,
       tutorial_battle_pending: false,
       current_area: '逆穹悬城·主缆街',
+      gold: nextGold,
+      inventory: nextInventory,
+      tutorial_battle_reward_gold: rewardGold,
+      tutorial_battle_reward_potions: potionCount,
       last_event: '击退补给吊箱中的裂隙爬兽',
     };
 
-    setGameState((prev) => ({
-      ...prev,
+    rewardNoticeDeferRef.current = true;
+    queuedRewardNoticesRef.current = [];
+    deferredSystemEventsRef.current = [];
+
+    const nextState = {
+      ...current,
       ...tutorialStatePatch,
-    }));
+    };
+    stateRef.current = nextState;
+    setGameState(nextState);
     if (gameId) {
       void patchGameState(gameId, tutorialStatePatch).catch((error: any) => {
         addEvent(error.message || '教学战斗状态同步失败', 'error');
@@ -3006,11 +3309,13 @@ export default function App() {
       '瑟琳快步走到你身边，短银杖的微光扫过你的肩膀。瑟琳：「没有重伤。很好，你的反应速度比大部分第一次进悬城的人快。」',
       '黑缆守卫翻看着碎裂吊箱的封条，脸色渐渐沉了下来。守卫：「这是从孢海据点回收的空箱。最近三个月，类似事件发生了四次。」',
       '守卫收起手弩，语气严肃。守卫：「感谢你们出手。如果让它们冲进吊桥区，今天的通行记录上就要多几行红字了。」',
+      `守卫把一只应急补给袋递给你。你获得 ${rewardGold}G 和治疗药水 x${potionCount}。`,
       '瑟琳的视线仍停在那些蓝绿色孢尘上。瑟琳：「四次不是偶然。它们不是主动潜进来的——箱壁内侧有拖痕，像是被什么东西赶上去的。」',
       '主缆街短暂安静下来，远处城市缆索发出低沉震响。守卫指了指公会方向。「冒险者公会在倒挂塔楼区，顺着主缆走到底。你们的委托应该需要先登记。」',
       '瑟琳将银杖收回腰间，对你微微点头。瑟琳：「先过去吧。米娜应该已经在等你了。」',
     ], 'kp', '主持人', true);
     addEvent('教学战斗完成', 'state');
+    addEvent(`教学战斗奖励：${rewardGold}G、治疗药水 x${potionCount}`, 'state');
     // 直接跳回游戏画面，不需要二次点击
     setScreen('game');
   }, [addEvent, appendStoryLines, gameId]);
@@ -3140,22 +3445,6 @@ export default function App() {
     return <LazyBoundary><BargainTestScreen onBack={() => setShowBargainGame(false)} onComplete={handleBargainComplete} /></LazyBoundary>;
   }
 
-  if (showDrinkingDiceGame) {
-    return <LazyBoundary><DrinkingDiceGame onBack={() => setShowDrinkingDiceGame(false)} onComplete={handleDrinkingDiceComplete} /></LazyBoundary>;
-  }
-
-  if (showLuckyBoxGame) {
-    return (
-      <LazyBoundary>
-        <OrlanBoxGame
-          gold={Number(gameState.gold ?? 200)}
-          onBack={() => setShowLuckyBoxGame(false)}
-          onComplete={handleOrlanBoxComplete}
-        />
-      </LazyBoundary>
-    );
-  }
-
   if (showApothecaryShopUI) {
     const purchasedShopKeys = shopItems
       .filter((item) => !item.repeatable)
@@ -3200,6 +3489,7 @@ export default function App() {
               suggestions={visibleSuggestions}
               disabled={streaming}
               onSubmit={submitAction}
+              placeholder={actionInputPlaceholder}
               helperText={choiceHelperText}
             />
           ) : undefined
@@ -3408,6 +3698,9 @@ export default function App() {
                 diceFiredRef.current = false;
                 tutorialBattleIntentRef.current = false;
                 tutorialBattleDiceRef.current = null;
+                rewardNoticeDeferRef.current = true;
+                queuedRewardNoticesRef.current = [];
+                deferredSystemEventsRef.current = [];
 
                 // 构造带结果上下文的行动文本
                 const resultContext = resultData.result === 'win'
@@ -3430,7 +3723,13 @@ export default function App() {
                   onSystem: (rawEvent) => {
                     const parsed = runtime.parseSystemEvent(rawEvent);
                     if (!parsed) return;
-                    addEvent(runtime.formatSystemEvent(parsed), parsed.type === 'error' ? 'error' : 'dice');
+                    const message = runtime.formatSystemEvent(parsed);
+                    if (message) {
+                      deferredSystemEventsRef.current.push({
+                        message,
+                        tone: parsed.type === 'error' ? 'error' : 'dice',
+                      });
+                    }
                   },
                   onStateUpdate: (change) => {
                     applyRuntimeStateChange(change);
@@ -3439,6 +3738,7 @@ export default function App() {
                     const parsed = parserRef.current.flush();
                     if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
                     if (parsed.lines.length) appendStoryLines(parsed.lines, 'kp', '主持人');
+                    flushDeferredSystemEvents();
                     setSuggestions(constrainActionSuggestions(stateRef.current, streamSuggestionsRef.current));
                     setStreaming(false);
                   },
@@ -3449,6 +3749,7 @@ export default function App() {
                       : rawMessage || '主持人暂时没有回应';
                     setStreaming(false);
                     addEvent(message, 'state');
+                    flushDeferredSystemEvents();
                     appendStoryLines([message], 'system', '系统');
                     setSuggestions(constrainActionSuggestions(stateRef.current));
                   },
@@ -3468,6 +3769,17 @@ export default function App() {
           submitAction(actionText);
         }}
       />
+
+      {/* 布洛克喝酒游戏弹窗 */}
+      <AnimatePresence>
+        {showDrinkingDiceGame && (
+          <DrinkingDiceGame
+            playerCon={Number(gameState.attr_con ?? gameState.con ?? 15)}
+            onBack={() => setShowDrinkingDiceGame(false)}
+            onComplete={handleDrinkingDiceComplete}
+          />
+        )}
+      </AnimatePresence>
 
       {/* 酒馆三局骰子游戏 */}
       <AnimatePresence>
@@ -3489,9 +3801,11 @@ export default function App() {
               const gift = Number(result?.gift ?? 0);
               const currentGold = Number(stateRef.current.gold ?? 200);
               const saloIntel = getScriptedScene('salo-companion-intel');
+              const saloClues = Array.isArray(saloIntel?.clues) ? saloIntel.clues : [];
               const saloPatch: GameState = saloIntel
                 ? {
                     ...(saloIntel.statePatch ?? {}),
+                    ...(saloClues.length ? { clues: mergeClues(stateRef.current.clues, saloClues) } : {}),
                     ...(saloIntel.setArea ? { current_area: saloIntel.setArea, actions_in_area: 0 } : {}),
                   }
                 : {};
@@ -3508,6 +3822,10 @@ export default function App() {
                 ...saloPatch,
                 last_event: saloIntel?.lastEvent || `酒馆快艇骰子结束（${wins}胜，有效情报胜${effectiveWins}）`,
               };
+              if (saloClues.length) {
+                rewardNoticeDeferRef.current = true;
+                queuedRewardNoticesRef.current = [];
+              }
               const nextState = { ...stateRef.current, ...tavernPatch };
               stateRef.current = nextState;
               setGameState(nextState);
@@ -3522,7 +3840,7 @@ export default function App() {
               const postDiceLines: StoryLine[] = wins >= 2
                 ? [
                     { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: `「啧。${wins}胜。你这手气不像第一次玩。」` },
-                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「愿赌服输。我会把艾琳、布洛克、凯娅的位置和脾气都说清楚。你们最好记牢，找人比找路麻烦。另外，黑市深处有个药剂商叫云苓，她手里有真正能下孢海的药。」' },
+                    { id: lineId.current++, role: 'kp' as const, speaker: '萨洛', text: '「愿赌服输。我会把艾琳、布洛克、凯娅的位置和脾气都说清楚。你们最好记牢，找人比找路麻烦。另外，黑市深处有个药剂商叫云苓，她手里有针对深层污染的药剂——不是必需品，但能让你们在孢海里走得更远。」' },
                     { id: lineId.current++, role: 'kp' as const, speaker: '主持人', text: '萨洛把一只小钱袋丢到桌上，里面是整整一百枚金币。他又用酒渍在纸角画了一个不会响的铜铃，示意你们收好。' },
                     { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「萨洛很少这么干脆。看来他确实认为这三个人缺一不可。」' },
                     { id: lineId.current++, role: 'kp' as const, speaker: '主持人', text: '瑟琳将银杖收回袖口，对你微微点头。酒馆里的喧嚣重新漫上来，但萨洛的情报像一块石头坠入水面，散开的波纹还没停。' },
@@ -3564,6 +3882,17 @@ export default function App() {
                     '和瑟琳讨论远征路线',
                   ]));
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 奥兰幸运盲盒弹窗 */}
+      <AnimatePresence>
+        {showLuckyBoxGame && (
+          <OrlanBoxGame
+            gold={Number(gameState.gold ?? 200)}
+            onBack={() => setShowLuckyBoxGame(false)}
+            onComplete={handleOrlanBoxComplete}
           />
         )}
       </AnimatePresence>

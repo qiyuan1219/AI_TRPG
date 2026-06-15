@@ -78,6 +78,7 @@ export function VisualNovelStage({
   const { visible, done, reveal } = useTypewriter(text, autoAdvance ? 0 : 20);
   const [showActionPrompt, setShowActionPrompt] = useState(false);
   const actionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const actionPromptShownRef = useRef(false);
 
   // 粘性背景：某行设置了 bgImage 后，后续无 bgImage 的行自动继承
   const [stickyBg, setStickyBg] = useState<string | null>(null);
@@ -87,16 +88,22 @@ export function VisualNovelStage({
 
   // 进入行动阶段时显示"选择行动"提示，1秒后自动消失
   useEffect(() => {
-    if (isActionPhase && actionPanel) {
+    if (!isActionPhase) {
+      actionPromptShownRef.current = false;
+      setShowActionPrompt(false);
+      return;
+    }
+
+    if (actionPanel && !actionPromptShownRef.current) {
+      actionPromptShownRef.current = true;
       setShowActionPrompt(true);
       actionPromptTimerRef.current = setTimeout(() => setShowActionPrompt(false), 1000);
-    } else {
-      setShowActionPrompt(false);
     }
+
     return () => {
       if (actionPromptTimerRef.current) clearTimeout(actionPromptTimerRef.current);
     };
-  }, [isActionPhase, actionPanel]);
+  }, [isActionPhase, Boolean(actionPanel)]);
   const speaker = useMemo(
     () => resolveSpeakerName(line?.speaker || (isStreaming ? '主持人' : '')),
     [isStreaming, line?.speaker],

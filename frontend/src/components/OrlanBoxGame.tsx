@@ -1,7 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
-import { TutorialOverlay } from './TutorialOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
 import '../styles/orlan-box.css';
@@ -32,6 +31,8 @@ export interface OrlanBoxResult {
   finalD20: number;
   guaranteed: boolean;
   rewardHistory: DrawRecord[];
+  hasDiamond: boolean;
+  failedNoGoldNoDiamond?: boolean;
 }
 
 interface OrlanBoxGameProps {
@@ -133,14 +134,21 @@ const DIAMOND_REWARD: RewardItem = {
 };
 
 const COST_PER_DRAW = 20;
-const PITY_LIMIT = 8;
+const PITY_LIMIT = 10;
 const DIAMOND_THRESHOLD = 18;
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: '规则说明',
     badge: 'ORLAN BOX',
-    body: '20G 一次，D20 投出 19 或 20 获得钻石。连续 8 次未中会触发保底；每次抽取都会获得一个小道具或钻石。',
+    body: '20G 一次，D20 投出 19 或 20 获得钻石。连续 10 次未中会触发保底；每次抽取都会获得一个小道具或钻石。',
+    placement: 'center',
+  },
+  {
+    title: '失败结算',
+    badge: '金币耗尽',
+    body: '如果金币不足以继续抽奖，且还没有拿到钻石，奥兰的游戏会立即结束。凯娅仍会暂时加入队伍，但会记下一笔债，信任大幅下降。',
+    placement: 'center',
   },
 ];
 
@@ -188,6 +196,69 @@ function RewardReveal({
   );
 }
 
+function GameTutorialPrompt({
+  steps,
+  currentStep,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  steps: TutorialStep[];
+  currentStep: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  const step = steps[currentStep];
+  if (!step) return null;
+  const isLast = currentStep >= steps.length - 1;
+
+  return (
+    <motion.div
+      className="opening-action-tutorial"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="opening-action-tutorial-card"
+        initial={{ opacity: 0, y: -14, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -10, scale: 0.96 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+      >
+        <div className="opening-action-tutorial-progress">
+          <i style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }} />
+        </div>
+        <header>
+          <span>{step.badge}</span>
+          <button type="button" aria-label="关闭规则教程" onClick={onClose}>×</button>
+        </header>
+        <h2>{step.title}</h2>
+        <p>{step.body}</p>
+        <footer>
+          <button
+            type="button"
+            className="opening-action-tutorial-prev"
+            disabled={currentStep <= 0}
+            onClick={onPrev}
+          >
+            上一步
+          </button>
+          <small>{currentStep + 1} / {steps.length}</small>
+          <button
+            type="button"
+            className="opening-action-tutorial-next"
+            onClick={onNext}
+          >
+            {isLast ? '开始游戏' : '下一步'}
+          </button>
+        </footer>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
   const [drawCount, setDrawCount] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
@@ -199,11 +270,12 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
   const [diceResult, setDiceResult] = useState<DiceResult | null>(null);
   const [pendingDraw, setPendingDraw] = useState<DrawRecord | null>(null);
   const [revealedDraw, setRevealedDraw] = useState<DrawRecord | null>(null);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const completedRef = useRef(false);
 
   const currentGold = Math.max(0, gold - totalCost);
   const canDraw = !hasDiamond && currentGold >= COST_PER_DRAW;
+  const failedNoGoldNoDiamond = !hasDiamond && currentGold < COST_PER_DRAW;
 
   const doDraw = useCallback(() => {
     if (!canDraw) return;
@@ -252,7 +324,10 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
     }
   }, [pendingDraw]);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback((failed = false) => {
+    if (completedRef.current) return;
+    completedRef.current = true;
+    const diamondOwned = hasDiamond || allRewards.some((reward) => reward.itemId === 'diamond');
     onComplete({
       drawCount,
       spent: totalCost,
@@ -260,27 +335,44 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
       finalD20: lastD20 ?? 0,
       guaranteed: rewardHistory.some((record) => record.isPity),
       rewardHistory,
+      hasDiamond: diamondOwned,
+      failedNoGoldNoDiamond: failed && !diamondOwned,
     });
-  }, [allRewards, drawCount, lastD20, onComplete, rewardHistory, totalCost]);
+  }, [allRewards, drawCount, hasDiamond, lastD20, onComplete, rewardHistory, totalCost]);
+
+  useEffect(() => {
+    if (tutorialStep >= 0) return;
+    if (!failedNoGoldNoDiamond) return;
+    if (diceResult || pendingDraw || revealedDraw) return;
+
+    const timer = window.setTimeout(() => handleComplete(true), 450);
+    return () => window.clearTimeout(timer);
+  }, [diceResult, failedNoGoldNoDiamond, handleComplete, pendingDraw, revealedDraw, tutorialStep]);
 
   return (
-    <main className="orlan-box-screen">
-      {showTutorial && (
-        <TutorialOverlay
-          steps={TUTORIAL_STEPS}
-          currentStep={tutorialStep}
-          onClose={() => setShowTutorial(false)}
-          onPrev={() => setTutorialStep((value) => Math.max(0, value - 1))}
-          onNext={() => {
-            if (tutorialStep >= TUTORIAL_STEPS.length - 1) {
-              setShowTutorial(false);
-              setTutorialStep(0);
-            } else {
-              setTutorialStep((value) => value + 1);
-            }
-          }}
-        />
-      )}
+    <motion.div
+      className="orlan-box-screen"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <AnimatePresence>
+        {tutorialStep >= 0 && (
+          <GameTutorialPrompt
+            steps={TUTORIAL_STEPS}
+            currentStep={tutorialStep}
+            onClose={() => setTutorialStep(-1)}
+            onPrev={() => setTutorialStep((value) => Math.max(0, value - 1))}
+            onNext={() => {
+              if (tutorialStep >= TUTORIAL_STEPS.length - 1) {
+                setTutorialStep(-1);
+              } else {
+                setTutorialStep((value) => value + 1);
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <DiceRollOverlay
         dice={diceResult}
@@ -302,7 +394,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
             <p>奥兰把木盒推到柜台中央，盒盖下传来细碎的金属声。</p>
           </div>
           <div className="orlan-box-actions">
-            <button type="button" onClick={() => setShowTutorial(true)}>
+            <button type="button" onClick={() => setTutorialStep(0)}>
               规则
             </button>
             <button type="button" onClick={onBack}>
@@ -319,7 +411,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
 
           <div className="orlan-box-status">
             <strong>当前金币 {currentGold}G</strong>
-            <p>20G 一次。D20 投出 19 或 20 获得钻石，第 8 次未中会触发保底。</p>
+            <p>20G 一次。D20 投出 19 或 20 获得钻石，第 10 次未中会触发保底。</p>
             {lastReward && (
               <div className="orlan-last-reward">
                 <img src={lastReward.icon} alt={lastReward.name} />
@@ -332,8 +424,12 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
           </div>
 
           {hasDiamond ? (
-            <button type="button" className="orlan-primary-button" onClick={handleComplete} disabled={Boolean(revealedDraw)}>
+            <button type="button" className="orlan-primary-button" onClick={() => handleComplete(false)} disabled={Boolean(revealedDraw)}>
               继续剧情
+            </button>
+          ) : failedNoGoldNoDiamond ? (
+            <button type="button" className="orlan-primary-button danger" onClick={() => handleComplete(true)} disabled={Boolean(diceResult) || Boolean(revealedDraw)}>
+              结束抽奖
             </button>
           ) : (
             <button type="button" className="orlan-primary-button" onClick={doDraw} disabled={!canDraw || Boolean(diceResult) || Boolean(revealedDraw)}>
@@ -342,8 +438,8 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
           )}
         </div>
 
-        {!hasDiamond && currentGold < COST_PER_DRAW && (
-          <p className="orlan-warning">奥兰按住盒盖，笑着摇头：没金币，就别让幸运为难。</p>
+        {failedNoGoldNoDiamond && (
+          <p className="orlan-warning">奥兰按住盒盖，笑着摇头：没金币，就别让幸运为难。游戏即将结束。</p>
         )}
 
         <div className="orlan-history">
@@ -367,7 +463,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
           )}
         </div>
       </section>
-    </main>
+    </motion.div>
   );
 }
 

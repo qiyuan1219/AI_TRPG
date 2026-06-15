@@ -14,20 +14,20 @@ export function LuckyBoxGame({ gold, onBack, onComplete }: LuckyBoxGameProps) {
   const [rolls, setRolls] = useState<number[]>([]);
   const [won, setWon] = useState(false);
   const spent = rolls.length * 20;
-  const canRoll = !won && rolls.length < 8 && gold - spent >= 20;
+  const canRoll = !won && rolls.length < 10 && gold - spent >= 20;
 
   function draw() {
     if (!canRoll) return;
     const roll = rollD20();
     const nextRolls = [...rolls, roll];
-    const guaranteed = nextRolls.length >= 8;
+    const guaranteed = nextRolls.length >= 10;
     const success = roll > 18 || guaranteed;
     setRolls(nextRolls);
     if (success) setWon(true);
   }
 
   const finalRoll = rolls[rolls.length - 1] ?? 0;
-  const guaranteed = won && rolls.length >= 8 && finalRoll <= 18;
+  const guaranteed = won && rolls.length >= 10 && finalRoll <= 18;
 
   return (
     <main
@@ -50,13 +50,13 @@ export function LuckyBoxGame({ gold, onBack, onComplete }: LuckyBoxGameProps) {
         <section className="dice-judge-panel">
           <div className="test-section-title">
             <span>二十金一次</span>
-            <small>D20 大于 18 获得钻石；第 8 次保底。当前为简化版规则。</small>
+            <small>D20 大于 18 获得钻石；第 10 次保底。当前为简化版规则。</small>
           </div>
 
           <div className="dice-judge-board">
             <div className="dice-judge-symbol">D20</div>
             <div className="dice-judge-copy">
-              <strong>已抽 {rolls.length}/8 次，花费 {spent}G</strong>
+              <strong>已抽 {rolls.length}/10 次，花费 {spent}G</strong>
               <p>
                 {won
                   ? guaranteed ? '奥兰按保底规则拿出了钻石。' : `点数 ${finalRoll}，钻石到手。`

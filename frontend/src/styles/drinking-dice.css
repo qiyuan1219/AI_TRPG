@@ -1,0 +1,326 @@
+.brock-drink-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background:
+    linear-gradient(180deg, rgba(7, 9, 12, 0.7), rgba(7, 9, 12, 0.88)),
+    rgba(0, 0, 0, 0.64);
+  backdrop-filter: blur(8px);
+}
+
+.brock-drink-modal {
+  width: min(980px, calc(100vw - 34px));
+  height: min(650px, calc(100vh - 34px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(212, 168, 67, 0.46);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(35, 27, 22, 0.98), rgba(12, 16, 19, 0.98)),
+    #12161c;
+  box-shadow:
+    0 34px 90px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 rgba(255, 247, 223, 0.08);
+}
+
+.brock-drink-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 70px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(212, 168, 67, 0.24);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.brock-drink-header div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.brock-drink-header span {
+  color: #efd58c;
+  font-family: "MedievalSharp", "Cinzel", "Noto Serif SC", serif;
+  font-size: 1.22rem;
+  font-weight: 900;
+}
+
+.brock-drink-header small {
+  color: rgba(224, 220, 200, 0.78);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.brock-drink-close {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(239, 213, 140, 0.34);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #efd58c;
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.brock-drink-board {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) 270px;
+  gap: 14px;
+  padding: 16px;
+}
+
+.brock-drink-side,
+.brock-drink-table,
+.brock-drink-log {
+  min-width: 0;
+  border: 1px solid rgba(231, 211, 161, 0.18);
+  border-radius: 8px;
+  background: rgba(8, 11, 15, 0.44);
+}
+
+.brock-drink-side {
+  align-self: end;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.brock-drink-table {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 16px;
+  background:
+    linear-gradient(90deg, rgba(239, 213, 140, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(239, 213, 140, 0.06) 1px, transparent 1px),
+    rgba(8, 11, 15, 0.42);
+  background-size: 34px 34px;
+}
+
+.brock-drink-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.brock-drink-status div {
+  min-height: 66px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid rgba(95, 183, 167, 0.16);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.brock-drink-status small {
+  color: rgba(224, 220, 200, 0.62);
+  font-size: 0.72rem;
+}
+
+.brock-drink-status strong {
+  color: #fff7df;
+  font-size: 1.12rem;
+  font-weight: 900;
+}
+
+.brock-drink-meter {
+  height: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(239, 213, 140, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.brock-drink-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(95, 183, 167, 0.94), rgba(239, 213, 140, 0.92)),
+    #5fb7a7;
+  transition: width 0.35s ease;
+}
+
+.brock-drink-message {
+  min-height: 0;
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.brock-drink-message p {
+  margin: 0;
+  color: #e0dcc8;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.brock-drink-last {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.brock-drink-last.success {
+  border-color: rgba(95, 183, 167, 0.42);
+}
+
+.brock-drink-last.fail {
+  border-color: rgba(211, 99, 99, 0.42);
+}
+
+.brock-drink-last b {
+  color: #efd58c;
+}
+
+.brock-drink-last span,
+.brock-drink-last small {
+  color: rgba(224, 220, 200, 0.78);
+  font-size: 0.84rem;
+}
+
+.brock-drink-final {
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 213, 140, 0.26);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.brock-drink-final span {
+  color: rgba(224, 220, 200, 0.7);
+  font-size: 0.82rem;
+}
+
+.brock-drink-final strong {
+  color: #efd58c;
+  font-size: 1.08rem;
+}
+
+.brock-drink-final p {
+  margin: 0;
+  color: #fff7df;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.brock-drink-final.excellent {
+  border-color: rgba(95, 183, 167, 0.54);
+}
+
+.brock-drink-final.rough {
+  border-color: rgba(211, 99, 99, 0.45);
+}
+
+.brock-drink-log {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 13px;
+}
+
+.brock-drink-log h3 {
+  margin: 0;
+  color: #efd58c;
+  font-size: 0.98rem;
+}
+
+.brock-drink-log > div {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding-right: 4px;
+}
+
+.brock-drink-log article {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid rgba(231, 211, 161, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.brock-drink-log span {
+  color: rgba(95, 183, 167, 0.94);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.brock-drink-log p,
+.brock-drink-empty {
+  margin: 0;
+  color: rgba(224, 220, 200, 0.78);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 860px) {
+  .brock-drink-modal {
+    height: min(760px, calc(100vh - 24px));
+  }
+
+  .brock-drink-board {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) minmax(140px, 190px);
+    overflow: auto;
+  }
+
+  .brock-drink-side {
+    align-self: stretch;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .brock-drink-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .brock-drink-backdrop {
+    padding: 12px;
+  }
+
+  .brock-drink-modal {
+    width: calc(100vw - 18px);
+    height: calc(100vh - 18px);
+  }
+
+  .brock-drink-header {
+    padding: 12px;
+  }
+
+  .brock-drink-header span {
+    font-size: 1.02rem;
+  }
+
+  .brock-drink-board {
+    padding: 10px;
+  }
+
+  .brock-drink-side {
+    grid-template-columns: 1fr;
+  }
+}

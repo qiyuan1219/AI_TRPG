@@ -38,6 +38,7 @@ export interface InvestigationClue {
   id: string;
   name: string;
   description: string;
+  icon?: string;
   source?: string;
   tags?: string[];
   relatedDocuments?: string[];
