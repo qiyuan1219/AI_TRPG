@@ -860,11 +860,19 @@ function choiceLimitForStage(state: GameState, stage: ActionNodeConfig | null) {
   if (stage && stage.hints.includes('购买药剂') && stage.hints.some((h) => /返回公会登记/.test(h))) {
     return 1;
   }
+  // 蓝伞浅滩战斗前选择阶段：只有1次行动机会，选择后通过旁白进入战斗
+  if (stage && stage.hints.some((h) => /前往蓝伞浅滩/.test(h)) && stage.hints.some((h) => /判断前方风向|确认旧巡逻路线/.test(h))) {
+    return 1;
+  }
   return NODE_CHOICE_LIMIT;
 }
 
 function forcedSceneForChoiceStage(stage: ActionNodeConfig | null) {
   if (stage?.id === 'guild_intel') return getScriptedScene('tavern-intro');
+  // 蓝伞浅滩战斗前：选择次数用完后，自动播放旁白过渡剧情，然后进入战斗
+  if (stage && stage.hints.some((h) => /前往蓝伞浅滩/.test(h)) && stage.hints.some((h) => /判断前方风向|确认旧巡逻路线/.test(h))) {
+    return getScriptedScene('enter-blue-shoal');
+  }
   return null;
 }
 
