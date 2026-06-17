@@ -32,7 +32,7 @@ const SPRITE_SHEET_MAP: Record<string, string> = {
 };
 
 interface BattleTestScreenProps {
-  onBack: () => void;
+  onBack?: () => void;
   mode?: "test" | "tutorial" | "side-event";
   onComplete?: (result?: BattleResult) => void;
   onSkip?: () => void;
@@ -1264,13 +1264,13 @@ const TUTORIAL_BATTLE_CONFIG: BattleConfig = {
   completeLabel: "继续剧情",
   tutorialIntro: {
     title: "瑟琳的战斗教学",
-    subtitle: "一步一步来：先看先攻，再看行动。战斗必胜，重点是理解每一步为什么发生。",
+    subtitle: "依次掌握先攻检定、技能施放、目标选择与防御站位。本场为保证教学流畅度预设为必胜，重心在于理解回合制战斗的每一层判据。",
     steps: [
       { title: "① 先攻", text: "开场所有单位投 1D20 + 敏捷调整值。行动条从左到右显示顺序，当前行动者高亮。" },
       { title: "② 选择技能", text: "轮到你时点下方技能，选攻击（稳步斩击）、检定（盾牌压制）或治疗（回气）。" },
       { title: "③ 指定目标", text: "选完技能后，敌对单位会发光。点击目标确认释放，攻击打敌人，治疗点我方。" },
       { title: "④ 观察骰子", text: "右侧弹出 3D 骰子展示 D20 结果和加值 vs 目标AC/DC，看清通过还是失败再点继续。" },
-      { title: "⑤ 防御思路", text: "冒险者 AC18 很难被命中，瑟琳 AC14 较脆。高AC = 更难被打中，前排承伤是基础策略。" },
+      { title: "⑤ 防御站位", text: "冒险者 AC 较高，适合顶在前排承受主要火力；瑟琳 AC 偏低，应保持在后方施法与治疗。高 AC 单位承伤是基础战术构成。" },
       { title: "⑥ 治疗时机", text: "回气和逆钟愈合恢复 HP。受伤后用治疗维持血量，不要等 HP 过低才动手。" },
     ],
     enemySkills: [
@@ -3052,14 +3052,9 @@ export function BattleTestScreen({
           <small>{config.subtitle}</small>
         </div>
         <div className="battle-hud-actions">
-          {mode === "tutorial" && onSkip && (
+          {(mode === "tutorial" || mode === "test") && onSkip && (
             <button type="button" className="ghost-button" onClick={onSkip} style={{ borderColor: "rgba(211,99,99,0.4)", color: "#d36363" }}>
-              ⏭ 跳过教学战斗
-            </button>
-          )}
-          {mode !== "tutorial" && (
-            <button type="button" className="ghost-button" onClick={onBack}>
-              {config.backLabel}
+              ⏭ 跳过战斗（胜利）
             </button>
           )}
         </div>

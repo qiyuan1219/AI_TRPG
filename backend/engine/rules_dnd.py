@@ -18,17 +18,196 @@ def roll_dice(dice_str: str) -> int:
 
 
 # ============================================================
-# 职业预设（标准数组: 16,15,14,13,12,10 分配）
+# 冒险者流派与旧职业兼容
 # ============================================================
-CLASS_PRESETS = {
-    "战士":   {"str":16, "dex":13, "con":15, "int":10, "wis":12, "cha":8,  "hp":30, "ac":18, "atk_bonus":5},
-    "游荡者":  {"str":10, "dex":16, "con":14, "int":12, "wis":13, "cha":8,  "hp":26, "ac":15, "atk_bonus":5},
-    "法师":   {"str":8,  "dex":13, "con":14, "int":16, "wis":12, "cha":13, "hp":20, "ac":13, "atk_bonus":5},
-    "牧师":   {"str":13, "dex":10, "con":14, "int":12, "wis":16, "cha":8,  "hp":26, "ac":18, "atk_bonus":5},
-    "圣骑士":  {"str":15, "dex":10, "con":13, "int":8,  "wis":12, "cha":14, "hp":28, "ac":20, "atk_bonus":5},
+DEFAULT_STYLE_ID = "balanced"
+PENDING_STYLE_NAME = "待确认流派"
+
+PLAYER_STYLES = [
+    {
+        "id": "iron-cable",
+        "name": "铁缆流",
+        "attributes": {"str": 15, "dex": 10, "con": 16, "int": 10, "wis": 12, "cha": 10},
+    },
+    {
+        "id": "shadow-step",
+        "name": "影步流",
+        "attributes": {"str": 10, "dex": 16, "con": 12, "int": 10, "wis": 15, "cha": 10},
+    },
+    {
+        "id": "arcane-analysis",
+        "name": "秘析流",
+        "attributes": {"str": 8, "dex": 12, "con": 12, "int": 16, "wis": 15, "cha": 10},
+    },
+    {
+        "id": "resonance",
+        "name": "共鸣流",
+        "attributes": {"str": 8, "dex": 12, "con": 12, "int": 12, "wis": 13, "cha": 16},
+    },
+    {
+        "id": "balanced",
+        "name": "均衡流",
+        "attributes": {"str": 12, "dex": 12, "con": 13, "int": 12, "wis": 12, "cha": 12},
+    },
+]
+
+PLAYER_STYLE_BY_ID = {style["id"]: style for style in PLAYER_STYLES}
+PLAYER_STYLE_BY_NAME = {style["name"]: style for style in PLAYER_STYLES}
+LEGACY_CLASS_TO_STYLE_ID = {
+    "warrior": "iron-cable",
+    "战士": "iron-cable",
+    "rogue": "shadow-step",
+    "游荡者": "shadow-step",
+    "wizard": "arcane-analysis",
+    "mage": "arcane-analysis",
+    "法师": "arcane-analysis",
+    "cleric": "resonance",
+    "牧师": "resonance",
+    "paladin": "balanced",
+    "圣骑士": "balanced",
 }
 
 PROFICIENCY_BONUS = {3: 2, 4: 3, 5: 3, 6: 4, 7: 4}
+
+
+def get_modifier(value: int) -> int:
+    return (value - 10) // 2
+
+
+def get_max_hp(attributes: dict[str, int]) -> int:
+    return 36 + get_modifier(int(attributes.get("con", 10))) * 3
+
+
+def get_ac(attributes: dict[str, int]) -> int:
+    return 13 + get_modifier(int(attributes.get("dex", 10)))
+
+
+def get_initiative_modifier(attributes: dict[str, int]) -> int:
+    return get_modifier(int(attributes.get("dex", 10)))
+
+
+def derive_player_combat_stats(attributes: dict[str, int]) -> dict[str, int]:
+    return {
+        "hp": get_max_hp(attributes),
+        "ac": get_ac(attributes),
+        "initiative_modifier": get_initiative_modifier(attributes),
+        "atk_bonus": 5,
+    }
+
+
+def resolve_player_style(style_id: str | None = None, style_name: str | None = None, legacy_class: str | None = None) -> dict:
+    for raw in (style_id, style_name, legacy_class):
+        key = str(raw or "").strip()
+        if not key:
+            continue
+        if key in PLAYER_STYLE_BY_ID:
+            return PLAYER_STYLE_BY_ID[key]
+        if key in PLAYER_STYLE_BY_NAME:
+            return PLAYER_STYLE_BY_NAME[key]
+        mapped = LEGACY_CLASS_TO_STYLE_ID.get(key)
+        if mapped and mapped in PLAYER_STYLE_BY_ID:
+            return PLAYER_STYLE_BY_ID[mapped]
+    return PLAYER_STYLE_BY_ID[DEFAULT_STYLE_ID]
+
+
+def _attributes_from_state(state: dict) -> dict[str, int]:
+    player = state.get("player")
+    if isinstance(player, dict):
+        attrs = player.get("attributes")
+        if isinstance(attrs, dict) and all(key in attrs for key in ("str", "dex", "con", "int", "wis", "cha")):
+            return {key: int(attrs[key]) for key in ("str", "dex", "con", "int", "wis", "cha")}
+    if all(key in state for key in ("str", "dex", "con", "int", "wis", "cha")):
+        return {key: int(state.get(key, 10)) for key in ("str", "dex", "con", "int", "wis", "cha")}
+    return {}
+
+
+def normalize_player_style_state(state: dict) -> dict:
+    selected_style_id = str(
+        state.get("selectedStyleId")
+        or state.get("selected_style_id")
+        or ((state.get("player") or {}).get("styleId") if isinstance(state.get("player"), dict) else "")
+        or ""
+    ).strip()
+    selected_style_name = str(
+        state.get("style_name")
+        or ((state.get("player") or {}).get("styleName") if isinstance(state.get("player"), dict) else "")
+        or ""
+    ).strip()
+    legacy_class = str(state.get("selectedClassId") or state.get("char_class") or "").strip()
+    pending_selection = bool(state.get("style_selection_pending")) and not selected_style_id and legacy_class == PENDING_STYLE_NAME
+
+    if pending_selection:
+        attributes = _attributes_from_state(state) or dict(PLAYER_STYLE_BY_ID[DEFAULT_STYLE_ID]["attributes"])
+        derived = derive_player_combat_stats(attributes)
+        current_hp = int(state.get("current_hp") or derived["hp"])
+        player = state.get("player") if isinstance(state.get("player"), dict) else {}
+        state["player"] = {
+            **player,
+            "styleId": "",
+            "styleName": PENDING_STYLE_NAME,
+            "attributes": attributes,
+            "maxHp": derived["hp"],
+            "hp": min(current_hp, derived["hp"]),
+            "ac": derived["ac"],
+        }
+        state["style_name"] = PENDING_STYLE_NAME
+        state["char_class"] = PENDING_STYLE_NAME
+        state["selectedStyleId"] = ""
+        state["selected_style_id"] = ""
+        state["selectedClassId"] = None
+        for key, value in attributes.items():
+            state[key] = value
+        state["max_hp"] = derived["hp"]
+        state["current_hp"] = min(current_hp, derived["hp"])
+        state["ac"] = derived["ac"]
+        state["initiative_modifier"] = derived["initiative_modifier"]
+        state["atk_bonus"] = derived["atk_bonus"]
+        return state
+
+    style = resolve_player_style(selected_style_id, selected_style_name, legacy_class)
+    has_explicit_style = bool(selected_style_id or selected_style_name)
+    attributes = _attributes_from_state(state) if has_explicit_style else {}
+    if not attributes:
+        attributes = dict(style["attributes"])
+
+    derived = derive_player_combat_stats(attributes)
+    current_hp = int(state.get("current_hp") or ((state.get("player") or {}).get("hp") if isinstance(state.get("player"), dict) else 0) or derived["hp"])
+    player = state.get("player") if isinstance(state.get("player"), dict) else {}
+    state["player"] = {
+        **player,
+        "styleId": style["id"],
+        "styleName": style["name"],
+        "attributes": attributes,
+        "maxHp": derived["hp"],
+        "hp": min(current_hp, derived["hp"]),
+        "ac": derived["ac"],
+    }
+    state["selectedStyleId"] = style["id"]
+    state["selected_style_id"] = style["id"]
+    state["style_name"] = style["name"]
+    state["char_class"] = style["name"]
+    state["selectedClassId"] = None
+    for key, value in attributes.items():
+        state[key] = value
+    state["max_hp"] = derived["hp"]
+    state["current_hp"] = min(current_hp, derived["hp"])
+    state["ac"] = derived["ac"]
+    state["initiative_modifier"] = derived["initiative_modifier"]
+    state["atk_bonus"] = int(state.get("atk_bonus") or derived["atk_bonus"])
+    state["style_selection_pending"] = False
+    return state
+
+
+def _style_preset(style: dict) -> dict[str, int]:
+    attributes = dict(style["attributes"])
+    derived = derive_player_combat_stats(attributes)
+    return {**attributes, "hp": derived["hp"], "ac": derived["ac"], "atk_bonus": derived["atk_bonus"]}
+
+
+CLASS_PRESETS = {style["name"]: _style_preset(style) for style in PLAYER_STYLES}
+for legacy_name, mapped_style_id in LEGACY_CLASS_TO_STYLE_ID.items():
+    CLASS_PRESETS[legacy_name] = dict(CLASS_PRESETS[PLAYER_STYLE_BY_ID[mapped_style_id]["name"]])
+CLASS_PRESETS[PENDING_STYLE_NAME] = dict(CLASS_PRESETS[PLAYER_STYLE_BY_ID[DEFAULT_STYLE_ID]["name"]])
 
 
 # ============================================================

@@ -18,7 +18,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       statuses: ['前排'],
       traits: ['HP32/AC16'],
       skills: [
-        { id: 'adv-slash', name: '长剑挥砍', resource: '战斗技能', source: '职业技能', formula: 'STR+熟练 vs AC；1d8+4', effect: '正面劈砍', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 13, label: '长剑挥砍' }, tags: ['攻击'] },
+        { id: 'adv-slash', name: '长剑挥砍', resource: '战斗技能', source: '职业技能', formula: 'STR+熟练 vs AC；1d8+400', effect: '正面劈砍', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 13, label: '长剑挥砍' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },
@@ -31,7 +31,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       statuses: ['后排'],
       traits: ['HP24/AC14'],
       skills: [
-        { id: 'serin-bolt', name: '银杖射击', resource: '战斗技能', source: '队友技能', formula: 'INT+熟练 vs AC；1d8+3光耀', effect: '远程法术射击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'int', targetAc: 13, label: '银杖射击' }, tags: ['攻击'] },
+        { id: 'serin-bolt', name: '银杖射击', resource: '战斗技能', source: '队友技能', formula: 'INT+熟练 vs AC；1d8+300光耀', effect: '远程法术射击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'int', targetAc: 13, label: '银杖射击' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },
@@ -45,7 +45,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       traits: ['HP26/AC15'],
       skills: [
         { id: 'ailin-heal', name: '白枝治疗', resource: '战斗技能', source: '队友技能', formula: '恢复1d8+3', effect: '包扎伤口', cooldown: '每回合1次', rule: '治疗骰', roll: { kind: 'healing', dieType: 'd8', diceCount: 1, bonus: 3, label: '白枝治疗' }, tags: ['治疗'] },
-        { id: 'ailin-strike', name: '白枝杖击', resource: '战斗技能', source: '队友技能', formula: 'WIS+熟练 vs AC；1d6+2', effect: '近身防卫', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'wis', targetAc: 13, label: '白枝杖击' }, tags: ['攻击'] },
+        { id: 'ailin-strike', name: '白枝杖击', resource: '战斗技能', source: '队友技能', formula: 'WIS+熟练 vs AC；1d6+200', effect: '近身防卫', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'wis', targetAc: 13, label: '白枝杖击' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },
@@ -58,7 +58,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       statuses: ['前排'],
       traits: ['HP34/AC16'],
       skills: [
-        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d10+3钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 13, label: '铁锅重砸' }, tags: ['攻击'] },
+        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d10+300钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 13, label: '铁锅重砸' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },
@@ -71,7 +71,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       statuses: ['后排'],
       traits: ['HP22/AC15'],
       skills: [
-        { id: 'kaiya-stab', name: '匕首连刺', resource: '战斗技能', source: '队友技能', formula: 'DEX+熟练 vs AC；1d4+4穿刺', effect: '快速连续刺击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'dex', targetAc: 13, label: '匕首连刺' }, tags: ['攻击'] },
+        { id: 'kaiya-stab', name: '匕首连刺', resource: '战斗技能', source: '队友技能', formula: 'DEX+熟练 vs AC；1d400+400穿刺', effect: '快速连续刺击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'dex', targetAc: 13, label: '匕首连刺' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },

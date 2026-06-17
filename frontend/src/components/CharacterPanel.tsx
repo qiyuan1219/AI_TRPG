@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { abilityModifier, DND_CLASSES, DND_COMPANIONS } from '../data/dndClasses';
+import { abilityModifier, COMMON_COMBAT_SKILLS, COMMON_NON_COMBAT_SKILLS, DND_COMPANIONS } from '../data/dndClasses';
 import type { GameState, SkillEntry } from '../types/game';
 import { COMPANION_ID_BY_UI_ID, getCompanionTrust, getTrustTier, recentTrustLogs } from '../utils/trust';
 
@@ -31,7 +31,7 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
   const currentHp = Number(state.current_hp ?? 30);
   const maxHp = Number(state.max_hp ?? 30);
   const hpPercent = Math.max(0, Math.min(100, (currentHp / Math.max(maxHp, 1)) * 100));
-  const classPreset = DND_CLASSES.find((item) => item.name === state.char_class || item.id === state.char_class);
+  const styleName = String(state.style_name || state.player?.styleName || state.char_class || (state.style_selection_pending ? '待确认流派' : '均衡流'));
   const visibleCompanions = DND_COMPANIONS.filter((companion) => ACTIVE_COMPANION_IDS.has(companion.id));
   const trustLogs = recentTrustLogs(state, 5);
 
@@ -40,7 +40,7 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
       <div className="panel-block character-identity">
         <span>{state.player_name || '冒险者'}</span>
         <strong>
-          {state.char_class || '战士'} Lv.{state.level || 3}
+          {styleName} Lv.{state.level || 3}
         </strong>
       </div>
 
@@ -80,13 +80,11 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
         <b>{state.gold || 200} GP</b>
       </div>
 
-      {classPreset && (
-        <div className="panel-block skill-block">
-          <h2>职业技能</h2>
-          <SkillGroup label="战斗" skills={classPreset.skills.combat} />
-          <SkillGroup label="探索/对话" skills={classPreset.skills.nonCombat} />
-        </div>
-      )}
+      <div className="panel-block skill-block">
+        <h2>流派技能</h2>
+        <SkillGroup label="战斗" skills={COMMON_COMBAT_SKILLS} />
+        <SkillGroup label="探索/对话" skills={COMMON_NON_COMBAT_SKILLS} />
+      </div>
 
       <div className="panel-block">
         <h2>同伴信任</h2>

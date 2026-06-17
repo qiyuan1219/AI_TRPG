@@ -8,7 +8,16 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from engine.rules_dnd import attack_roll, modifier, skill_check, validate_character
+from engine.rules_dnd import (
+    attack_roll,
+    get_ac,
+    get_max_hp,
+    modifier,
+    normalize_player_style_state,
+    resolve_player_style,
+    skill_check,
+    validate_character,
+)
 
 
 class RulesDndTests(unittest.TestCase):
@@ -37,6 +46,44 @@ class RulesDndTests(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertIn("str", message)
+
+    def test_style_formula_matches_expected_balanced_values(self):
+        style = resolve_player_style("balanced")
+
+        self.assertEqual(get_max_hp(style["attributes"]), 39)
+        self.assertEqual(get_ac(style["attributes"]), 14)
+
+    def test_normalize_player_style_state_maps_legacy_class(self):
+        state = {
+            "char_class": "战士",
+            "current_hp": 30,
+        }
+
+        normalize_player_style_state(state)
+
+        self.assertEqual(state["selectedStyleId"], "iron-cable")
+        self.assertEqual(state["char_class"], "铁缆流")
+        self.assertEqual(state["player"]["styleName"], "铁缆流")
+        self.assertEqual(state["max_hp"], 45)
+        self.assertEqual(state["ac"], 13)
+
+    def test_pending_style_state_stays_unselected(self):
+        state = {
+            "char_class": "待确认流派",
+            "style_selection_pending": True,
+            "str": 12,
+            "dex": 12,
+            "con": 13,
+            "int": 12,
+            "wis": 12,
+            "cha": 12,
+        }
+
+        normalize_player_style_state(state)
+
+        self.assertEqual(state["char_class"], "待确认流派")
+        self.assertEqual(state["selectedStyleId"], "")
+        self.assertEqual(state["player"]["styleId"], "")
 
 
 if __name__ == "__main__":

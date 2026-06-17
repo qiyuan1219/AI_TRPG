@@ -148,21 +148,29 @@ export interface SkillEntry {
   effect: string;
 }
 
+export interface PlayerAttributes {
+  str: number;
+  dex: number;
+  con: number;
+  int: number;
+  wis: number;
+  cha: number;
+}
+
 export interface CharacterPreset {
   id: string;
   name: string;
-  mark: string;
-  desc: string;
-  stats: {
-    str: number;
-    dex: number;
-    con: number;
-    int: number;
-    wis: number;
-    cha: number;
+  hotkey: string;
+  tagline: string;
+  summary: string;
+  attributes: PlayerAttributes;
+  derived: {
+    hp: number;
+    ac: number;
+    initiativeModifier: number;
   };
-  pros: string[];
-  cons: string[];
+  advantages: string[];
+  limitations: string[];
   skills: {
     combat: SkillEntry[];
     nonCombat: SkillEntry[];
@@ -196,6 +204,8 @@ export interface CreateGamePayload {
   attr_cha: number;
   level?: number;
   skip_opening?: boolean;
+  selected_style_id?: string;
+  style_selection_pending?: boolean;
 }
 
 export interface CreateGameResult {
@@ -207,7 +217,7 @@ export interface CreateGameResult {
   state: GameState;
 }
 
-export type SaveSlotKey = 'auto' | 'slot-1' | 'slot-2' | 'slot-3' | 'slot-4' | 'slot-5';
+export type SaveSlotKey = 'auto' | 'slot-1' | 'slot-2' | 'slot-3' | 'slot-4' | 'slot-5' | 'slot-6' | 'slot-7' | 'slot-8' | 'slot-9' | 'slot-10';
 
 export interface SaveSlotSummary {
   slot_key: SaveSlotKey;

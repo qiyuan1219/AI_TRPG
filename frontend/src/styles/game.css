@@ -88,39 +88,6 @@
   line-height: 1.35;
 }
 
-.skill-preview {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 0 0 12px;
-  padding-top: 2px;
-}
-
-.skill-preview h3 {
-  margin: 0 0 6px;
-  color: var(--gold-soft);
-  font-size: 0.9rem;
-}
-
-.skill-preview p {
-  display: grid;
-  gap: 2px;
-  margin: 0 0 6px;
-  color: var(--muted);
-  line-height: 1.35;
-  font-size: 0.84rem;
-}
-
-.skill-preview b {
-  color: var(--text);
-  font-size: 0.9rem;
-}
-
-.skill-preview span {
-  font-size: 0.8rem;
-  overflow-wrap: anywhere;
-}
-
 .save-load-panel {
   display: grid;
   gap: 10px;
@@ -293,10 +260,19 @@
   gap: 20px;
 }
 
+.start-entry-grid {
+  grid-template-columns: minmax(0, 560px);
+  justify-content: center;
+}
+
 .creator-column {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.start-entry-column {
+  gap: 14px;
 }
 
 .field-label {
@@ -313,6 +289,21 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.style-selector-copy {
+  margin-bottom: 14px;
+}
+
+.style-selector-copy h2 {
+  margin: 4px 0 8px;
+  color: var(--gold-soft);
+}
+
+.style-selector-copy p:last-child {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .class-option {
@@ -377,12 +368,20 @@
   font-weight: 800;
 }
 
-.sheet-stats-badge {
-  display: flex;
-  gap: 8px;
+.style-tagline {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
-.badge-hp, .badge-ac {
+.sheet-stats-badge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.badge-hp, .badge-ac, .badge-initiative {
   padding: 3px 10px;
   border-radius: 6px;
   font-size: 0.8rem;
@@ -401,9 +400,112 @@
   color: #5fb7a7;
 }
 
+.badge-initiative {
+  background: rgba(212, 168, 67, 0.12);
+  border: 1px solid rgba(212, 168, 67, 0.32);
+  color: #d4a843;
+}
+
 .radar-chart {
   display: block;
   margin: 0 auto;
+}
+
+.style-attr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 14px;
+}
+
+.style-attr-grid p {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(231, 211, 161, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.style-attr-grid b {
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.style-attr-grid span,
+.style-attr-grid em {
+  color: var(--muted);
+  font-style: normal;
+  font-family: Consolas, monospace;
+}
+
+.start-brief-card {
+  padding: 14px 16px;
+  border: 1px solid rgba(231, 211, 161, 0.16);
+  border-radius: 10px;
+  background: rgba(14, 17, 23, 0.48);
+}
+
+.start-brief-card h3 {
+  margin: 0 0 8px;
+  color: var(--gold-soft);
+  font-size: 0.96rem;
+}
+
+.start-brief-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.start-brief-card p + p {
+  margin-top: 8px;
+}
+
+.start-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid rgba(231, 211, 161, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.start-inline-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #5fb7a7;
+  cursor: pointer;
+}
+
+.style-selection-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 8, 14, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.style-selection-modal {
+  width: min(1120px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid rgba(231, 211, 161, 0.18);
+  border-radius: 14px;
+  background: rgba(11, 15, 22, 0.96);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
 }
 
 /* 紧凑版 ── 小屏 */
@@ -422,6 +524,12 @@
   }
   .start-header h1 {
     font-size: 2rem;
+  }
+  .style-attr-grid {
+    grid-template-columns: 1fr;
+  }
+  .style-selection-modal {
+    padding: 16px;
   }
 }
 
@@ -513,48 +621,51 @@
   max-width: calc(100% - 40px);
 }
 
-/* 娓告垙鍐呭彸涓婅鎿嶄綔鎸夐挳 */
+.game-log-btn,
+.game-map-btn,
 .game-save-btn,
-.game-title-btn {
+.game-title-btn,
+.game-inventory-entry .inventory-open-button,
+.game-character-btn {
   min-height: 36px;
   padding: 0 14px;
+  border: 1px solid rgba(214, 168, 90, 0.4);
   border-radius: 6px;
+  background: rgba(42, 33, 27, 0.72);
   font-weight: 700;
   font-size: 0.9rem;
   white-space: nowrap;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(10px);
-}
-
-.game-save-btn {
-  border: 1px solid rgba(212, 168, 67, 0.5);
-  background: rgba(212, 168, 67, 0.15);
   color: var(--gold-soft);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 
-.game-title-btn {
-  border: 1px solid rgba(231, 211, 161, 0.28);
-  background: rgba(17, 19, 24, 0.7);
-  color: var(--text);
-}
-
-.game-save-btn:hover {
-  background: rgba(212, 168, 67, 0.28);
+.game-log-btn:hover,
+.game-map-btn:hover,
+.game-save-btn:hover,
+.game-title-btn:hover,
+.game-inventory-entry .inventory-open-button:hover,
+.game-character-btn:hover {
+  border-color: rgba(239, 213, 140, 0.62);
+  background: rgba(214, 168, 90, 0.2);
 }
 
 .game-title-btn:hover {
-  border-color: rgba(239, 213, 140, 0.56);
   background: rgba(156, 63, 87, 0.24);
-  color: var(--gold-soft);
 }
 
 .game-inventory-entry {
   position: absolute;
   top: 96px;
-  left: 24px;
+  right: 20px;
   z-index: 7;
-  width: 132px;
+  width: auto;
 }
+
+/* 背包/角色按钮位置与环境已由上方统一按钮样式接管 */
 
 .return-title-backdrop {
   position: fixed;
@@ -627,25 +738,8 @@
 .game-character-btn {
   position: absolute;
   top: 154px;
-  left: 24px;
+  right: 20px;
   z-index: 6;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid rgba(95, 183, 167, 0.56);
-  border-radius: 6px;
-  background: rgba(95, 183, 167, 0.14);
-  color: var(--teal);
-  font-weight: 800;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(10px);
-}
-
-.game-character-btn:hover {
-  border-color: rgba(239, 213, 140, 0.62);
-  background: rgba(95, 183, 167, 0.25);
-  color: var(--gold-soft);
 }
 
 .character-modal-backdrop {

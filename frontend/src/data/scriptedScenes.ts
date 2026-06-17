@@ -88,6 +88,14 @@ const OPENING: ScriptedScene = {
     { speaker: '主持人', text: '「深入幽暗地域，抵达逆穹悬城。调查地底堡垒与历次远征队失联的原因。确认地心之门封印状态。带回生还者、调查记录，或者足以证明真相的证据。」' },
     { speaker: '主持人', text: '委托报酬丰厚，危险等级却没有标注上限。你接下了它。' },
 
+
+    { speaker: '主持人', text: '出发前，公会要求你补完最后一份登记档案。那不是职业证明，也不是头衔认证，而是一份关于“你通常如何活下来”的记录。' },
+    { speaker: '主持人', text: '有人依靠体魄和耐力穿过危险，有人依靠速度和警觉避开死亡；有人擅长分析异常规则，也有人更懂得与活人、伤员和幸存者交谈。' },
+    { speaker: '主持人', text: '在幽暗地域里，所谓流派并不代表身份高低。它只说明当危险降临时，你会本能地选择哪一种方式面对它。' },
+    { speaker: '主持人', text: '你在登记页上停下笔，开始确认自己的冒险者流派。' },
+
+
+
     // ===== 旅途 =====
     { speaker: '主持人', text: '你沿着一条废弃的符文矿道不断下行，起初还能看见锈蚀矿车与熄灭的矮人锻炉。', bgImage: '/assets/scenes/opening/opening09.webp' },
     { speaker: '主持人', text: '越往深处，空气越发潮湿，蓝绿色菌斑开始爬满岩壁。' },
@@ -122,17 +130,58 @@ const OPENING: ScriptedScene = {
     { speaker: '主持人', text: '她看见你时，目光短暂停顿，随后恢复平静。' },
     { speaker: '瑟琳', text: '「你就是公会指名的赏金猎人，{name}。」' },
     { speaker: '瑟琳', text: '「我是瑟琳，负责你的法术支援、治疗和环境监测，也作为你的向导」' },
-    { speaker: '瑟琳', text: '「你比预计早到了三天，看来传言并不全是夸张。」' },
-    { speaker: '瑟琳', text: '「先去公会登记吧。路上我会说明城里的情况。」' },
+  ],
+  hints: [],
+  statePatch: {
+    first_choice_resolved: false,
+    tutorial_battle_done: false,
+    tutorial_battle_pending: true,
+    serlin_intro_pending: true,
+    currentNodeId: 'opening_tutorial_battle',
+  },
+};
 
-    // ===== 教学战斗触发 =====
-    { speaker: '主持人', text: '你们刚走出街口，前方便传来刺耳的金属断裂声。', bgImage: '/assets/scenes/02tutorial-battle-trigger.webp' },
-    { speaker: '主持人', text: '一只运输吊箱脱离缆车，重重砸在街面上。木板碎裂，蓝绿色孢尘喷涌而出。' },
-    { speaker: '主持人', text: '箱中没有补给，只有数只沾满孢粉的裂隙爬兽。' },
-    { speaker: '主持人', text: '它们受到惊吓，立刻张开口器冲向人群。其中一只踏着断裂缆索跃起，径直扑向你。' },
-    { speaker: '主持人', text: '瑟琳抬起银杖，寒白色法光照亮了它腹侧裸露的软甲。' },
-    { speaker: '瑟琳', text: '「别退向护栏！攻击它腹侧的软肋！」' },
-    { speaker: '主持人', text: '裂隙爬兽已经逼近，战斗一触即发！' },
+// ============================================================
+// 瑟琳介绍完毕后 → 教学战斗触发（serlin_intro_pending 清除后由 completeSerlinIntro 播放）
+// ============================================================
+const OPENING_SUSPENSE: ScriptedScene = {
+  id: 'opening-suspense',
+  manualOnly: true,
+  triggers: ['开场疑云'],
+  setArea: '逆穹悬城·主缆街',
+  bgImage: '/assets/scenes/0101cable-street-walk.webp',
+  lastEvent: '裂隙爬兽冲出吊箱，教学战斗触发',
+  statePatch: {
+    tutorial_battle_pending: true,
+    first_choice_resolved: false,
+    currentNodeId: 'opening_tutorial_battle',
+  },
+  events: ['裂隙爬兽袭击'],
+  lines: [
+    { speaker: '主持人', text: '瑟琳转身走向街口。她的步子不快，却很稳，像是已经习惯在这座倒悬城市的边缘行走。' },
+    { speaker: '主持人', text: '你跟在她身后，穿过一条由黑石与金属梁架成的主缆街。街道一侧是倒挂的民居与商铺，另一侧则能看见深井下方翻涌的蓝绿色孢光。' },
+    { speaker: '瑟琳', text: '「逆穹城的道路不按地面城市的逻辑运转。这里的街区靠主缆、绞盘和符文制动维持稳定。听见钟声、缆鸣或者金属崩裂声时，第一反应不是抬头看，而是先确认脚下。」' },
+    { speaker: '主持人', text: '她说话时，远处一条粗大的秘银缆索低低震动，声音沉闷得像某种巨兽在石层深处翻身。行人们对此并不惊讶，只是熟练地往街道内侧让了让。' },
+    { speaker: '瑟琳', text: '「近一个月，这种异常缆鸣越来越频繁。城防署说只是负载问题，但我不这么认为。」' },
+    { speaker: '主持人', text: '你注意到街边有几名工匠正在检查吊运轨道。木箱、补给袋和矿石吊篮被悬挂在半空，沿着缆车轨道缓慢移动。每只吊箱外侧都贴着封条，封条上印着公会与城防署的双重印记。' },
+    { speaker: '瑟琳', text: '「公会登记处就在前面。登记之后，你会拿到临时通行许可。没有它，你无法进入缆梯中枢，也无法接触远征队档案。」' },
+    { speaker: '主持人', text: '她停顿了一下，目光扫过你腰间的装备，又落回街道前方。' },
+    { speaker: '瑟琳', text: '「在此之前，记住一件事：这座城市看起来还在运转，不代表它安全。逆穹城只是习惯了把危险藏在日常里面。」' },
+
+    { speaker: '主持人', text: '你们刚走出街口，前方便传来一阵刺耳的警铃。街边的符文灯同时闪烁，几名工匠猛地抬头，脸色瞬间变了。' },
+    { speaker: '工匠', text: '「三号吊轨失衡！让开！都让开！」' },
+    { speaker: '主持人', text: '下一秒，半空中的一只运输吊箱剧烈摇晃。固定它的金属扣发出连续的崩裂声，缆索像被无形的手撕开一样绷断。', bgImage: '/assets/scenes/02tutorial-battle-trigger.webp' },
+    { speaker: '主持人', text: '吊箱从轨道上脱离，重重砸在街面上。木板碎裂，铁片翻卷，蓝绿色孢尘从箱体缝隙里喷涌而出，瞬间淹没了半条街。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp' },
+    { speaker: '主持人', text: '人群惊叫着后退。几名巡街守卫刚想上前，箱体内部却传来密集的刮擦声，像许多细小的爪子正在同时撕扯木板。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '瑟琳', text: '「后退，别吸入孢尘。」' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '主持人', text: '她抬起银杖，寒白色法光在杖尖聚成一圈，将翻涌的孢尘短暂压低。你这才看清，箱中没有补给，只有数只沾满孢粉的裂隙爬兽。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '主持人', text: '那些生物像是刚从狭窄的黑暗里被惊醒，背部甲壳不断开合，口器里流出带着荧光的黏液。它们不是有组织地伏击，更像是被吊箱坠落和人群尖叫彻底激怒。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '主持人', text: '其中一只裂隙爬兽踏着断裂缆索跃起，锋利的前肢在石面上拖出一串火星，径直扑向你。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '瑟琳', text: '「别退向护栏！那里没有第二次落脚机会！」' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '主持人', text: '瑟琳的银杖向前一指，寒白色法光照亮了裂隙爬兽腹侧一片没有硬壳覆盖的软甲。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '瑟琳', text: '「看清楚它的动作。腹侧软肋是弱点，等它跃起时攻击。」' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '主持人', text: '裂隙爬兽已经逼近。周围的行人四散逃离，巡街守卫被孢尘阻隔在另一侧，而你正站在它冲锋路线的正前方。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '主持人', text: '这是你抵达逆穹城后的第一场战斗。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
   ],
   hints: [
     '正面迎击裂隙爬兽【力量DC10】',
@@ -140,16 +189,41 @@ const OPENING: ScriptedScene = {
     '请求瑟琳施展辅助法术【魅力DC12】',
     '闪避并寻找掩护位置【敏捷DC10】',
   ],
-  statePatch: {
-    first_choice_resolved: false,
-    tutorial_battle_done: false,
-    tutorial_battle_pending: true,
-    currentNodeId: 'opening_tutorial_battle',
-  },
 };
 
 // ============================================================
-// 教学战斗后 → 抵达冒险者公会，米娜给出三名队友线索
+// 教学战斗后 → 战后固定剧情
+// ============================================================
+const TUTORIAL_BATTLE_AFTER: ScriptedScene = {
+  id: 'tutorial-battle-after',
+  manualOnly: true,
+  triggers: ['教学战斗后剧情'],
+  setArea: '逆穹悬城·主缆街',
+  bgImage: '/assets/scenes/03post-battle-street.webp',
+  statePatch: {
+    tutorial_battle_done: true,
+    tutorial_battle_pending: false,
+  },
+  events: ['教学战斗完成'],
+  lastEvent: '击退补给吊箱中的裂隙爬兽，守卫引导前往冒险者公会',
+  lines: [
+    { speaker: '主持人', text: '最后一只裂隙爬兽被银白色光芒逼退，撞在吊箱边缘，蜷缩着失去了攻击性。' },
+    { speaker: '瑟琳', text: '「没有重伤。很好，你的反应速度比大部分第一次进悬城的人快。」' },
+    { speaker: '守卫', text: '「这是从孢海据点回收的空箱。最近三个月，类似事件发生了四次。」' },
+    { speaker: '守卫', text: '「感谢你们出手。如果让它们冲进吊桥区，今天的通行记录上就要多几行红字了。」' },
+    { speaker: '主持人', text: '守卫把一只应急补给袋递给你。' },
+    { speaker: '瑟琳', text: '「四次不是偶然。它们不是主动潜进来的——箱壁内侧有拖痕，像是被什么东西赶上去的。」' },
+    { speaker: '主持人', text: '主缆街短暂安静下来，远处城市缆索发出低沉震响。' },
+    { speaker: '守卫', text: '「冒险者公会在倒挂塔楼区，顺着主缆走到底。你们的委托应该需要先登记。」' },
+    { speaker: '瑟琳', text: '「先过去吧。米娜应该已经在等你了。」' },
+  ],
+  hints: [
+    '前往冒险者公会登记',
+  ],
+};
+
+// ============================================================
+// 教学战斗后 → 抵达冒险者公会
 // ============================================================
 const GUILD_ARRIVAL: ScriptedScene = {
   id: 'guild-arrival',
@@ -667,6 +741,7 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
     kl_recruited: true,
     expedition_registered: true,
     blackmarket_done: true,
+    currentNodeId: 'guild-final-registration',
     inventory: '长剑,冒险者工具包,抗孢面罩,冷光灯,止血粉,解毒剂,缆梯安全扣,公会补给箱',
   },
   events: ['五人远征队登记完成', '公会物资已领取'],
@@ -738,6 +813,8 @@ const ELEVATOR_DESCENT: ScriptedScene = {
   bgImage: '/assets/scenes/ele2.webp',
   statePatch: {
     elevator_descent_started: true,
+    reach_elevator_hub: true,
+    currentNodeId: 'elevator-descent',
   },
   events: ['降渊缆梯启动'],
   lastEvent: '乘降渊缆梯从逆穹悬城前往无光孢海第一层',
@@ -932,7 +1009,7 @@ const AILIN_SIDEQUEST: ScriptedScene = {
     { speaker: '艾琳', text: '「其中一个是我父亲。」' },
     { speaker: '主持人', text: '她说得很平静，像这段话已经在心里重复过无数遍，早就磨去了最锋利的痛。' },
     { speaker: '艾琳', text: '「公会那时候很忙。新的事故、新的失踪、新的委托，一件接一件。对他们来说，那只是十二个未归名额。」' },
-    { speaker: '艾琳', text: '「可对我来说，那不是十二。那是一个会在换班后给我带热面包的人，是会把破掉的护腕重新缝好的人。」' },
+    { speaker: '艾琳', text: '「可对我来说，那不是一个数字。那是一个会在换班后给我带热面包的人，是会把破掉的护腕重新缝好的人。」' },
     { speaker: '瑟琳', text: '「后来呢？」' },
     { speaker: '艾琳', text: '「静默神殿的一位白枝修女陪我找了三个月。最后，她只找到一枚烧裂的身份牌。」' },
     { speaker: '艾琳', text: '「她把身份牌交给我时说：\u2018人也许回不来了，但名字不能留在下面。名字是死者回家的路。\u2019」' },
@@ -1043,9 +1120,9 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
     { speaker: '凯娅', text: '「不对。没有脚步声。」' },
     { speaker: '布洛克', text: '「也没有呼吸声。」' },
     { speaker: '主持人', text: '风从浅滩深处吹来，带来一阵极轻的呼喊。那声音断断续续，像被厚厚的菌毯捂住，又像有人隔着很远的水面喊你们。' },
-    { condition: 'flags.clue_voice_mimic', speaker: '瑟琳', text: '「别回应。巡逻记录里提到过，第三巡逻队就是在听见求救声后偏离路线。」' },
-    { condition: 'flags.wounded_guard_stabilized', speaker: '艾琳', text: '「伤员说过，那声音会模仿死者。所有人保持队形，不要离开灯光范围。」' },
-    { condition: '!flags.clue_voice_mimic', speaker: '瑟琳', text: '「声音来源不稳定。它不像正常回声，更像在试探我们的反应。」' },
+  { condition: 'flags.clue_voice_mimic', speaker: '瑟琳', text: '「别回应。巡逻记录里提到过，第三巡逻队就是在听见求救声后偏离路线。」' },
+  { condition: 'flags.wounded_guard_stabilized', speaker: '艾琳', text: '「伤员说过，那声音会模仿死者。所有人保持队形，不要离开灯光范围。」' },
+  { condition: '!flags.clue_voice_mimic && !flags.wounded_guard_stabilized', speaker: '瑟琳', text: '「声音来源不稳定。它不像正常回声，更像在试探我们的反应。」' },
     { speaker: '主持人', text: '你们没有回应。那声音停顿片刻，忽然变得更近。菌毯深处鼓起几个圆形凸包，像有什么东西正从下面顶开湿软的地面。' },
     { speaker: '布洛克', text: '「后退半步，别踩到鼓起来的地方！」' },
     { speaker: '主持人', text: '第一团凸包猛地破开，喷出一阵蓝绿色孢尘。几只覆满菌丝的兽形生物从菌毯下爬出，骨刺与菌壳纠缠在一起，空洞的眼窝里亮着冷光。' },
@@ -1058,6 +1135,120 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
     { speaker: '主持人', text: '蓝伞浅滩的冷光骤然变亮。孢兽压低身体，菌团在水面上缓慢铺开，战斗已经无法避免。' },
   ],
   hints: [],
+  battlePrep: [
+    {
+      id: 'blue-shoal-prep-ignore-voices',
+      label: '保持沉默，识破拟声诱导',
+      type: 'battlePrep',
+      desc: '根据先前收集到的情报，判断这些求救声是否是拟声菌团的诱导。',
+      autoSuccessWhen: 'flags.clue_voice_mimic || flags.wounded_guard_stabilized',
+      greatSuccessWhen: 'flags.clue_voice_mimic && flags.wounded_guard_stabilized',
+      check: { skill: 'observe', altSkill: 'arcana', dc: 14, label: '观察 / 奥秘 DC 14' },
+      successText: '你们没有回应那些求救声。结合先前的线索，你们迅速判断出声音并非来自活人，而是拟声菌团在试探队伍反应。',
+      greatSuccessText: '巡逻记录与伤员证词在此刻完全对上了。你们不仅识破了拟声诱导，还借声音变化判断出了菌团核心的大致位置。',
+      failText: '你们虽然没有立刻回应，但那声音越来越像熟悉的人。短暂的迟疑让队伍阵型出现了一瞬间松动。',
+      successEffect: {
+        flags: { blue_shoal_prep_ignore_voices_success: true },
+        battleEffects: {
+          disableEnemySkillFirstRound: ['voice_disruption'],
+          allyMentalResistBonus: 2,
+          allyMentalResistRounds: 1,
+        },
+      },
+      greatSuccessEffect: {
+        flags: { blue_shoal_prep_ignore_voices_great_success: true },
+        battleEffects: {
+          disableEnemySkillFirstRound: ['voice_disruption'],
+          allyMentalResistBonus: 2,
+          allyMentalResistRounds: 2,
+          targetEnemyType: 'fungal_mimic',
+          attackBonusFirstRound: 2,
+        },
+      },
+      failEffect: {
+        flags: { blue_shoal_prep_ignore_voices_failed: true },
+        battleEffects: {
+          randomBacklineDebuff: {
+            id: 'voice_lure',
+            name: '声音牵引',
+            duration: 1,
+            initiativePenalty: 2,
+            attackPenaltyVsEnemyType: { enemyType: 'fungal_mimic', value: 1 },
+          },
+        },
+      },
+    },
+    {
+      id: 'blue-shoal-prep-find-core',
+      label: '用符文灯寻找拟声菌团核心',
+      type: 'battlePrep',
+      desc: '照向拟声菌团腹腔，尝试在开战前找出它们真正的核心。',
+      autoSuccessWhen: 'flags.clue_voice_mimic',
+      check: { skill: 'observe', altSkill: 'arcana', dc: 15, label: '观察 / 奥秘 DC 15' },
+      successText: '符文灯的冷光刺入菌团腹腔，你们看见几枚暗蓝色核心正在湿软菌块中缓慢收缩。那些断续的求救声短暂失真，变成了刺耳杂音。',
+      failText: '符文灯扫过菌团身体，却只照出一层层湿软菌块。下一刻，菌团突然模仿出你们的声音，干扰了队伍判断。',
+      successEffect: {
+        flags: { blue_shoal_prep_find_core_success: true },
+        battleEffects: {
+          targetEnemyType: 'fungal_mimic',
+          attackBonusFirstRound: 2,
+          bonusDamageOnFirstHit: '1d4',
+        },
+      },
+      failEffect: {
+        flags: { blue_shoal_prep_find_core_failed: true },
+        battleEffects: {
+          enemyTypeBuff: { enemyType: 'fungal_mimic', initiativeBonusFirstRound: 2 },
+        },
+      },
+    },
+    {
+      id: 'blue-shoal-prep-avoid-bulges',
+      label: '听从布洛克指挥，避开菌毯鼓包',
+      type: 'battlePrep',
+      desc: '根据菌毯鼓起的位置，提前避开孢化兽破土突袭。',
+      check: { skill: 'survival', altSkill: 'perception', dc: 13, label: '生存 / 感知 DC 13' },
+      successText: '布洛克用斧柄敲了敲几处鼓起的菌毯，立刻示意众人后撤。下一秒，孢化兽从你们原本站立的位置破土而出，却扑了个空。',
+      failText: '你们刚刚后撤，另一侧菌毯却猛然炸开。孢化兽从意料之外的位置冲出，逼得前排仓促举盾。',
+      successEffect: {
+        flags: { blue_shoal_prep_avoid_bulges_success: true },
+        battleEffects: {
+          targetEnemyType: 'spore_beast',
+          enemyAttackPenaltyFirstRound: 2,
+          frontlineAcBonus: 1,
+          frontlineAcBonusRounds: 1,
+        },
+      },
+      failEffect: {
+        flags: { blue_shoal_prep_avoid_bulges_failed: true },
+        battleEffects: {
+          enemyTypeBuff: { enemyType: 'spore_beast', attackBonusFirstRound: 1 },
+        },
+      },
+    },
+    {
+      id: 'blue-shoal-prep-mask',
+      label: '整理抗孢面罩，压低呼吸',
+      type: 'battlePrep',
+      desc: '重新压紧抗孢面罩，减少孢尘对队伍的影响。',
+      alwaysSuccess: true,
+      successText: '你们重新压紧抗孢面罩，放慢呼吸。甜腻的孢尘气味被隔在面罩之外，脑中的昏沉感稍稍退去。',
+      successEffect: {
+        flags: { blue_shoal_prep_mask_success: true },
+        battleEffects: {
+          allyStatus: [
+            {
+              id: 'steady_breath',
+              name: '稳息',
+              duration: 2,
+              sporeDamageReduce: 2,
+              sporeResistBonus: 2,
+            },
+          ],
+        },
+      },
+    },
+  ],
 };
 
 // ============================================================
@@ -1068,22 +1259,44 @@ const AFTER_BATTLE_BLUE_SHOAL: ScriptedScene = {
   manualOnly: true,
   triggers: ['蓝伞浅滩战后结算'],
   setArea: '无光孢海·蓝伞浅滩出口',
-  bgImage: '/assets/scenes/blue-shoal-aftermath.webp',
+  bgImage: '/assets/scenes/bg-08-blue-cap-shallows.webp',
   bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
   statePatch: {
     blue_shoal_battle_done: true,
     completedBlueShoalBattle: true,
     battle_blue_shoal_result: 'win',
+    discovered_deep_corruption: true,
+    discovered_blue_shoal_corruption: true,
     currentNodeId: 'sidequest_brock_echo_grove',
   },
-  events: ['蓝伞浅滩战斗结束', '发现污染异常'],
-  lastEvent: '蓝伞浅滩战斗结束，发现敌人被更深处污染驱赶',
+  events: ['蓝伞浅滩战斗结束', '发现污染异常', '旧远征路线重新出现', '布洛克注意到回声菌林方向'],
+  lastEvent: '蓝伞浅滩战斗结束，众人发现孢化生物并非主动狩猎，而是被更深处的污染驱赶到浅滩外围。布洛克注意到远处回声菌林的异常呼救声。',
   lines: [
-    { speaker: '主持人', text: '最后一只孢化生物倒下后，浅滩上的蓝光并没有立刻熄灭。相反，远处的菌毯像受到惊扰般一圈圈亮起。' },
-    { speaker: '布洛克', text: '「它们不是在狩猎，是被什么东西从更深处赶出来的。」' },
-    { speaker: '艾琳', text: '「这些生物的伤口里有污染残留。不是普通孢毒，更像是某种侵蚀。」' },
-    { speaker: '凯娅', text: '「前面有旧路标。有人曾经从这里往据点方向撤退，而且撤得很急。」' },
-    { speaker: '瑟琳', text: '「继续前进。旧远征停靠点应该就在前方。」' },
+    { speaker: '主持人', text: '最后一只孢化生物倒在菌毯里。它的身体没有像普通孢兽那样慢慢融入浅滩，反而从伤口深处渗出几缕灰黑色的细丝。' },
+    { speaker: '主持人', text: '那些细丝刚接触到蓝色菌毯，周围的荧光便迅速暗了下去，像有一小片夜色被硬生生按进了浅滩。' },
+    { condition: 'flags.blue_shoal_prep_ignore_voices_success || flags.blue_shoal_prep_ignore_voices_great_success', speaker: '主持人', text: '因为你们在战前识破了拟声诱导，菌团残骸中的声音很快失去了节奏，只剩下几段破碎而空洞的杂音。' },
+    { condition: 'flags.blue_shoal_prep_find_core_success', speaker: '主持人', text: '先前被符文灯照出的暗蓝色核心已经裂开，核心内部并不是正常菌质，而是一圈圈像烧焦血管般的黑色纹路。' },
+    { condition: 'flags.blue_shoal_prep_mask_success', speaker: '主持人', text: '抗孢面罩替你们挡住了大部分战后扬起的孢尘。即便如此，那股发甜的腐败气味还是从面罩边缘挤了进来。' },
+    { speaker: '艾琳', text: '「这些伤口不对。孢毒通常会扩散、寄生、吞噬，但这些痕迹……更像是被什么东西从里面烧穿了。」' },
+    { speaker: '瑟琳', text: '「不是蓝伞浅滩本身造成的污染。污染源在更深处，浅滩只是被波及。」' },
+    { speaker: '布洛克', text: '「所以它们不是来狩猎的。」' },
+    { speaker: '凯娅', text: '「那它们是在逃？」' },
+    { speaker: '布洛克', text: '「对。能把孢化兽和拟声菌团一起往外赶的东西，最好别急着给它起名字。」' },
+    { condition: 'flags.clue_voice_mimic', speaker: '瑟琳', text: '「巡逻记录里说第三巡逻队听见求救声后偏离路线。现在看来，他们当时遇到的不是单一菌团，而是一整片正在迁移的拟声群落。」' },
+    { condition: 'flags.wounded_guard_stabilized', speaker: '艾琳', text: '「那个伤员身上的污染残留，和这些孢化兽伤口里的痕迹很接近。它们很可能都来自同一个方向。」' },
+    { speaker: '主持人', text: '浅滩尽头，几根半埋在菌毯下的木桩露了出来。木桩上绑着褪色的红绳，旁边还有被刮花的远征队路标。' },
+    { speaker: '凯娅', text: '「旧路标。箭头被人重新刻过，而且刻得很急。」' },
+    { speaker: '主持人', text: '路标指向浅滩外侧的一片低矮菌林。那里的蓝光比周围更暗，菌柄细密地挤在一起，风吹过时，会发出像人声一样的细碎回响。' },
+    { speaker: '瑟琳', text: '「回声菌林。旧远征停靠点前的最后一段缓冲区。」' },
+    { speaker: '布洛克', text: '「不。」' },
+    { speaker: '主持人', text: '布洛克忽然停下脚步。他盯着那片菌林，原本握着斧柄的手指慢慢收紧。' },
+    { speaker: '凯娅', text: '「你认识这里？」' },
+    { speaker: '布洛克', text: '「我认识那种声音。」' },
+    { speaker: '主持人', text: '远处的菌林深处，传来一声极轻的呼喊。那声音不像刚才的拟声菌团那样直接求救，而是断断续续地重复着某个名字。' },
+    { speaker: '布洛克', text: '「别跟着喊。也别问它在喊谁。」' },
+    { speaker: '艾琳', text: '「布洛克？」' },
+    { speaker: '布洛克', text: '「先找到声音的规律。回声菌林不会平白无故学人说话，除非它曾经听过很多遍。」' },
+    { speaker: '主持人', text: '蓝伞浅滩的冷光在你们身后逐渐暗下去。前方，旧路标、灰黑污染和布洛克沉默的表情一起指向了同一个地方。' },
   ],
   hints: [
     '跟随布洛克调查回声菌林',
@@ -1091,6 +1304,11 @@ const AFTER_BATTLE_BLUE_SHOAL: ScriptedScene = {
     '协助布洛克配置净化粉【自然DC14】',
   ],
 };
+
+// ============================================================
+// 蓝伞浅滩战后固定结算
+// ============================================================
+
 
 // ============================================================
 // 前线废弃据点
@@ -1220,6 +1438,8 @@ const BLACKSTONE_CORE_CHOICE: ScriptedScene = {
 
 export const SCRIPTED_SCENES: ScriptedScene[] = [
   OPENING,
+  OPENING_SUSPENSE,
+  TUTORIAL_BATTLE_AFTER,
   GUILD_ARRIVAL,
   TAVERN_INTRO,
   SALO_COMPANION_INTEL,

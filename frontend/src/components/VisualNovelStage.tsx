@@ -17,6 +17,7 @@ interface VisualNovelStageProps {
   scriptedBgOverride?: string | null;  // 脚本场景直接指定的背景图，绕过文本匹配
   visualResetKey?: number;
   onAdvance: () => void;
+  onLineFullyVisible?: (lineId: StoryLine['id']) => void;
 }
 
 function useTypewriter(text: string, speed = 20) {
@@ -73,6 +74,7 @@ export function VisualNovelStage({
   scriptedBgOverride,
   visualResetKey = 0,
   onAdvance,
+  onLineFullyVisible,
 }: VisualNovelStageProps) {
   const text = line?.text || '';
   const { visible, done, reveal } = useTypewriter(text, autoAdvance ? 0 : 20);
@@ -86,24 +88,22 @@ export function VisualNovelStage({
     if (line?.bgImage) setStickyBg(line.bgImage);
   }, [line?.bgImage]);
 
-  // 进入行动阶段时显示"选择行动"提示，1秒后自动消失
-  useEffect(() => {
-    if (!isActionPhase) {
-      actionPromptShownRef.current = false;
-      setShowActionPrompt(false);
-      return;
-    }
-
-    if (actionPanel && !actionPromptShownRef.current) {
-      actionPromptShownRef.current = true;
-      setShowActionPrompt(true);
-      actionPromptTimerRef.current = setTimeout(() => setShowActionPrompt(false), 1000);
-    }
-
-    return () => {
-      if (actionPromptTimerRef.current) clearTimeout(actionPromptTimerRef.current);
-    };
-  }, [isActionPhase, Boolean(actionPanel)]);
+  // "选择行动"特效（暂时关闭，避免 bug）
+  // useEffect(() => {
+  //   if (!isActionPhase) {
+  //     actionPromptShownRef.current = false;
+  //     setShowActionPrompt(false);
+  //     return;
+  //   }
+  //   if (actionPanel && !actionPromptShownRef.current) {
+  //     actionPromptShownRef.current = true;
+  //     setShowActionPrompt(true);
+  //     actionPromptTimerRef.current = setTimeout(() => setShowActionPrompt(false), 1000);
+  //   }
+  //   return () => {
+  //     if (actionPromptTimerRef.current) clearTimeout(actionPromptTimerRef.current);
+  //   };
+  // }, [isActionPhase, Boolean(actionPanel)]);
   const speaker = useMemo(
     () => resolveSpeakerName(line?.speaker || (isStreaming ? '主持人' : '')),
     [isStreaming, line?.speaker],
@@ -115,6 +115,11 @@ export function VisualNovelStage({
     if (!canAdvance) return '等待KP';
     return '下一句';
   }, [canAdvance, done, isActionPhase, isStreaming, line]);
+
+  useEffect(() => {
+    if (!line || !done || visible !== text) return;
+    onLineFullyVisible?.(line.id);
+  }, [done, line, onLineFullyVisible, text, visible]);
 
   // 场景背景图多阶段切换
   const FALLBACK_TRIGGER = '双脚重新落地时，一座倒悬于洞穴穹顶之上的城市出现在你面前';  // 子串匹配，兼容AI文本微小差异

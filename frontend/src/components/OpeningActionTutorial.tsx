@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
 
 export interface OpeningActionTutorialProps {
-  step: number;
-  total: number;
-  onPrevious: () => void;
-  onNext: () => void;
+  step?: number;
+  total?: number;
+  onPrevious?: () => void;
+  onNext?: () => void;
   onClose: () => void;
+  steps?: Array<{ title: string; body: string; badge: string }>;
 }
 
 export const OPENING_ACTION_TUTORIAL = [
@@ -32,15 +33,20 @@ export const OPENING_ACTION_TUTORIAL = [
 ];
 
 export function OpeningActionTutorial({
-  step,
-  total,
+  step: stepProp,
+  total: totalProp,
   onPrevious,
   onNext,
   onClose,
+  steps: stepsProp,
 }: OpeningActionTutorialProps) {
-  const item = OPENING_ACTION_TUTORIAL[step] ?? OPENING_ACTION_TUTORIAL[0];
+  const steps = stepsProp || OPENING_ACTION_TUTORIAL;
+  const step = stepProp ?? 0;
+  const total = totalProp ?? steps.length;
+  const item = steps[step] ?? steps[0];
   const isFirst = step <= 0;
   const isLast = step >= total - 1;
+  const isSingleStep = total <= 1;
 
   return (
     <motion.div
@@ -72,14 +78,19 @@ export function OpeningActionTutorial({
         <h2>{item.title}</h2>
         <p>{item.body}</p>
         <footer>
-          <button type="button" className="opening-action-tutorial-prev" disabled={isFirst} onClick={onPrevious}>
-            上一步
-          </button>
-          <small>
-            {step + 1} / {total}
-          </small>
-          <button type="button" className="opening-action-tutorial-next" onClick={onNext}>
-            {isLast ? '开始行动' : '下一步'}
+          {!isSingleStep && (
+            <button type="button" className="opening-action-tutorial-prev" disabled={isFirst} onClick={onPrevious}>
+              上一步
+            </button>
+          )}
+          {!isSingleStep && <small>{step + 1} / {total}</small>}
+          <button
+            type="button"
+            className="opening-action-tutorial-next"
+            onClick={isSingleStep ? onClose : onNext}
+            style={isSingleStep ? { marginLeft: 'auto', marginRight: 'auto' } : undefined}
+          >
+            {isSingleStep ? '确认' : isLast ? '开始行动' : '下一步'}
           </button>
         </footer>
       </motion.div>

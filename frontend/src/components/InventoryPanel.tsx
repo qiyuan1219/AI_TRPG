@@ -389,8 +389,7 @@ export function InventoryPanel({ state, onStatePatch }: InventoryPanelProps) {
   return (
     <div className="inventory-panel-entry">
       <button type="button" className="inventory-open-button" onClick={() => setIsOpen(true)}>
-        <span>背包</span>
-        <b>{items.length}</b>
+        背包
       </button>
 
       {isOpen && (

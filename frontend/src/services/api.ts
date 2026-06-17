@@ -230,6 +230,27 @@ export async function judgeAilinRecruitAnswer(payload: AilinRecruitAnswerPayload
   return response.json();
 }
 
+export interface SerlinIntroResult {
+  trustDelta: number;
+  maturityScore: number;
+  evaluation: string;
+  serlinReply: string;
+}
+
+export async function judgeSerlinIntro(playerAnswer: string): Promise<SerlinIntroResult> {
+  const response = await apiFetch(`${BASE}/serlin/intro-judge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ player_answer: playerAnswer }),
+  }, '瑟琳印象判定失败');
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '瑟琳印象判定失败'));
+  }
+
+  return response.json();
+}
+
 export async function startCompanionSideEvent(
   eventId = 'block_echo_forest',
   initialTrust = 55,

@@ -1,200 +1,115 @@
-import type { CharacterPreset, CompanionPreset } from '../types/game';
+import type { CharacterPreset, CompanionPreset, PlayerAttributes } from '../types/game';
 
-export const DND_CLASSES: CharacterPreset[] = [
+export const CLASS_TO_STYLE_MAP: Record<string, string> = {
+  warrior: 'iron-cable',
+  rogue: 'shadow-step',
+  mage: 'arcane-analysis',
+  wizard: 'arcane-analysis',
+  cleric: 'resonance',
+  paladin: 'balanced',
+  战士: 'iron-cable',
+  游荡者: 'shadow-step',
+  法师: 'arcane-analysis',
+  牧师: 'resonance',
+  圣骑士: 'balanced',
+};
+
+export const COMMON_COMBAT_SKILLS = [
   {
-    id: 'warrior',
-    name: '战士',
-    mark: 'W',
-    desc: '前排坦克，高 AC 高 HP。擅长把战斗压力拉到自己身上，也能用蛮力打开危险路线。',
-    stats: { str: 16, dex: 13, con: 15, int: 10, wis: 12, cha: 8 },
-    pros: ['最高 AC 和 HP', '近战压制稳定', '能替同伴承担风险'],
-    cons: ['远程乏力', '奥术与细致社交较弱'],
-    skills: {
-      combat: [
-        {
-          name: '压制斩',
-          kind: 'combat',
-          check: '攻击检定：力量+熟练 vs AC',
-          effect: '命中后造成武器伤害；若敌人正威胁队友，追加一次击退或缴械叙事机会。',
-        },
-        {
-          name: '盾墙嘲讽',
-          kind: 'combat',
-          check: '力量(运动) DC13 或 魅力(威吓) DC14',
-          effect: '成功后一个敌人下轮优先攻击你，指定同伴下一次防御或逃脱检定+2。',
-        },
-      ],
-      nonCombat: [
-        {
-          name: '破门开路',
-          kind: 'noncombat',
-          check: '力量(运动) DC12-18',
-          effect: '撞门、移石、撑住坍塌机关；失败会制造声响或造成少量伤害。',
-        },
-        {
-          name: '战场读势',
-          kind: 'noncombat',
-          check: '感知(洞悉) DC14',
-          effect: '读出伏击方向、敌人胆怯点或 Boss 的下一步战术。',
-        },
-      ],
-    },
+    name: '基础攻击',
+    kind: 'combat' as const,
+    check: '攻击检定：D20 + 熟练值 + 当前武器属性修正 vs AC',
+    effect: '命中后造成基础武器伤害。',
   },
   {
-    id: 'rogue',
-    name: '游荡者',
-    mark: 'R',
-    desc: '灵活刺客，高爆发偷袭。最适合承担潜入、开锁、拆陷阱和危险侦查。',
-    stats: { str: 10, dex: 16, con: 14, int: 12, wis: 13, cha: 8 },
-    pros: ['潜行先手偷袭', '解陷阱开锁主力', '高单体爆发'],
-    cons: ['脆皮不能扛', '需要队友配合'],
-    skills: {
-      combat: [
-        {
-          name: '偷袭',
-          kind: 'combat',
-          check: '攻击检定：敏捷+熟练 vs AC',
-          effect: '若目标被队友牵制或你处于隐藏，命中追加1d6伤害并暴露弱点。',
-        },
-        {
-          name: '烟雾脱离',
-          kind: 'combat',
-          check: '敏捷(杂技) DC13',
-          effect: '从近战威胁中撤离，成功后可顺势潜行或护送一名队友后撤。',
-        },
-      ],
-      nonCombat: [
-        {
-          name: '开锁拆陷',
-          kind: 'noncombat',
-          check: '敏捷(巧手/盗贼工具) DC12-18',
-          effect: '处理门锁、宝箱、压力板和毒针；失败可能消耗工具或触发弱化版陷阱。',
-        },
-        {
-          name: '暗处侦查',
-          kind: 'noncombat',
-          check: '敏捷(潜行) 对抗 感知(察觉)',
-          effect: '提前发现巡逻、暗门、偷听情报；大成功可给全队下一次行动优势。',
-        },
-      ],
-    },
+    name: '防守架势',
+    kind: 'combat' as const,
+    check: '本回合 AC +2，或获得少量临时护盾',
+    effect: '稳住站位，降低本轮被击穿的风险。',
   },
   {
-    id: 'wizard',
-    name: '法师',
-    mark: 'M',
-    desc: '远程炮台，法术轰炸。擅长奥术鉴定、符文谜题和用法术重写场景规则。',
-    stats: { str: 8, dex: 13, con: 14, int: 16, wis: 12, cha: 10 },
-    pros: ['AOE 清怪最强', '解谜调查主力', '法术花样多'],
-    cons: ['AC 最低最脆', '法术位有限'],
-    skills: {
-      combat: [
-        {
-          name: '炽焰爆裂',
-          kind: 'combat',
-          check: '智力(奥秘) DC14 或 法术攻击 vs AC',
-          effect: '塑形火焰打击多个炼狱污染生物；成功避免误伤队友，失败引发环境燃烧。',
-        },
-        {
-          name: '护盾反应',
-          kind: 'combat',
-          check: '智力(奥秘) DC13',
-          effect: '预判一次来袭攻击，成功后本轮 AC 临时+3或保护身旁队友。',
-        },
-      ],
-      nonCombat: [
-        {
-          name: '奥术鉴定',
-          kind: 'noncombat',
-          check: '智力(奥秘) DC12-18',
-          effect: '识别魔法物品、黑色方尖碑、封印符文和炼狱符纹，常能解锁额外剧情。',
-        },
-        {
-          name: '仪式解谜',
-          kind: 'noncombat',
-          check: '智力(调查/历史) DC14-18',
-          effect: '解读古代封印、推演时间锚点顺序；失败会推进危险计时。',
-        },
-      ],
-    },
+    name: '战术援护',
+    kind: 'combat' as const,
+    check: '指定一名队友，使其下一次命中检定 +2',
+    effect: '通过位置、提醒和压制为队友创造窗口。',
   },
   {
-    id: 'cleric',
-    name: '牧师',
-    mark: 'C',
-    desc: '治疗辅助，亡灵克星。擅长祝福、驱散、医治，以及辨认真伪神迹。',
-    stats: { str: 13, dex: 10, con: 14, int: 12, wis: 16, cha: 8 },
-    pros: ['唯一治疗职业', '炼狱污染特攻', '团队 buff'],
-    cons: ['输出较低', '仇恨高易被集火'],
-    skills: {
-      combat: [
-        {
-          name: '圣光打击',
-          kind: 'combat',
-          check: '攻击检定：感知+熟练 vs AC',
-          effect: '对炼狱污染生物造成光耀伤害；命中后可压制目标的暗影再生。',
-        },
-        {
-          name: '战地治疗',
-          kind: 'combat',
-          check: '感知(医药) DC12',
-          effect: '稳定濒死角色或恢复少量 HP；若消耗治疗药水，检定成功额外+2治疗。',
-        },
-      ],
-      nonCombat: [
-        {
-          name: '辨认真伪神迹',
-          kind: 'noncombat',
-          check: '感知(洞悉/宗教) DC13-17',
-          effect: '识破阿弗纳斯符纹、孢子幻觉伪装和被污染的圣物。',
-        },
-        {
-          name: '驱散诅咒',
-          kind: 'noncombat',
-          check: '感知(宗教) DC15-20',
-          effect: '解除临时属性惩罚、净化孢子污染或削弱黑石诅咒。',
-        },
-      ],
-    },
+    name: '应急处理',
+    kind: 'combat' as const,
+    check: '消耗道具或行动点，恢复少量生命，或移除轻度异常状态',
+    effect: '在短时间内稳定伤势或清理轻度负面效果。',
+  },
+];
+
+export const COMMON_NON_COMBAT_SKILLS = [
+  { name: '观察', kind: 'noncombat' as const, check: '感知 DC 12-18', effect: '观察周边异动、伏击和环境线索。' },
+  { name: '潜行', kind: 'noncombat' as const, check: '敏捷 DC 12-18', effect: '压低声息，绕开危险区域或提前侦察。' },
+  { name: '交涉', kind: 'noncombat' as const, check: '魅力 DC 12-18', effect: '安抚、说服、套话或压住场面。' },
+  { name: '解析', kind: 'noncombat' as const, check: '智力 DC 12-18', effect: '拆解规则、机关、文本和异常现象。' },
+  { name: '强行突破', kind: 'noncombat' as const, check: '力量 DC 12-18', effect: '撞开阻碍、搬运重物或强行推进。' },
+  { name: '耐受', kind: 'noncombat' as const, check: '体质 DC 12-18', effect: '扛住污染、疲劳、缺氧和持续压迫。' },
+];
+
+export const PLAYER_STYLES: CharacterPreset[] = [
+  {
+    id: 'iron-cable',
+    name: '铁缆流',
+    hotkey: 'W',
+    tagline: '稳健抗压，适合正面承受风险。',
+    summary: '体质与力量较高，血量最高，适合在危险环境中稳定推进。',
+    attributes: { str: 15, dex: 10, con: 16, int: 10, wis: 12, cha: 10 },
+    derived: { hp: 45, ac: 13, initiativeModifier: 0 },
+    advantages: ['血量最高', '力量与体质检定稳定', '适合承受危险'],
+    limitations: ['先攻较低', '潜行与交涉普通', '解谜与奥术分析不突出'],
+    skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
   },
   {
-    id: 'paladin',
-    name: '圣骑士',
-    mark: 'P',
-    desc: '攻守兼备，魅力领袖。善于谈判、审判誓言，也能在 Boss 战里爆发圣光。',
-    stats: { str: 15, dex: 10, con: 13, int: 8, wis: 12, cha: 14 },
-    pros: ['攻守均衡', '魅力社交优势', 'Boss 战爆发'],
-    cons: ['各方面不突出', '法术位少'],
-    skills: {
-      combat: [
-        {
-          name: '神圣一击',
-          kind: 'combat',
-          check: '攻击检定：力量+熟练 vs AC',
-          effect: '命中后可追加光耀爆发；对恶魔、炼狱污染生物和誓敌特别有效。',
-        },
-        {
-          name: '守护灵光',
-          kind: 'combat',
-          check: '魅力(说服/宗教) DC13',
-          effect: '鼓舞队友抵抗恐惧或魅惑，全队下一次相关豁免+2。',
-        },
-      ],
-      nonCombat: [
-        {
-          name: '威严谈判',
-          kind: 'noncombat',
-          check: '魅力(说服/威吓) DC12-18',
-          effect: '压住争执、争取守卫配合、逼问俘虏；失败会让对方警觉或索要代价。',
-        },
-        {
-          name: '誓言审判',
-          kind: 'noncombat',
-          check: '感知(洞悉) 或 魅力(宗教) DC14-18',
-          effect: '判断莱因的记忆、黑石的污染是否源自邪恶力量。',
-        },
-      ],
-    },
+    id: 'shadow-step',
+    name: '影步流',
+    hotkey: 'R',
+    tagline: '敏捷侦察，适合先手行动。',
+    summary: '敏捷与感知较高，擅长潜行、侦察、发现陷阱和规避伏击。',
+    attributes: { str: 10, dex: 16, con: 12, int: 10, wis: 15, cha: 10 },
+    derived: { hp: 39, ac: 16, initiativeModifier: 3 },
+    advantages: ['先攻最高', '潜行与侦察能力强', '容易发现陷阱和伏击'],
+    limitations: ['血量一般', '力量检定普通', '交涉与奥术分析不突出'],
+    skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
+  },
+  {
+    id: 'arcane-analysis',
+    name: '秘析流',
+    hotkey: 'M',
+    tagline: '理性分析，适合解谜和识破异常。',
+    summary: '智力与感知较高，擅长奥术、历史、机关、异常规则和线索分析。',
+    attributes: { str: 8, dex: 12, con: 12, int: 16, wis: 15, cha: 10 },
+    derived: { hp: 39, ac: 14, initiativeModifier: 1 },
+    advantages: ['智力最高', '解谜与奥术检定强', '容易识破异常规则'],
+    limitations: ['力量最低', '近身压制和搬运较弱', '交涉能力普通'],
+    skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
+  },
+  {
+    id: 'resonance',
+    name: '共鸣流',
+    hotkey: 'C',
+    tagline: '善于共情，适合交涉和建立信任。',
+    summary: '魅力最高，兼具一定感知，擅长交涉、安抚、套话和提升 NPC 信任。',
+    attributes: { str: 8, dex: 12, con: 12, int: 12, wis: 13, cha: 16 },
+    derived: { hp: 39, ac: 14, initiativeModifier: 1 },
+    advantages: ['魅力最高', '交涉和安抚能力强', '更容易提升 NPC 信任'],
+    limitations: ['力量较弱', '硬碰硬能力不突出', '高难度奥术分析不如秘析流'],
+    skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
+  },
+  {
+    id: 'balanced',
+    name: '均衡流',
+    hotkey: 'P',
+    tagline: '六维均衡，适合第一次游玩。',
+    summary: '没有明显短板，所有检定都有基础表现，适合想体验完整内容的新手。',
+    attributes: { str: 12, dex: 12, con: 13, int: 12, wis: 12, cha: 12 },
+    derived: { hp: 39, ac: 14, initiativeModifier: 1 },
+    advantages: ['没有明显短板', '所有检定都有基础加值', '适合体验完整内容'],
+    limitations: ['没有极端强项', '高 DC 检定不如专精流派', '战斗和剧情都偏稳但不爆发'],
+    skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
   },
 ];
 
@@ -500,13 +415,111 @@ export function abilityModifier(value: number) {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
-export function presetHp(constitution: number) {
-  return constitution <= 10 ? constitution : constitution * 3;
+export function abilityModifierValue(value: number) {
+  return Math.floor((value - 10) / 2);
 }
 
-export function presetAc(classId: string) {
-  if (classId === 'warrior' || classId === 'paladin') return 18;
-  if (classId === 'cleric') return 16;
-  if (classId === 'rogue') return 15;
-  return 13;
+export function getMaxHp(attributes: PlayerAttributes) {
+  return 36 + abilityModifierValue(attributes.con) * 3;
+}
+
+export function getAc(attributes: PlayerAttributes) {
+  return 13 + abilityModifierValue(attributes.dex);
+}
+
+export function getInitiativeModifier(attributes: PlayerAttributes) {
+  return abilityModifierValue(attributes.dex);
+}
+
+export function getPlayerStyleById(styleId: string) {
+  return PLAYER_STYLES.find((item) => item.id === styleId) || PLAYER_STYLES.find((item) => item.id === 'balanced')!;
+}
+
+export function getPlayerStyleByName(name: string) {
+  return PLAYER_STYLES.find((item) => item.name === name) || null;
+}
+
+function readAttributes(source: any): PlayerAttributes | null {
+  if (!source || typeof source !== 'object') return null;
+  const keys: Array<keyof PlayerAttributes> = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+  if (!keys.every((key) => Number.isFinite(Number(source[key])))) return null;
+  return {
+    str: Number(source.str),
+    dex: Number(source.dex),
+    con: Number(source.con),
+    int: Number(source.int),
+    wis: Number(source.wis),
+    cha: Number(source.cha),
+  };
+}
+
+export function migrateClassToStyleState<T extends Record<string, any>>(state: T): T {
+  if (!state || typeof state !== 'object') return state;
+  const player = state.player && typeof state.player === 'object' ? state.player : {};
+  const pendingSelection = Boolean(state.style_selection_pending) && !state.selectedStyleId && !player.styleId;
+  const explicitStyleId = String(state.selectedStyleId || state.selected_style_id || player.styleId || '').trim();
+  const explicitStyleName = String(state.style_name || player.styleName || '').trim();
+  const legacyClass = String(state.selectedClassId || state.char_class || '').trim();
+
+  if (pendingSelection && legacyClass === '待确认流派') {
+    const pendingAttrs = readAttributes(player.attributes) || readAttributes(state) || getPlayerStyleById('balanced').attributes;
+    const pendingHp = getMaxHp(pendingAttrs);
+    return {
+      ...state,
+      char_class: '待确认流派',
+      style_name: '待确认流派',
+      selectedStyleId: '',
+      selected_style_id: '',
+      selectedClassId: undefined,
+      player: {
+        ...player,
+        styleId: '',
+        styleName: '待确认流派',
+        attributes: pendingAttrs,
+        maxHp: pendingHp,
+        hp: Math.min(Number(state.current_hp ?? player.hp ?? pendingHp), pendingHp),
+        ac: getAc(pendingAttrs),
+      },
+      ...pendingAttrs,
+      current_hp: Math.min(Number(state.current_hp ?? player.hp ?? pendingHp), pendingHp),
+      max_hp: pendingHp,
+      ac: getAc(pendingAttrs),
+      initiative_modifier: getInitiativeModifier(pendingAttrs),
+    };
+  }
+
+  let style = explicitStyleId ? getPlayerStyleById(explicitStyleId) : null;
+  if (!style && explicitStyleName) style = getPlayerStyleByName(explicitStyleName);
+  if (!style) {
+    const mappedStyleId = CLASS_TO_STYLE_MAP[legacyClass] || 'balanced';
+    style = getPlayerStyleById(mappedStyleId);
+  }
+  const hasExplicitStyle = Boolean(explicitStyleId || explicitStyleName);
+  const attributes = (hasExplicitStyle ? (readAttributes(player.attributes) || readAttributes(state)) : null) || style.attributes;
+  const maxHp = getMaxHp(attributes);
+  const currentHp = Math.min(Number(state.current_hp ?? player.hp ?? maxHp), maxHp);
+
+  return {
+    ...state,
+    char_class: style.name,
+    style_name: style.name,
+    selectedStyleId: style.id,
+    selected_style_id: style.id,
+    selectedClassId: undefined,
+    style_selection_pending: false,
+    player: {
+      ...player,
+      styleId: style.id,
+      styleName: style.name,
+      attributes,
+      maxHp,
+      hp: currentHp,
+      ac: getAc(attributes),
+    },
+    ...attributes,
+    current_hp: currentHp,
+    max_hp: maxHp,
+    ac: getAc(attributes),
+    initiative_modifier: getInitiativeModifier(attributes),
+  };
 }

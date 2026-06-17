@@ -16,6 +16,7 @@ from kp.dm_service import (
     dm_battle_narrate,
     dm_judge_advantage,
     judge_ailin_recruit_answer,
+    judge_serlin_self_introduction,
 )
 from kp.memory import (
     get_game_memories,
@@ -30,7 +31,15 @@ from kp.memory import (
     save_memory,
     search_memory,
 )
-from engine.rules_dnd import CLASS_PRESETS, PROFICIENCY_BONUS, modifier, skill_check, validate_character
+from engine.rules_dnd import (
+    PROFICIENCY_BONUS,
+    derive_player_combat_stats,
+    modifier,
+    normalize_player_style_state,
+    resolve_player_style,
+    skill_check,
+    validate_character,
+)
 from engine.investigation_rewards import (
     action_check_for_message,
     apply_investigation_rewards,
@@ -43,7 +52,7 @@ from logger import get_logger, new_session
 router_dnd = APIRouter(prefix="/api/dnd")
 OPENING_TIMEOUT = 30
 init_db()
-SAVE_SLOT_KEYS = {"auto", "slot-1", "slot-2", "slot-3", "slot-4", "slot-5"}
+SAVE_SLOT_KEYS = {"auto", "slot-1", "slot-2", "slot-3", "slot-4", "slot-5", "slot-6", "slot-7", "slot-8", "slot-9", "slot-10"}
 
 # 对话历史缓存（每局游戏保留最近 20 轮）
 _chat_history: dict[str, list[dict]] = {}
@@ -193,14 +202,17 @@ def _sanitize_state_in_place(state: dict) -> dict:
 # ============================================================
 class CreateDNDRequest(BaseModel):
     player_name: str = "冒险者"
-    char_class: str = "战士"
-    attr_str: int = 16
-    attr_dex: int = 13
-    attr_con: int = 15
-    attr_int: int = 10
+    char_class: str = "待确认流派"
+    attr_str: int = 12
+    attr_dex: int = 12
+    attr_con: int = 13
+    attr_int: int = 12
     attr_wis: int = 12
-    attr_cha: int = 8
+    attr_cha: int = 12
     level: int = 3
+    skip_opening: bool = False
+    selected_style_id: str | None = None
+    style_selection_pending: bool = False
 
 class ChatRequest(BaseModel):
     game_id: str
@@ -226,6 +238,10 @@ class AilinRecruitAnswerRequest(BaseModel):
     player_name: str = "冒险者"
     player_answer: str
     current_trust: int = 55
+
+
+class SerlinIntroRequest(BaseModel):
+    player_answer: str
 
 
 class MiniGameCommentaryRequest(BaseModel):
@@ -502,22 +518,51 @@ FALLBACK_OPENING = (
 @router_dnd.post("/game/create")
 async def create_dnd_game(req: CreateDNDRequest):
     gid = str(uuid.uuid4())[:8]
-    preset = CLASS_PRESETS.get(req.char_class, CLASS_PRESETS["战士"])
+    style = resolve_player_style(req.selected_style_id, req.char_class, req.char_class)
+    attributes = {
+        "str": req.attr_str,
+        "dex": req.attr_dex,
+        "con": req.attr_con,
+        "int": req.attr_int,
+        "wis": req.attr_wis,
+        "cha": req.attr_cha,
+    }
+    derived = derive_player_combat_stats(attributes)
+    style_selection_pending = bool(req.style_selection_pending)
+    if style_selection_pending:
+        style_name = "待确认流派"
+        selected_style_id = ""
+    else:
+        style_name = style["name"]
+        selected_style_id = style["id"]
 
     state = {
         "player_name": req.player_name,
-        "char_class": req.char_class,
+        "char_class": style_name,
+        "style_name": style_name,
+        "selectedStyleId": selected_style_id,
+        "selected_style_id": selected_style_id,
+        "style_selection_pending": style_selection_pending,
         "level": req.level,
         "current_area": "逆穹悬城·入城平台",
         "actions_in_area": 0,
         "cleared_levels": 0,
-        "str": req.attr_str, "dex": req.attr_dex, "con": req.attr_con,
-        "int": req.attr_int, "wis": req.attr_wis, "cha": req.attr_cha,
-        "current_hp": preset["hp"], "max_hp": preset["hp"], "ac": preset["ac"],
-        "atk_bonus": preset.get("atk_bonus", 5),
+        "str": attributes["str"], "dex": attributes["dex"], "con": attributes["con"],
+        "int": attributes["int"], "wis": attributes["wis"], "cha": attributes["cha"],
+        "current_hp": derived["hp"], "max_hp": derived["hp"], "ac": derived["ac"],
+        "initiative_modifier": derived["initiative_modifier"],
+        "atk_bonus": derived["atk_bonus"],
         "proficiency_bonus": PROFICIENCY_BONUS.get(req.level, 2),
         "gold": 400,
         "inventory": "长剑,冒险者工具包,治疗药水x2",
+        "player": {
+            "styleId": selected_style_id,
+            "styleName": style_name,
+            "attributes": attributes,
+            "maxHp": derived["hp"],
+            "hp": derived["hp"],
+            "ac": derived["ac"],
+        },
         "guild_registered": False,
         "city_map_unlocked": False,
         "blackmarket_unlocked": False,
@@ -545,17 +590,18 @@ async def create_dnd_game(req: CreateDNDRequest):
         },
         "last_event": "抵达逆穹悬城入城平台，第一次遭遇裂隙爬兽。",
     }
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     save_game_state(gid, state)
-    save_memory(gid, f"游戏开始。{req.player_name}，{req.char_class}，接受委托来到逆穹悬城。")
+    save_memory(gid, f"游戏开始。{req.player_name}，{state.get('char_class') or req.char_class}，接受委托来到逆穹悬城。")
 
     opening_text = FALLBACK_OPENING.replace("{name}", req.player_name)
     _chat_history[gid] = [{"role": "assistant", "content": opening_text}]
 
     sid, log = new_session(
         req.player_name,
-        req.char_class,
+        str(state.get("char_class") or req.char_class),
         {"attr_str": req.attr_str, "attr_dex": req.attr_dex, "attr_con": req.attr_con,
          "attr_int": req.attr_int, "attr_wis": req.attr_wis, "attr_cha": req.attr_cha},
         opening_text,
@@ -575,6 +621,7 @@ async def get_state(game_id: str):
     state = load_game_state(game_id)
     if not state:
         raise HTTPException(404, "游戏不存在")
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     save_game_state(game_id, state)
@@ -586,6 +633,7 @@ async def get_trust(game_id: str):
     state = load_game_state(game_id)
     if not state:
         raise HTTPException(404, "游戏不存在")
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     save_game_state(game_id, state)
@@ -597,6 +645,7 @@ async def patch_state(game_id: str, req: StatePatchRequest):
     state = load_game_state(game_id)
     if not state:
         raise HTTPException(404, "游戏不存在")
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     old_trust = dict(state.get("companionTrust", {}))
@@ -620,6 +669,7 @@ async def patch_state(game_id: str, req: StatePatchRequest):
     if recruited:
         state["recruited_companions"] = ",".join(recruited)
 
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     record_trust_patch_changes(
         state,
@@ -650,6 +700,7 @@ async def save_current_game(game_id: str, req: SaveGameRequest):
         client_state.pop("game_id", None)
         client_state.pop("id", None)
         state.update(client_state)
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     title = _build_save_title(req.slot_key, state, req.title)
@@ -687,6 +738,7 @@ async def load_saved_game(slot_key: str):
 
     game_id = save["game_id"]
     state = dict(save["state"])
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     save["state"] = state
@@ -758,6 +810,14 @@ async def judge_ailin_recruit(req: AilinRecruitAnswerRequest):
     )
 
 
+@router_dnd.post("/serlin/intro-judge")
+async def judge_serlin_intro(req: SerlinIntroRequest):
+    player_answer = req.player_answer.strip()
+    if not player_answer:
+        raise HTTPException(400, "介绍不能为空")
+    return await judge_serlin_self_introduction(player_answer=player_answer)
+
+
 @router_dnd.post("/mini-game/commentary")
 async def mini_game_commentary(req: MiniGameCommentaryRequest):
     character = req.character.strip().lower()
@@ -791,6 +851,7 @@ async def chat_stream(req: ChatRequest):
     state = load_game_state(req.game_id)
     if not state:
         raise HTTPException(404, "游戏不存在")
+    normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     recorded_message = _sanitize_persisted_text(req.visible_message or req.message)

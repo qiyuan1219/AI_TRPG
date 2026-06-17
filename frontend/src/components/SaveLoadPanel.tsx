@@ -1,14 +1,12 @@
+import { useState } from 'react';
 import type { SaveSlotKey, SaveSlotSummary } from '../types/game';
 
-export const SAVE_SLOT_KEYS: SaveSlotKey[] = ['auto', 'slot-1', 'slot-2', 'slot-3', 'slot-4', 'slot-5'];
+export const SAVE_SLOT_KEYS: SaveSlotKey[] = ['auto', 'slot-1', 'slot-2', 'slot-3', 'slot-4', 'slot-5', 'slot-6', 'slot-7', 'slot-8', 'slot-9', 'slot-10'];
 
 const SLOT_LABELS: Record<SaveSlotKey, string> = {
   auto: '自动存档',
-  'slot-1': '存档一',
-  'slot-2': '存档二',
-  'slot-3': '存档三',
-  'slot-4': '存档四',
-  'slot-5': '存档五',
+  'slot-1': '存档一', 'slot-2': '存档二', 'slot-3': '存档三', 'slot-4': '存档四', 'slot-5': '存档五',
+  'slot-6': '存档六', 'slot-7': '存档七', 'slot-8': '存档八', 'slot-9': '存档九', 'slot-10': '存档十',
 };
 
 interface SaveLoadPanelProps {
@@ -19,7 +17,7 @@ interface SaveLoadPanelProps {
   messageTone?: 'neutral' | 'success' | 'error';
   title?: string;
   onRefresh?: () => void;
-  onSave?: (slotKey: SaveSlotKey) => void;
+  onSave?: (slotKey: SaveSlotKey, customTitle?: string) => void;
   onLoad: (slotKey: SaveSlotKey) => void;
 }
 
@@ -51,6 +49,7 @@ export function SaveLoadPanel({
 }: SaveLoadPanelProps) {
   const saveBySlot = new Map(saves.map((save) => [save.slot_key, save]));
   const hasBusySlot = Boolean(busySlot);
+  const [customTitles, setCustomTitles] = useState<Record<string, string>>({});
 
   return (
     <div className="save-load-panel">
@@ -70,11 +69,24 @@ export function SaveLoadPanel({
           const save = saveBySlot.get(slotKey);
           const isBusy = busySlot === slotKey;
           const isAutoSlot = slotKey === 'auto';
+          const customTitle = customTitles[slotKey] || '';
+          const displayTitle = customTitle || save?.title || SLOT_LABELS[slotKey];
 
           return (
             <div key={slotKey} className={`save-slot ${save ? 'has-save' : ''} ${isAutoSlot ? 'is-auto-save' : ''}`}>
               <div className="save-slot-copy">
-                <strong>{save?.title || SLOT_LABELS[slotKey]}</strong>
+                {!isAutoSlot && (onSave || save) ? (
+                  <input
+                    className="save-title-input"
+                    type="text"
+                    value={customTitle}
+                    placeholder={save?.title || SLOT_LABELS[slotKey]}
+                    maxLength={30}
+                    onChange={(e) => setCustomTitles((prev) => ({ ...prev, [slotKey]: e.target.value }))}
+                  />
+                ) : (
+                  <strong>{displayTitle}</strong>
+                )}
                 <small>
                   {save
                     ? `${save.player_name} · ${save.char_class} Lv.${save.level}`
@@ -85,7 +97,7 @@ export function SaveLoadPanel({
 
               <div className="save-slot-actions">
                 {onSave && !isAutoSlot && (
-                  <button type="button" onClick={() => onSave(slotKey)} disabled={disabled || hasBusySlot}>
+                  <button type="button" onClick={() => onSave(slotKey, customTitle || undefined)} disabled={disabled || hasBusySlot}>
                     {isBusy ? '...' : '存'}
                   </button>
                 )}
