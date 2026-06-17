@@ -330,6 +330,8 @@ class BattleEngine:
         self.state["phase"] = RESOLVE_ACTION
         dice = DiceService(seed=seed, fixed_rolls=list(fixed_rolls or []))
         target = targets[0]
+        if action.get("aiTactic"):
+            events.append({"type": "ai_tactic", **action["aiTactic"]})
         events.append({"type": "action_declared", "actorId": actor["id"], "skillId": skill["id"], "targetIds": [target["id"] for target in targets]})
         if skill.get("requiresHitRoll"):
             roll = dice.roll_die(20, f"{actor['name']} {skill['name']} attack")
@@ -362,6 +364,9 @@ class BattleEngine:
         actor = self.current_actor()
         if not actor or actor["team"] != "enemy":
             raise ValueError("current actor is not enemy")
+        tactical = self.choose_tactical_action(actor)
+        if tactical:
+            return tactical
         legal = self.legal_actions_for(actor)
         if not legal:
             return {"actorId": actor["id"], "skillId": actor["skillIds"][0], "targetIds": []}
@@ -370,6 +375,46 @@ class BattleEngine:
         living = [target for target in targets if target and target.get("alive", True)]
         living.sort(key=lambda item: item["combatStats"]["hp"] / max(item["combatStats"]["maxHp"], 1))
         return {"actorId": actor["id"], "skillId": action["skillId"], "targetIds": [living[0]["id"]]}
+
+    def choose_tactical_action(self, actor: dict | None = None) -> dict | None:
+        actor = actor or self.current_actor()
+        if not actor or not actor.get("alive", True):
+            return None
+
+        legal = self.legal_actions_for(actor)
+        best: dict | None = None
+        for action in legal:
+            skill = self.state["skills"].get(action["skillId"])
+            if not skill:
+                continue
+            targets = [self.get_character(target_id) for target_id in action["allowedTargetIds"]]
+            for target in [item for item in targets if item and item.get("alive", True)]:
+                score, intent, reason = self._score_tactical_target(actor, skill, target)
+                if best is None or score > best["score"]:
+                    best = {
+                        "actorId": actor["id"],
+                        "skillId": skill["id"],
+                        "targetIds": [target["id"]],
+                        "score": score,
+                        "intent": intent,
+                        "reason": reason,
+                    }
+
+        if not best:
+            return None
+
+        score = best.pop("score")
+        best["aiTactic"] = {
+            "actorId": actor["id"],
+            "skillId": best["skillId"],
+            "targetIds": best["targetIds"],
+            "intent": best["intent"],
+            "confidence": max(54, min(96, int(score))),
+            "reason": best["reason"],
+        }
+        best.pop("intent", None)
+        best.pop("reason", None)
+        return best
 
     def _targets_for(self, actor: dict, skill: dict) -> list[dict]:
         target_type = skill.get("targetType", "single_enemy")
@@ -381,6 +426,31 @@ class BattleEngine:
         if target_type in {"single_enemy", "all_enemies"}:
             return [item for item in living if item["team"] != actor["team"]]
         return []
+
+    def _score_tactical_target(self, actor: dict, skill: dict, target: dict) -> tuple[float, str, str]:
+        hp = target["combatStats"]["hp"]
+        max_hp = max(target["combatStats"]["maxHp"], 1)
+        hp_ratio = hp / max_hp
+
+        if skill.get("healingDice"):
+            score = (1 - hp_ratio) * 100
+            reason = f"{target['name']} HP偏低，优先治疗保持行动力"
+            if hp_ratio < 0.35:
+                score += 30
+            return score, "heal", reason
+
+        if skill.get("tempHpDice") or any(effect.get("type") == "defense_bonus" for effect in skill.get("effects", []) if isinstance(effect, dict)):
+            score = 52 + (1 - hp_ratio) * 28
+            return score, "protect", f"{target['name']}承压较高，防护可提高下一轮容错"
+
+        estimate = _estimate_skill_amount(skill)
+        defense_pressure = max(0, 18 - self._defense(target))
+        score = 34 + (1 - hp_ratio) * 35 + defense_pressure
+        if hp <= estimate + 2:
+            return score + 40, "finish", f"{target['name']}剩余HP{hp}，有机会直接击倒"
+        if skill.get("targetType") in {"all_enemies", "all_allies"}:
+            return score + 22, "pressure", f"{skill['name']}可覆盖多个目标，适合压低整条战线"
+        return score, "pressure", f"{target['name']}当前血线适合集火压制"
 
     def _defense(self, target: dict) -> int:
         bonus = sum(status.get("value", 0) for status in target.get("statuses", []) if isinstance(status, dict) and status.get("type") == "defense_bonus")
@@ -475,3 +545,15 @@ def _double_dice(formula: str) -> str:
         return formula
     count = int(match.group(1) or 1) * 2
     return f"{count}d{match.group(2)}{match.group(3)}"
+
+
+def _estimate_skill_amount(skill: dict) -> int:
+    import re
+    formula = str(skill.get("damageDice") or skill.get("healingDice") or skill.get("tempHpDice") or "1d4")
+    total = 0.0
+    for count, sides, bonus in re.findall(r"(\d*)d(\d+)([+-]\d+)?", formula, re.I):
+        dice_count = int(count or 1)
+        die_sides = int(sides)
+        flat_bonus = int(bonus or 0)
+        total += dice_count * ((die_sides + 1) / 2) + flat_bonus
+    return max(1, round(total or 4))

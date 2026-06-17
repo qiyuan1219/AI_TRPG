@@ -7,7 +7,16 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from kp.dm_service import dm_chat_stream, dm_narrate_stream, judge_black_market_bargain, dm_battle_narrate, dm_judge_advantage, judge_ailin_recruit_answer
+from kp.dm_service import (
+    dm_chat_stream,
+    dm_mini_game_commentary,
+    dm_narrate_stream,
+    dm_shop_consult,
+    judge_black_market_bargain,
+    dm_battle_narrate,
+    dm_judge_advantage,
+    judge_ailin_recruit_answer,
+)
 from kp.memory import (
     get_game_memories,
     get_recent_memories,
@@ -144,7 +153,39 @@ def _strip_player_protocol_text(text: str) -> str:
     protocol_filter = PlayerProtocolFilter()
     visible, _ = protocol_filter.feed(text or "")
     tail, _ = protocol_filter.flush()
-    return (visible + tail).strip()
+    return _strip_phase_limit_notice(visible + tail).strip()
+
+
+_PHASE_LIMIT_NOTICE_RE = re.compile(
+    r"(?:\r?\n)?[\[【]\s*系统提示\s*[:：]\s*这是本阶段第\s*\d+\s*/\s*\d+\s*次选择行动。?"
+    r"请在完成本次叙事后直接推进到下一段剧情，不要继续停留在当前选择阶段。?\s*[\]】]",
+    re.MULTILINE,
+)
+
+
+def _strip_phase_limit_notice(text: str) -> str:
+    return _PHASE_LIMIT_NOTICE_RE.sub("", str(text or "")).strip()
+
+
+def _sanitize_persisted_text(text: str) -> str:
+    return _strip_player_protocol_text(_strip_phase_limit_notice(text))
+
+
+def _sanitize_for_persistence(value):
+    if isinstance(value, str):
+        return _sanitize_persisted_text(value)
+    if isinstance(value, list):
+        return [_sanitize_for_persistence(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _sanitize_for_persistence(item) for key, item in value.items()}
+    return value
+
+
+def _sanitize_state_in_place(state: dict) -> dict:
+    sanitized = _sanitize_for_persistence(state)
+    state.clear()
+    state.update(sanitized)
+    return state
 
 
 # ============================================================
@@ -164,6 +205,7 @@ class CreateDNDRequest(BaseModel):
 class ChatRequest(BaseModel):
     game_id: str
     message: str
+    visible_message: str | None = None
 
 
 class BargainJudgeRequest(BaseModel):
@@ -186,9 +228,25 @@ class AilinRecruitAnswerRequest(BaseModel):
     current_trust: int = 55
 
 
+class MiniGameCommentaryRequest(BaseModel):
+    character: str
+    event: str
+    context: dict = Field(default_factory=dict)
+
+
+class ShopConsultRequest(BaseModel):
+    item_id: str
+    name: str
+    desc: str
+    price: int = 0
+    type: str = ""
+    stat: str | None = None
+
+
 class SaveGameRequest(BaseModel):
     slot_key: str
     title: str | None = None
+    state: dict | None = None
     story: list[dict] = Field(default_factory=list)
     suggestions: list[dict] = Field(default_factory=list)
     active_index: int = 0
@@ -204,6 +262,27 @@ def _validate_slot_key(slot_key: str):
         raise HTTPException(400, "鏃犳晥鐨勫瓨妗ｄ綅")
 
 
+def _save_title_area(state: dict) -> str:
+    scene_state = state.get("sceneState") if isinstance(state.get("sceneState"), dict) else {}
+    scene_id = str(scene_state.get("currentScene") or "")
+    if scene_id == "elevator-descent" or state.get("elevator_descent_started"):
+        return "缆梯垂降途中"
+    if scene_id == "elevator-hub" or state.get("elevator_hub_visited"):
+        return "降渊缆梯中枢"
+    if scene_id == "guild-final-registration" or state.get("expedition_registered"):
+        return "最终公会登记"
+    return str(state.get("current_area") or "未知区域")
+
+
+def _build_save_title(slot_key: str, state: dict, requested_title: str | None = None) -> str:
+    if slot_key == "auto":
+        return f"自动 · {state.get('player_name', '冒险者')} · {_save_title_area(state)}"
+    title = (requested_title or "").strip()
+    if title:
+        return title
+    return f"{state.get('player_name', '冒险者')} · {_save_title_area(state)}"
+
+
 # ============================================================
 # DC妯″紡棰勯
 # ============================================================
@@ -211,10 +290,16 @@ _ATTR_MAP = {
     "智力": "int", "敏捷": "dex", "力量": "str",
     "感知": "wis", "洞悉": "wis", "魅力": "cha", "体质": "con",
     "调查": "int", "历史": "int", "奥秘": "int",
-    "察觉": "wis", "生存": "wis", "医药": "wis", "宗教": "wis",
+    "察觉": "wis", "生存": "wis", "医药": "wis", "宗教": "wis", "自然": "wis",
     "巧手": "dex", "盗贼工具": "dex", "盗贼": "dex", "潜行": "dex", "杂技": "dex", "闪避": "dex",
     "说服": "cha", "威吓": "cha", "欺瞒": "cha", "人脉": "cha", "谈判": "cha",
     "运动": "str", "破门": "str",
+}
+
+# 六维属性中文名映射（用于骰子结算展示）
+_STAT_TO_DND_NAME = {
+    "str": "力量", "dex": "敏捷", "con": "体质",
+    "int": "智力", "wis": "感知", "cha": "魅力",
 }
 _DC_BRACKET_RE = re.compile(
     r"[\[【]\s*([^\]】\n]{1,40}?)\s*(?:DC|ＤＣ)\s*(\d{1,2})(?:\s*[-~—到至]\s*\d{1,2})?\s*[\]】]",
@@ -318,7 +403,15 @@ def _preroll_if_dc(message: str, state: dict) -> tuple[str | None, str]:
     check_label, stat_mod, prof_bonus = _resolve_check(attr_name, message, state)
     result = skill_check(stat_mod, prof_bonus, dc)
     result_dict = result.to_dict()
-    result_dict["属性"] = f"{check_label}(检定)"
+
+    # 确定六维属性中文名 + 拆解加值明细
+    stat_key, _ = _infer_player_stat(attr_name, message)
+    dnd_ability = _STAT_TO_DND_NAME.get(stat_key, "智力")
+    result_dict["六维"] = dnd_ability
+    result_dict["属性"] = check_label
+    result_dict["属性加值"] = stat_mod
+    result_dict["熟练加值"] = prof_bonus
+
     system_event = f"[SYSTEM:skill_check:{json.dumps(result_dict, ensure_ascii=False)}]"
 
     label = "成功" if result.success else "失败"
@@ -552,15 +645,22 @@ async def save_current_game(game_id: str, req: SaveGameRequest):
     state = load_game_state(game_id)
     if not state:
         raise HTTPException(404, "游戏不存在")
+    if isinstance(req.state, dict) and req.state:
+        client_state = dict(_sanitize_for_persistence(req.state))
+        client_state.pop("game_id", None)
+        client_state.pop("id", None)
+        state.update(client_state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
-
-    title = (req.title or "").strip()
-    if not title:
-        title = f"{state.get('player_name', '冒险者')} · {state.get('current_area', '未知区域')}"
+    title = _build_save_title(req.slot_key, state, req.title)
 
     phase = req.phase if req.phase in {"narrating", "action"} else "action"
-    story = req.story[-120:]
+    state = _sanitize_for_persistence(state)
+    save_game_state(game_id, state)
+    story = _sanitize_for_persistence(req.story[-120:])
+    suggestions = _sanitize_for_persistence(req.suggestions[:6])
+    chat_history = _sanitize_for_persistence(_chat_history.get(game_id, [])[-MAX_HISTORY:])
+    memories = _sanitize_for_persistence(get_game_memories(game_id))
     story_offset = max(0, len(req.story) - len(story))
     active_index = min(max(0, req.active_index - story_offset), max(len(story) - 1, 0))
     save = save_game_slot(
@@ -569,11 +669,11 @@ async def save_current_game(game_id: str, req: SaveGameRequest):
         game_id,
         state,
         story,
-        req.suggestions[:6],
+        suggestions,
         active_index,
         phase,
-        _chat_history.get(game_id, [])[-MAX_HISTORY:],
-        get_game_memories(game_id),
+        chat_history,
+        memories,
     )
     return {"save": save}
 
@@ -590,6 +690,9 @@ async def load_saved_game(slot_key: str):
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
     save["state"] = state
+    save["summary"]["title"] = _build_save_title(slot_key, state, save["summary"].get("title"))
+    save["summary"]["current_area"] = state.get("current_area", "未知区域")
+    save["summary"]["last_event"] = state.get("last_event", save["summary"].get("last_event", ""))
     save_game_state(game_id, state)
     replace_game_memories(game_id, save["memories"])
     _chat_history[game_id] = save["chat_history"][-MAX_HISTORY:]
@@ -655,6 +758,34 @@ async def judge_ailin_recruit(req: AilinRecruitAnswerRequest):
     )
 
 
+@router_dnd.post("/mini-game/commentary")
+async def mini_game_commentary(req: MiniGameCommentaryRequest):
+    character = req.character.strip().lower()
+    if character not in {"brock", "serin", "orlan"}:
+        raise HTTPException(400, "unsupported mini-game commentator")
+    event = req.event.strip()
+    if not event:
+        raise HTTPException(400, "event is required")
+    line = await dm_mini_game_commentary(character, event, req.context)
+    return {"line": line}
+
+
+@router_dnd.post("/shop/consult")
+async def shop_consult(req: ShopConsultRequest):
+    item = {
+        "item_id": req.item_id,
+        "name": req.name.strip(),
+        "desc": req.desc.strip(),
+        "price": max(0, req.price),
+        "type": req.type,
+        "stat": req.stat,
+    }
+    if not item["name"] or not item["desc"]:
+        raise HTTPException(400, "item name and desc are required")
+    line = await dm_shop_consult(item)
+    return {"line": line}
+
+
 @router_dnd.post("/chat/stream")
 async def chat_stream(req: ChatRequest):
     state = load_game_state(req.game_id)
@@ -662,13 +793,15 @@ async def chat_stream(req: ChatRequest):
         raise HTTPException(404, "游戏不存在")
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
+    recorded_message = _sanitize_persisted_text(req.visible_message or req.message)
+    model_message = req.message
 
     # 閫掑褰撳墠鍖哄煙琛屽姩娆℃暟
     state["actions_in_area"] = int(state.get("actions_in_area", 0)) + 1
     save_game_state(req.game_id, state)
 
     recent = get_recent_memories(req.game_id)
-    ctx = search_memory(req.game_id, req.message, n_results=3)
+    ctx = search_memory(req.game_id, recorded_message, n_results=3)
 
     async def gen():
         full = ""
@@ -679,7 +812,7 @@ async def chat_stream(req: ChatRequest):
         # 鑾峰彇鏃ュ織鍣ㄥ苟绔嬪嵆鍐欏叆鐜╁杈撳叆
         sid = _session_map.get(req.game_id, req.game_id)
         log = get_logger(sid)
-        log.log_player(req.message)
+        log.log_player(recorded_message)
 
         # 鑾峰彇鍘嗗彶瀵硅瘽
         history = _chat_history.get(req.game_id, [])
@@ -687,20 +820,20 @@ async def chat_stream(req: ChatRequest):
             history = history[-MAX_HISTORY:]
 
         # 棰勯: 妫€娴嬬敤鎴锋秷鎭腑鐨凞C妫€瀹氭爣绛撅紝鑷姩鎺烽
-        preroll_event, enhanced_msg = _preroll_if_dc(req.message, state)
+        preroll_event, enhanced_msg = _preroll_if_dc(model_message, state)
         if preroll_event:
             systems.append(preroll_event)
             yield f"data: {json.dumps({'type':'system','content':preroll_event}, ensure_ascii=False)}\n\n"
             parsed_event = _parse_system_event_payload(preroll_event)
             if parsed_event:
                 _, check_payload = parsed_event
-                reward_change = apply_investigation_rewards(state, req.message, check_payload)
+                reward_change = apply_investigation_rewards(state, recorded_message, check_payload)
                 if reward_change:
                     yield f"data: {json.dumps({'type':'state_update','content':reward_change}, ensure_ascii=False)}\n\n"
             user_message = enhanced_msg
         else:
-            user_message = req.message
-            reward_change = apply_investigation_rewards(state, req.message, None)
+            user_message = model_message
+            reward_change = apply_investigation_rewards(state, recorded_message, None)
             if reward_change:
                 yield f"data: {json.dumps({'type':'state_update','content':reward_change}, ensure_ascii=False)}\n\n"
 
@@ -749,7 +882,7 @@ async def chat_stream(req: ChatRequest):
 
             if not _strip_player_protocol_text(full):
                 fallback_filter = PlayerProtocolFilter()
-                fallback = _fallback_chat_narrative(req.message, state, systems)
+                fallback = _fallback_chat_narrative(recorded_message, state, systems)
                 visible, hints = fallback_filter.feed(fallback)
                 tail, tail_hints = fallback_filter.flush()
                 hints.extend(tail_hints)
@@ -764,15 +897,16 @@ async def chat_stream(req: ChatRequest):
             log.log_dm(full, systems)
 
             # 淇濆瓨瀵硅瘽鍘嗗彶
-            history.append({"role": "user", "content": req.message})
+            history.append({"role": "user", "content": recorded_message})
             history.append({"role": "assistant", "content": full})
             if len(history) > MAX_HISTORY:
                 history = history[-MAX_HISTORY:]
             _chat_history[req.game_id] = history
             # 淇濆瓨璁板繂鍜岀姸鎬?
-            save_memory(req.game_id, f"鐜╁: {req.message}")
+            save_memory(req.game_id, f"鐜╁: {recorded_message}")
             if full: save_memory(req.game_id, f"DM: {full[:200]}")
-            state["last_event"] = req.message[:100]
+            state["last_event"] = recorded_message[:100]
+            _sanitize_state_in_place(state)
             save_game_state(req.game_id, state)
             yield f"data: {json.dumps({'type':'state_snapshot','content':state}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type':'done'})}\n\n"
@@ -782,7 +916,7 @@ async def chat_stream(req: ChatRequest):
             if full:
                 log.log_dm(_strip_player_protocol_text(full) + f"\n[涓柇: {e}]")
             log.log_error(str(e))
-            fallback = full or _fallback_chat_narrative(req.message, state, systems)
+            fallback = full or _fallback_chat_narrative(recorded_message, state, systems)
             if not full:
                 fallback_filter = PlayerProtocolFilter()
                 visible, hints = fallback_filter.feed(fallback)
@@ -796,15 +930,16 @@ async def chat_stream(req: ChatRequest):
 
             # 寮傚父鏃朵繚瀛樼姸鎬侊紙闃叉鏈疆鐘舵€佸彉鏇翠涪澶憋級
             try:
-                history.append({"role": "user", "content": req.message})
+                history.append({"role": "user", "content": recorded_message})
                 history.append({"role": "assistant", "content": full})
                 if len(history) > MAX_HISTORY:
                     history = history[-MAX_HISTORY:]
                 _chat_history[req.game_id] = history
-                save_memory(req.game_id, f"鐜╁: {req.message}")
+                save_memory(req.game_id, f"鐜╁: {recorded_message}")
                 if full:
                     save_memory(req.game_id, f"DM: {full[:200]}")
-                state["last_event"] = req.message[:100]
+                state["last_event"] = recorded_message[:100]
+                _sanitize_state_in_place(state)
                 save_game_state(req.game_id, state)
             except Exception as persist_error:
                 log.log_error(f"fallback persist failed: {persist_error}")

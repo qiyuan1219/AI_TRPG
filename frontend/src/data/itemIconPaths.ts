@@ -24,6 +24,13 @@ export const ITEM_ICON_PATHS: Record<string, string> = {
   'scroll-medicine': '/assets/icons/items/scroll-medicine.png',
   clue: '/assets/icons/items/clue.png',
   document: '/assets/icons/items/default.png',
+  'yunling-charm': '/assets/icons/items/charm-leaf.png',
+  sword: '/assets/icons/items/sword.png',
+  backpack: '/assets/icons/items/backpack.png',
+  coin: '/assets/icons/items/coin.png',
+  'spore-mask': '/assets/icons/items/spore-mask.png',
+  'cable-clip': '/assets/icons/items/cable-clip.png',
+  'supply-crate': '/assets/icons/items/supply-crate.png',
   item: DEFAULT_ITEM_ICON,
   default: DEFAULT_ITEM_ICON,
 
@@ -75,6 +82,13 @@ const ITEM_NAME_ICON_TOKENS: Record<string, string> = {
   体质药水: 'constitution_potion',
   感知药水: 'wisdom_potion',
   魅力药水: 'charisma_potion',
+  云苓的护身符: 'yunling-charm',
+  长剑: 'sword',
+  冒险者工具包: 'backpack',
+  金币: 'coin',
+  抗孢面罩: 'spore-mask',
+  缆梯安全扣: 'cable-clip',
+  公会补给箱: 'supply-crate',
 };
 
 const ITEM_NAME_SUMMARIES: Record<string, string> = {
@@ -100,6 +114,13 @@ const ITEM_NAME_SUMMARIES: Record<string, string> = {
   体质药水: '增强身体耐受力，适合体质豁免、抗毒和长时间探索。',
   感知药水: '提高警觉与直觉，适合察觉埋伏、幻觉和异常气息。',
   魅力药水: '增强谈判气势，适合说服、威吓、欺瞒和交涉。',
+  云苓的护身符: '封着蓝色菌叶和白枝烛芯的小护身符。不能抵挡伤害，却像是在提醒你——最危险的时候，先稳住呼吸，认清同伴。',
+  长剑: '标准制式长剑，适合近身作战。',
+  冒险者工具包: '包含绳索、火石、水袋和基本修理工具的基础探险装备。',
+  金币: '逆穹城通用货币，可在黑市和药铺购买补给。',
+  抗孢面罩: '过滤孢粉和有毒粉尘的防护面罩，孢海探索的必需品。',
+  缆梯安全扣: '固定在降渊缆梯主缆上的安全锁扣，防止意外坠落。',
+  公会补给箱: '冒险者公会配发的远征标准补给，内含急救品和应急物资。',
 };
 
 export function resolveItemIconPath(iconOrPath?: string, itemName?: string) {

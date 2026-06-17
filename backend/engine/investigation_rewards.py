@@ -529,6 +529,88 @@ def _list_ids(entries: Any) -> set[str]:
     return ids
 
 
+MAIN_STORY_NODE_META = {
+    "guild-final-registration": {
+        "objective": "前往降渊缆梯中枢，完成下潜前安全核验。",
+        "completed": ["recruit_full_party", "register_expedition_party"],
+        "update": {
+            "id": "guild-final-registration",
+            "title": "第七远征小队登记完成",
+            "objective": "前往降渊缆梯中枢，完成下潜前安全核验。",
+        },
+    },
+    "elevator-hub": {
+        "objective": "确认装备后乘缆梯前往无光孢海据点。",
+        "completed": ["recruit_full_party", "register_expedition_party", "reach_elevator_hub"],
+        "update": {
+            "id": "elevator-hub",
+            "title": "抵达降渊缆梯中枢",
+            "objective": "确认装备后乘缆梯前往无光孢海据点。",
+        },
+    },
+    "elevator-descent": {
+        "objective": "固定安全扣，适应垂降并观察下方异常孢光带。",
+        "completed": ["recruit_full_party", "register_expedition_party", "reach_elevator_hub", "start_elevator_descent"],
+        "update": {
+            "id": "elevator-descent",
+            "title": "降渊缆梯启动",
+            "objective": "固定安全扣，适应垂降并观察下方异常孢光带。",
+        },
+    },
+}
+
+
+def _merge_unique_strings(existing: Any, additions: list[str]) -> list[str]:
+    result = [item for item in existing if isinstance(item, str)] if isinstance(existing, list) else []
+    for item in additions:
+        if item and item not in result:
+            result.append(item)
+    return result
+
+
+def _merge_quest_update(existing: Any, update: dict) -> list[dict]:
+    result = [item for item in existing if isinstance(item, dict)] if isinstance(existing, list) else []
+    update_id = str(update.get("id") or "")
+    if update_id and not any(item.get("id") == update_id for item in result):
+        next_update = dict(update)
+        next_update["createdAt"] = _now()
+        result.append(next_update)
+    return result
+
+
+def _main_story_scene_for_state(state: dict) -> str:
+    scene_state = state.get("sceneState")
+    scene_id = ""
+    if isinstance(scene_state, dict):
+        scene_id = str(scene_state.get("currentScene") or "")
+    area = str(state.get("current_area") or "")
+    if state.get("elevator_descent_started") or "垂降" in area:
+        return "elevator-descent"
+    if state.get("elevator_hub_visited") or "缆梯" in area or "降渊" in area:
+        return "elevator-hub"
+    if state.get("expedition_registered"):
+        return "guild-final-registration"
+    if scene_id in MAIN_STORY_NODE_META:
+        return scene_id
+    return ""
+
+
+def _sync_main_story_progress(state: dict, scene_id: str) -> None:
+    meta = MAIN_STORY_NODE_META.get(scene_id)
+    if not meta:
+        return
+
+    quest = state.setdefault("questLog", {})
+    quest["mainQuest"] = quest.get("mainQuest") or "investigate_earthcore_gate"
+    quest["currentObjective"] = meta["objective"]
+    quest["completedObjectives"] = _merge_unique_strings(quest.get("completedObjectives"), meta["completed"])
+    quest["updates"] = _merge_quest_update(quest.get("updates"), meta["update"])
+
+    scene_state = state.setdefault("sceneState", {})
+    scene_state["currentScene"] = scene_id
+    scene_state["visitedScenes"] = _merge_unique_strings(scene_state.get("visitedScenes"), [scene_id])
+
+
 def ensure_investigation_state(state: dict) -> None:
     state.setdefault("documents", [])
     state.setdefault("clues", [])
@@ -545,12 +627,13 @@ def ensure_investigation_state(state: dict) -> None:
     })
     scene_state = state.get("sceneState")
     if isinstance(scene_state, dict):
-        current_scene = _scene_id_for_area(str(state.get("current_area") or ""))
+        current_scene = _main_story_scene_for_state(state) or _scene_id_for_area(str(state.get("current_area") or ""))
         if current_scene:
             scene_state["currentScene"] = current_scene
             visited = scene_state.setdefault("visitedScenes", [])
             if isinstance(visited, list) and current_scene not in visited:
                 visited.append(current_scene)
+            _sync_main_story_progress(state, current_scene)
         if current_scene == "spore_outpost":
             _grant_document(state, "shallow_map_spore_sea")
             _grant_clue(state, "glowing_rivets_warning")

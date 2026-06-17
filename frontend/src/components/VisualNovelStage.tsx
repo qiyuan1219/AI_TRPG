@@ -262,7 +262,7 @@ export function VisualNovelStage({
       >
         <div className="speaker-row">
           <span>{speaker || '主持人'}</span>
-          {isStreaming && <i>思考中</i>}
+          {isStreaming && <i>AI主持人书写中</i>}
         </div>
         <p>{visible || (isStreaming ? '……' : '')}</p>
         <button

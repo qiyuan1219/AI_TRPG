@@ -8,175 +8,220 @@
 
 ```
 demo02/
-├── backend/                         # Python 后端 (FastAPI)
-│   ├── main.py                      # FastAPI 入口
-│   ├── config.py                    # 集中配置（LLM/数据库/游戏参数）
-│   ├── requirements.txt             # Python 依赖
+├── backend/                              # Python 后端 (FastAPI)
+│   ├── main.py                           # FastAPI 入口
+│   ├── config.py                         # 集中配置（LLM/数据库/游戏参数）
+│   ├── requirements.txt                  # Python 依赖
 │   ├── engine/
-│   │   ├── rules_dnd.py             # D20 规则引擎（检定/战斗/HP）
-│   │   └── state_directives.py      # 状态指令解析
+│   │   ├── rules_dnd.py                  # D20 规则引擎（检定/战斗/HP）
+│   │   ├── state_directives.py           # 状态指令解析
+│   │   ├── trust_system.py               # 同伴信任值系统
+│   │   └── companion_events.py           # 同伴支线事件引擎（4条支线）
 │   ├── kp/
-│   │   ├── dm_service.py            # AI 主持人核心服务
-│   │   ├── prompt_builder_dnd.py    # System Prompt 动态组装
-│   │   └── memory.py               # SQLite 记忆系统
+│   │   ├── dm_service.py                 # AI 主持人核心服务
+│   │   ├── prompt_builder_dnd.py         # System Prompt 动态组装
+│   │   └── memory.py                     # SQLite 记忆系统
 │   └── api/
-│       ├── routes_dnd.py            # D&D REST + SSE 流式 API
-│       ├── routes_dice_poker.py     # 快艇骰子 API
-│       └── routes_companion_events.py
+│       ├── routes_dnd.py                 # D&D REST + SSE 流式 API
+│       ├── routes_tavern_dice_poker.py   # 快艇骰子 API
+│       ├── routes_companion_events.py    # 同伴支线 API
+│       └── routes_battle.py              # 战斗系统 API
 │
-├── frontend/                        # React 前端 (Vite + TypeScript)
+├── frontend/                             # React 前端 (Vite + TypeScript)
 │   ├── src/
-│   │   ├── App.tsx                  # 主应用（场景路由/状态管理）
-│   │   ├── components/              # UI 组件
-│   │   │   ├── VisualNovelStage.tsx # 视觉小说对话舞台
-│   │   │   ├── TitleMenu.tsx        # 标题主菜单
-│   │   │   ├── StartDND.tsx         # 角色创建
-│   │   │   ├── ActionPanel.tsx      # 行动面板
-│   │   │   ├── DiceRollOverlay.tsx  # 骰子动画
-│   │   │   ├── DicePokerGame.tsx    # 快艇骰子游戏
-│   │   │   ├── BattleTestScreen.tsx # 战斗系统
-│   │   │   └── CityMap.tsx          # 城市地图
-│   │   ├── data/
-│   │   │   ├── dndScenes.ts         # 场景与背景图配置
-│   │   │   ├── characterRegistry.ts # NPC 角色注册表
-│   │   │   ├── scriptedScenes.ts    # 固定剧情脚本
-│   │   │   └── dndClasses.ts        # D&D 职业数据
+│   │   ├── App.tsx                       # 主应用（场景路由/状态管理/结局分流）
+│   │   ├── components/                   # 28个 UI 组件
+│   │   │   ├── VisualNovelStage.tsx      # 视觉小说对话舞台（多阶段背景+立绘）
+│   │   │   ├── TitleMenu.tsx             # 标题主菜单（视频背景）
+│   │   │   ├── ActionPanel.tsx           # 行动面板
+│   │   │   ├── DiceRollOverlay.tsx       # 3D 骰子动画
+│   │   │   ├── BattleTestScreen.tsx      # 战斗系统（教学战+普通战+Boss战）
+│   │   │   ├── TavernDicePoker.tsx       # 快艇骰子（回声酒馆）
+│   │   │   ├── DrinkingDiceGame.tsx      # 喝酒骰子（布洛克招募）
+│   │   │   ├── OrlanBoxGame.tsx          # 奥兰幸运盲盒（钻石抽取）
+│   │   │   ├── ApothecaryShop.tsx        # 云苓黑市药铺
+│   │   │   ├── CompanionEventTestScreen.tsx  # 同伴支线事件
+│   │   │   ├── CharacterPanel.tsx        # 角色面板（含信任值+日志）
+│   │   │   ├── TutorialOverlay.tsx       # 教程提示卡片
+│   │   │   ├── CityMap.tsx               # 城市地图
+│   │   │   └── ...                       # 其他组件
+│   │   ├── data/                         # 游戏数据
+│   │   │   ├── scriptedScenes.ts         # 固定剧情脚本（19个场景）
+│   │   │   ├── dndScenes.ts              # 场景与背景图配置（14个区域）
+│   │   │   ├── battleConfigs.ts          # 战斗配置（3场战斗）
+│   │   │   ├── companionSideQuests.ts    # 同伴支线管理（4条+流程+AI约束）
+│   │   │   ├── intelDocuments.ts         # 情报档案数据库（22份情报）
+│   │   │   ├── characterRegistry.ts      # NPC 角色注册表
+│   │   │   └── dndClasses.ts             # D&D 职业数据
 │   │   ├── services/
-│   │   │   ├── api.ts               # API 封装 + SSE 流式对话
-│   │   │   └── dndRuntime.ts        # D&D 运行时服务
-│   │   ├── utils/narrative.ts       # 叙事文本解析
-│   │   └── styles/                  # CSS 样式
-│   ├── public/assets/               # 静态资源
-│   │   ├── scenes/                  # 场景背景图（按放映序号命名）
-│   │   ├── characters/              # 角色立绘
-│   │   ├── chibi/                   # Q版头像/精灵图
-│   │   ├── maps/                    # 地图与建筑图标
-│   │   ├── battle/                  # 战斗素材
-│   │   └── sounds/                  # 音效
+│   │   │   ├── api.ts                    # API 封装 + SSE 流式对话
+│   │   │   └── dndRuntime.ts             # D&D 运行时服务
+│   │   ├── types/game.ts                 # 类型定义
+│   │   ├── utils/
+│   │   │   ├── narrative.ts             # 叙事文本解析
+│   │   │   └── trust.ts                  # 信任值工具
+│   │   └── styles/                       # CSS 样式
+│   ├── public/assets/                    # 静态资源
+│   │   ├── scenes/                       # 场景背景图
+│   │   ├── characters/                   # 角色立绘
+│   │   ├── chibi/                        # Q版战斗精灵图
+│   │   ├── battle/                       # 战斗背景
+│   │   ├── bgm/                          # 背景音乐（8首）
+│   │   ├── maps/                         # 地图图标
+│   │   ├── prop/                         # 道具图标（盲盒+药水）
+│   │   └── sounds/                       # 音效
 │   ├── package.json
 │   └── vite.config.ts
 │
-├── data/                            # 运行时数据
-│   ├── game.db                      # SQLite 数据库
-│   └── saves/                       # 游戏存档 (JSON)
+├── data/                                 # 运行时数据
+│   ├── game.db                           # SQLite 数据库
+│   └── saves/                            # 游戏存档 (JSON)
 │
-├── document/                        # 设计文档（12+ 份）
-│   ├── 世界观文档V1-地心之门.md
-│   ├── 主线剧情框架V1-地心之门.md
-│   ├── 势力设定V1-地心之门.md
-│   ├── 最终NPC设定V1-地心之门.md
-│   ├── DND战斗规则详解.md
-│   ├── 逆穹城地图-生图提示词.md
-│   └── 素材需求清单-地心之门.md
+├── document/                             # 设计文档
+│   ├── new/                              # 最新版本文档（与代码同步）
+│   │   └── ...                           # 世界观/剧情/系统/Boss设计等
+│   └── ...                               # 初代设计文档（部分内容已过时）
 │
-├── logs/                            # 游戏日志
-├── start.bat                        # 一键启动脚本 (Windows)
+├── 情报档案数据库.md                      # 情报系统完整清单
+├── 第一幕后半段主线支线多结局编程版.md      # 后半段实现说明书
+├── AI控制的伙伴信任值机制设计与实现提示词.md # 信任系统设计
+├── AI跑团行动检定与调查档案系统设计.md      # 情报系统设计
+├── start.bat                             # 一键启动脚本 (Windows)
 └── README.md
 ```
 
 ---
 
+## 🎮 剧情流程（第一幕完整版）
+
+### 第一章：逆穹悬城（城市阶段）
+
+```
+开场动画 → 世界观叙事 → 逆穹悬城初入 → 瑟琳登场
+    ↓
+教学战斗（裂隙爬兽）→ 公会登记（米娜/赫尔曼）→ 获得三名队友线索
+    ↓
+回声酒馆 → 萨洛快艇骰子 → 获得三队友详细情报
+    ↓
+静默神殿 → 艾琳·白枝修女招募
+    ↓
+回声酒馆 → 布洛克·铁锅喝酒骰子招募 → 信任值变化
+    ↓
+黑市 → 暗号"断缆不问来路" → 凯娅现身 → 奥兰幸运盲盒抽钻石
+    ↓
+黑市深处 → 云苓药铺（可选药剂购买）→ 净化之心
+    ↓
+公会最终登记 → 五人小队组建完毕
+```
+
+### 第二章：无光孢海（地下探索阶段）
+
+```
+降渊缆梯中枢 → 缆梯垂降 → 孢海据点（尼布）
+    ↓
+艾琳支线：白枝下的名字（伤员+名册）
+    ↓
+战斗一：蓝伞浅滩遭遇战
+    ↓
+布洛克支线：回声菌林的假歌（污染菌核）
+    ↓
+前线废弃据点 → 远征痕迹调查
+    ↓
+凯娅支线：少了两个封扣（黑市暗道）
+    ↓
+战斗二：骨柱湿地遭遇战 → 莱因登场
+    ↓
+关键选择一：帮助莱因 / 无视莱因（影响结局+信任值）
+    ↓
+Boss战前休整 → 瑟琳支线：银杖的第一次裂痕
+    ↓
+Boss战：黑石门卫（三阶段）→ 核心暴露
+    ↓
+关键选择二：破坏核心 / 稳定核心
+    ↓
+结局分流：莱因选择 × 核心选择 → 4种正常结局
+    ↓
+团灭 → 逆时归零坏结局（2秒后回标题画面）
+```
+
+---
+
+## 🎯 结局系统（第一幕）
+
+| 结局 | 条件 | 描述 |
+|------|------|------|
+| **守门者仍在** | 帮助莱因 + 稳定核心 | 封印未破，带幸存者穿过黑石门 |
+| **带伤者穿门** | 帮助莱因 + 破坏核心 | 封印崩溃，搀着莱因进入门后黑暗 |
+| **冷静的远征** | 无视莱因 + 稳定核心 | 封印保留，无负担的远征继续 |
+| **裂门而下** | 无视莱因 + 破坏核心 | 封印解除，不在乎代价的队伍 |
+| **逆时归零** | Boss战团灭 | 时间倒流，回到标题画面 |
+
+---
+
+## 🤖 已实现系统
+
+### D20 检定系统
+- 所有行动提示使用 D&D 六维（力量/敏捷/体质/智力/感知/魅力）标注 DC
+- 骰子结算格式：`检定成功！结果：19 = 15（点数）+ 4（【力量】加值）≥ DC12`
+- D20=20 大成功 / D20=1 大失败
+- 后端自动预骰，前段骰子动画展示
+
+### 同伴信任值系统
+- 4名同伴独立信任值：瑟琳 84 / 艾琳 55 / 布洛克 50 / 凯娅 45
+- 5档信任：疏离(0-29) → 谨慎(30-49) → 合作(50-69) → 信赖(70-84) → 深信(85-100)
+- 信任值影响：剧情对话/支线奖励强度/Boss前提示/结局台词
+- 防刷机制：同节点同同伴限1次变化；总预算 positive≤12/negative≤-15
+- 下缆梯前信任反馈：根据4名同伴当前信任值生成出发前台词
+
+### 同伴支线系统
+- 4条支线必定触发（进入对应区域即激活）
+- 每条支线：固定开场 → 玩家检定+选择 → 危机/小战斗 → 奖励结算 → 自由对话
+- 后端引擎支持的完整事件流
+
+### 情报档案系统
+- 22份可收集情报文档，覆盖12个地点
+- 多入口线索设计（防卡关）：同一关键信息可从多个地点获得
+- 分类：报告/日志/地图/信件/记录/笔记/账本/经文
+- 稀有度：key(3)/rare(5)/uncommon(10)/common(4)
+
+### 小游戏系统
+- **快艇骰子**（萨洛情报局）：5骰重投3轮，瑟琳透视+说服技能
+- **喝酒骰子**（布洛克招募）：3轮体质豁免+拼点，结果影响信任值
+- **幸运盲盒**（钻石抽取）：20金/次 D20>18得钻石，8次保底
+
+### 战斗系统
+- 教学战斗：裂隙爬兽遭遇战（单场）
+- 普通战斗一：蓝伞浅滩（3敌 vs 5人队）
+- 普通战斗二：骨柱湿地（3敌 vs 5人队）
+- Boss战：黑石门卫（1敌 HP80 AC17，三阶段）
+
+### BGM 系统
+- 8首背景音乐覆盖全部场景
+- 场景→区域自动匹配
+- 音量控制（BGM/音效独立）
+
+---
+
 ## 🚀 快速启动
-
-### 前置要求
-
-- **Python 3.10+**
-- **Node.js 18+**
-- **DeepSeek API Key**（或其他兼容 OpenAI 格式的 LLM API）
 
 ### 1. 配置 API Key
 
-在 `backend/` 目录下创建 `.env` 文件：
-
+在 `backend/` 下创建 `.env`：
 ```env
 DEEPSEEK_API_KEY=your_api_key_here
 ```
 
-### 2. 安装依赖
+### 2. 安装 & 启动
 
 ```bash
 # 后端
-cd backend
-pip install -r requirements.txt
+cd backend && pip install -r requirements.txt && python main.py
 
 # 前端
-cd frontend
-npm install
+cd frontend && npm install && npm run dev
 ```
-
-### 3. 启动服务
-
-```bash
-# 后端 (端口 8000)
-cd backend
-python main.py
-
-# 前端 (端口 5174)
-cd frontend
-npm run dev
-```
-
-### 4. 一键启动 (Windows)
-
-双击运行 `start.bat`，自动打开两个终端窗口分别启动前后端。
-
-### 5. 访问游戏
 
 浏览器打开 **http://localhost:5174**
-
----
-
-## 🎮 游戏特色
-
-### AI 主持人系统
-- 全程由大模型扮演主持人（D&D 中的 DM/KP），负责叙事、NPC 扮演和行动裁决
-- **固定剧情 + AI 实时生成** 混合架构：关键剧情对话预写为脚本确保角色准确，玩家自由行动时由 AI 实时叙事
-- 支持 Function Calling：检定掷骰、金币物品、HP 变化、场景切换均由 AI 驱动规则引擎执行
-
-### 倒挂城市 · 逆穹悬城
-- 一整座城市倒挂在巨大洞穴穹顶之上，尖塔和吊桥从"天顶"垂挂而下
-- 探索冒险者公会、回声酒馆、黑市、静默神殿、降渊缆梯等独特场景
-- 多阶段背景图随剧情推进平滑切换
-
-### D20 检定与战斗
-- 简化 D&D 5E 规则：D20 + 属性调整值 + 熟练加值 vs DC/AC
-- 完整的教学战斗和正式战斗流程
-- 骰子动画、伤害计算、状态效果
-
-### 快艇骰子小游戏
-- 回声酒馆中与老板萨洛进行五骰扑克对决
-- AI 参谋瑟琳提供策略建议，玩家自主决策
-
-### NPC 同伴系统
-- "银杖"瑟琳固定同行，另有 5 名可选同伴
-- 信任值系统影响 NPC 行为和剧情分支
-- 视觉小说风格的立绘 + 对话呈现
-
----
-
-## 📡 API 接口
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/dnd/game/create` | 创建新游戏，返回固定开场脚本 + 状态 |
-| GET | `/api/dnd/game/{id}/state` | 获取游戏状态 |
-| POST | `/api/dnd/chat/stream` | SSE 流式主持人对话（核心接口） |
-| POST | `/api/dnd/battle/narrate` | 战斗回合 AI 叙述 |
-| POST | `/api/dnd/bargain/judge` | 黑市讲价判定 |
-| POST | `/api/dice-poker/start` | 开始快艇骰子对局 |
-| GET | `/api/dnd/saves` | 获取存档列表 |
-| POST | `/api/dnd/game/{id}/save` | 保存游戏 |
-| POST | `/api/dnd/saves/{slot}/load` | 读取存档 |
-| GET | `/api/dnd/health` | 健康检查 |
-
----
-
-## 🎨 美术风格
-
-- **画风**：日式二次元，赛璐珞平涂，动画电影质感
-- **参考**：《来自深渊》《迷宫饭》《无职转生》
-- **色调**：深蓝紫 `#1a1a3e`、暗紫黑 `#0d0d1a`、青绿荧光 `#5fb7a7`、暖金 `#d4a843`
-- **规格**：1920×1080，16:9，WebP/PNG
 
 ---
 
@@ -184,13 +229,26 @@ npm run dev
 
 | 层 | 技术 |
 |----|------|
-| 后端框架 | Python FastAPI + Uvicorn |
-| AI 模型 | DeepSeek V4（兼容 OpenAI SDK） |
-| 前端框架 | React 18 + TypeScript |
-| 构建工具 | Vite 5 |
-| UI 动效 | Framer Motion + TailwindCSS 3 |
-| 数据存储 | SQLite + JSON 存档 |
-| 流式通信 | Server-Sent Events (SSE) |
+| 后端 | Python FastAPI + Uvicorn |
+| AI | DeepSeek V4（OpenAI兼容） |
+| 前端 | React 18 + TypeScript + Vite 5 |
+| 动效 | Framer Motion + TailwindCSS 3 |
+| 存储 | SQLite + JSON存档 |
+| 通信 | Server-Sent Events (SSE) |
+
+---
+
+## 📡 核心 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/dnd/game/create` | 创建新游戏 |
+| GET | `/api/dnd/game/{id}/state` | 获取游戏状态 |
+| POST | `/api/dnd/chat/stream` | SSE 流式对话（核心） |
+| POST | `/api/dnd/battle/narrate` | 战斗回合叙述 |
+| POST | `/api/dice-poker/start` | 快艇骰子 |
+| GET/POST | `/api/dnd/saves` | 存档管理 |
+| GET | `/api/dnd/game/{id}/trust` | 信任值查询 |
 
 ---
 

@@ -224,6 +224,7 @@ export interface SaveSlotSummary {
 export interface SaveGamePayload {
   slot_key: SaveSlotKey;
   title?: string;
+  state?: GameState;
   story: StoryLine[];
   suggestions: ActionSuggestion[];
   active_index: number;
@@ -257,6 +258,7 @@ export interface GameRuntimeService {
     gameId: string,
     message: string,
     callbacks: StreamCallbacks,
+    options?: { visibleMessage?: string },
   ) => AbortController;
   applyStateChange: (state: GameState, change: Record<string, any>) => GameState;
   parseSystemEvent: (event: string) => DiceResult | null;

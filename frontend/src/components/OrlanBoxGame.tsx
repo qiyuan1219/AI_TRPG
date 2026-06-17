@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
+import { fetchMiniGameCommentary } from '../services/api';
 import '../styles/orlan-box.css';
 
 interface RewardItem {
@@ -48,7 +49,7 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     count: 1,
     type: '旧物',
     min: 1,
-    max: 3,
+    max: 2,
     icon: '/assets/prop/aolan_blindbox/copper_ring.png',
     desc: '边缘磨得发黑，奥兰坚持说它曾经属于一位勇敢的人。',
   },
@@ -57,8 +58,8 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     name: '旧护符碎片',
     count: 1,
     type: '材料',
-    min: 4,
-    max: 5,
+    min: 3,
+    max: 4,
     icon: '/assets/prop/aolan_blindbox/old_talisman_fragments.png',
     desc: '残缺的护符碎片，表面还有几道不完整的祈愿纹。',
   },
@@ -67,8 +68,8 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     name: '止血粉',
     count: 1,
     type: '消耗品',
-    min: 6,
-    max: 8,
+    min: 5,
+    max: 6,
     icon: '/assets/prop/aolan_blindbox/hemostatic_powder.png',
     desc: '可用于处理普通流血伤口，味道像苦涩的铁锈。',
   },
@@ -77,8 +78,8 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     name: '弱效解毒剂',
     count: 1,
     type: '消耗品',
-    min: 9,
-    max: 11,
+    min: 7,
+    max: 8,
     icon: '/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png',
     desc: '能缓解轻微毒素，但对深层污染效果有限。',
   },
@@ -87,8 +88,8 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     name: '冷光棒',
     count: 1,
     type: '探索',
-    min: 12,
-    max: 13,
+    min: 9,
+    max: 10,
     icon: '/assets/prop/aolan_blindbox/cold_light_stick.png',
     desc: '短时间照亮周围环境，不会产生明显热源。',
   },
@@ -97,8 +98,8 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     name: '密封样本瓶',
     count: 1,
     type: '探索',
-    min: 14,
-    max: 15,
+    min: 11,
+    max: 13,
     icon: '/assets/prop/aolan_blindbox/sealed_sample_bottle.png',
     desc: '可用于保存孢子、菌丝或污染残留。',
   },
@@ -107,8 +108,8 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     name: '小瓶治疗药水',
     count: 1,
     type: '消耗品',
-    min: 16,
-    max: 17,
+    min: 14,
+    max: 16,
     icon: '/assets/prop/aolan_blindbox/small_bottle_therapeutic_solution.png',
     desc: '能恢复少量生命，适合应急。',
   },
@@ -117,7 +118,7 @@ const ORLAN_REWARD_TABLE: RewardItem[] = [
     name: '黑市筹码',
     count: 1,
     type: '特殊',
-    min: 18,
+    min: 17,
     max: 18,
     icon: '/assets/prop/aolan_blindbox/blackmarket_chips.png',
     desc: '黑市流通的小筹码，也许以后能派上用场。',
@@ -160,11 +161,25 @@ function getRewardByD20(d20: number) {
   return ORLAN_REWARD_TABLE.find((item) => d20 >= (item.min ?? 1) && d20 <= (item.max ?? 20)) ?? ORLAN_REWARD_TABLE[0];
 }
 
+function fallbackOrlanComment(record: DrawRecord) {
+  if (record.reward.itemId === 'diamond') {
+    return record.isPity
+      ? '「看，奥兰从不让贵客空手离场。保底，也是幸运的一种包装。」'
+      : '「钻石！我就说这盒子懂得挑客人，当然，手续费也懂。」';
+  }
+  if (record.reward.type === '消耗品') return `「${record.reward.name}，实用货。别嫌小，真到流血中毒的时候你会想亲它一口。」`;
+  if (record.reward.type === '探索') return `「${record.reward.name}，下层用得上。黑市讲究的就是便宜里藏活路。」`;
+  if (record.reward.type === '材料') return `「${record.reward.name}，别急着丢，懂行的人会从碎片里看见价钱。」`;
+  return `「${record.reward.name}。哎，别皱眉，幸运有时候会先铺垫一下。」`;
+}
+
 function RewardReveal({
   record,
+  orlanLine,
   onClose,
 }: {
   record: DrawRecord;
+  orlanLine: string;
   onClose: () => void;
 }) {
   const isDiamond = record.reward.itemId === 'diamond';
@@ -188,6 +203,7 @@ function RewardReveal({
         </div>
         <h2>{record.reward.name}</h2>
         <p>{record.reward.desc}</p>
+        <blockquote className="orlan-reward-comment">{orlanLine}</blockquote>
         <button type="button" onClick={onClose}>
           收下
         </button>
@@ -270,6 +286,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
   const [diceResult, setDiceResult] = useState<DiceResult | null>(null);
   const [pendingDraw, setPendingDraw] = useState<DrawRecord | null>(null);
   const [revealedDraw, setRevealedDraw] = useState<DrawRecord | null>(null);
+  const [orlanLine, setOrlanLine] = useState('「二十金币一次，买不了命运，但能买命运开口说话。」');
   const [tutorialStep, setTutorialStep] = useState(0);
   const completedRef = useRef(false);
 
@@ -320,6 +337,19 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
     if (pendingDraw) {
       setRewardHistory((prev) => [...prev, pendingDraw]);
       setRevealedDraw(pendingDraw);
+      const fallback = fallbackOrlanComment(pendingDraw);
+      setOrlanLine(fallback);
+      fetchMiniGameCommentary('orlan', 'lucky_box_reward', {
+        draw_index: pendingDraw.index,
+        d20: pendingDraw.d20,
+        reward_name: pendingDraw.reward.name,
+        reward_type: pendingDraw.reward.type,
+        reward_desc: pendingDraw.reward.desc,
+        is_pity: pendingDraw.isPity,
+        is_diamond: pendingDraw.reward.itemId === 'diamond',
+      }).then((line) => {
+        if (line) setOrlanLine(line);
+      });
       setPendingDraw(null);
     }
   }, [pendingDraw]);
@@ -383,7 +413,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
       />
 
       <AnimatePresence>
-        {revealedDraw && <RewardReveal record={revealedDraw} onClose={() => setRevealedDraw(null)} />}
+        {revealedDraw && <RewardReveal record={revealedDraw} orlanLine={orlanLine} onClose={() => setRevealedDraw(null)} />}
       </AnimatePresence>
 
       <section className="orlan-box-panel">

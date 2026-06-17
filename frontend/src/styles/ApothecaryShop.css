@@ -272,6 +272,18 @@
   filter: brightness(1.08);
 }
 
+.shop-item-buy .shop-consult-button {
+  border-color: rgba(93, 199, 181, 0.42);
+  background: rgba(93, 199, 181, 0.12);
+  color: #9be5d7;
+  box-shadow: none;
+}
+
+.shop-item-buy .shop-consult-button:hover:not(:disabled) {
+  border-color: rgba(93, 199, 181, 0.72);
+  background: rgba(93, 199, 181, 0.18);
+}
+
 .shop-item-buy button:disabled {
   border-color: rgba(217, 209, 189, 0.12);
   background: rgba(255, 255, 255, 0.06);

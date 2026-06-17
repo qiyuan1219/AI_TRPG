@@ -1715,6 +1715,7 @@
 
 .battle-rules-dock article,
 .battle-enemy-turn-lock,
+.battle-ai-tactic,
 .battle-log-panel {
   border: 1px solid rgba(231, 211, 161, 0.18);
   border-radius: 8px;
@@ -1732,7 +1733,8 @@
 
 .battle-rules-dock b,
 .battle-log-panel span,
-.battle-enemy-turn-lock b {
+.battle-enemy-turn-lock b,
+.battle-ai-tactic header span {
   color: var(--teal);
   font-size: 0.78rem;
   font-weight: 900;
@@ -1765,6 +1767,50 @@
 }
 .battle-enemy-turn-lock.is-done b {
   color: var(--teal);
+}
+
+.battle-ai-tactic {
+  position: absolute;
+  top: 248px;
+  left: 50%;
+  z-index: 13;
+  display: grid;
+  width: min(520px, calc(100% - 560px));
+  gap: 8px;
+  padding: 12px 14px;
+  border-color: rgba(95, 183, 167, 0.42);
+  background: rgba(10, 18, 24, 0.78);
+  transform: translateX(-50%);
+}
+
+.battle-ai-tactic header {
+  display: grid;
+  gap: 3px;
+}
+
+.battle-ai-tactic header b {
+  color: var(--gold-soft);
+  font-size: 0.98rem;
+}
+
+.battle-ai-tactic p {
+  margin: 0;
+  color: rgba(245, 236, 216, 0.82);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.battle-ai-tactic small {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+}
+
+.battle-ai-tactic.is-heal {
+  border-color: rgba(115, 198, 157, 0.5);
+}
+
+.battle-ai-tactic.is-finish {
+  border-color: rgba(211, 99, 99, 0.48);
 }
 
 .battle-end-banner {
@@ -2188,8 +2234,8 @@
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 18;
-  padding: 0 24px 16px;
+  z-index: 34;
+  padding: 0 32px 26px;
   pointer-events: none;
 }
 .battle-effect-panel.is-fail {
@@ -2201,26 +2247,27 @@
 .vn-dialogue-box {
   position: relative;
   margin: 0 auto;
-  width: min(720px, calc(100vw - 320px));
-  padding: 16px 20px 14px;
-  border: 1px solid var(--vn-accent, rgba(239, 213, 140, 0.38));
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(13, 16, 24, 0.68) 0%, rgba(18, 22, 32, 0.66) 100%);
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4), 0 0 60px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(16px);
+  width: min(1040px, calc(100vw - 240px));
+  min-height: 176px;
+  padding: 24px 30px 22px;
+  border: 2px solid var(--vn-accent, rgba(239, 213, 140, 0.46));
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(13, 16, 24, 0.9) 0%, rgba(18, 22, 32, 0.88) 100%);
+  box-shadow: 0 -8px 34px rgba(0, 0, 0, 0.54), 0 0 80px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(20px);
   pointer-events: auto;
 }
 .vn-speaker-tag {
   display: inline-block;
   position: absolute;
-  top: -14px;
-  left: 18px;
-  padding: 3px 16px;
+  top: -17px;
+  left: 24px;
+  padding: 5px 18px;
   border: 1px solid var(--vn-accent, rgba(239, 213, 140, 0.44));
   border-radius: 20px;
   background: rgba(20, 24, 36, 0.9);
   color: var(--gold-soft);
-  font-size: 0.82rem;
+  font-size: 0.92rem;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -2228,9 +2275,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 4px 0 8px;
+  margin: 6px 0 12px;
   color: var(--text);
-  font-size: 1rem;
+  font-size: 1.12rem;
 }
 .vn-result-line b {
   color: var(--gold-accent, #efd58c);
@@ -2250,19 +2297,21 @@
 }
 .vn-narration {
   margin: 0;
-  padding: 10px 14px;
-  border-left: 3px solid var(--vn-accent, rgba(239, 213, 140, 0.58));
-  border-radius: 6px;
-  background: rgba(212, 168, 67, 0.06);
+  max-height: min(30vh, 240px);
+  padding: 16px 18px;
+  overflow-y: auto;
+  border-left: 5px solid var(--vn-accent, rgba(239, 213, 140, 0.58));
+  border-radius: 8px;
+  background: rgba(212, 168, 67, 0.09);
   color: #fff3cf;
-  font-size: 0.92rem;
-  line-height: 1.55;
+  font-size: 1.16rem;
+  line-height: 1.72;
 }
 .vn-formula {
   display: block;
-  margin-top: 8px;
+  margin-top: 10px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.84rem;
   text-align: right;
 }
 
@@ -3301,12 +3350,13 @@
   }
 
   .battle-enemy-turn-lock,
+  .battle-ai-tactic,
   .battle-end-banner {
     width: calc(100% - 480px);
   }
 
   .vn-dialogue-box {
-    width: calc(100vw - 280px);
+    width: calc(100vw - 96px);
   }
 
   .battle-log-panel {
@@ -3376,6 +3426,7 @@
   .battle-rules-toggle,
   .battle-rules-dock,
   .battle-enemy-turn-lock,
+  .battle-ai-tactic,
   .battle-end-banner,
   .battle-log-panel,
   .battle-effect-panel,
@@ -3403,6 +3454,7 @@
   }
 
   .battle-enemy-turn-lock,
+  .battle-ai-tactic,
   .battle-end-banner,
   .battle-log-panel {
     display: grid;

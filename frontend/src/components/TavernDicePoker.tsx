@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
+import { fetchMiniGameCommentary } from '../services/api';
 
 type Phase = 'prep' | 'skill_result' | 'ready' | 'rolling' | 'play' | 'round_result' | 'plead' | 'final';
 type SkillChoice = 'peek' | 'persuade' | 'none';
@@ -45,6 +46,7 @@ const SELIN_INT = 4;
 const SELIN_CHA = 3;
 const ROUND_LIMIT = 3;
 const BASE_REROLLS = 3;
+const SALO_REROLLS_PER_ROUND = 1;
 const BASE_STAKE = 50;
 const PIPS: Record<number, number[]> = {
   1: [4],
@@ -144,6 +146,23 @@ function buildAdvice(playerDice: number[], visibleSaloDice: Array<number | null>
   return `${saloText} 你现在是${score.label}，建议保留${keepText || '最高点'}，重投其余骰子寻找对子或顺子。`;
 }
 
+function diceIndexText(indexes: number[]) {
+  if (!indexes.length) return '无';
+  return indexes.map((index) => `第${index + 1}枚`).join('、');
+}
+
+function fallbackSerinAdvice(playerDice: number[], visibleSaloDice: Array<number | null>, rerollsLeft: number) {
+  if (!playerDice.length) return '「先等骰面落稳。我会看你和萨洛露出的点数，再判断怎么保留。」';
+  const keep = chooseKeepIndexes(playerDice);
+  const reroll = playerDice.map((_die, index) => index).filter((index) => !keep.includes(index));
+  const score = scoreHand(playerDice);
+  const visible = visibleSaloDice.filter((die): die is number => die !== null);
+  if (rerollsLeft <= 0) return `「没有重投次数了。现在是${score.label}，直接提交，别把确定的点数交给运气。」`;
+  if (score.rank >= 5) return `「${score.label}已经够强。保留全部；若一定要赌，只重投最低的一枚。」`;
+  const salo = visible.length ? `萨洛露出的点数是${visible.join('、')}。` : '萨洛还藏着大半骰面。';
+  return `「${salo}保留${diceIndexText(keep)}，重投${diceIndexText(reroll)}，先把${score.label}往更高牌型推。」`;
+}
+
 function createSkillDice(label: string, roll: number, bonus: number, dc: number, success: boolean): DiceResult {
   return {
     type: 'skill_check',
@@ -200,7 +219,7 @@ function RulePanel() {
   return (
     <aside className="tavern-rule-panel">
       <h3>规则说明</h3>
-      <p>三局为限，每局先下注50G。每局初始有3次重投机会。</p>
+      <p>三局为限，每局先下注50G。你每局初始有3次重投机会，萨洛每局只会跟随调整1次。</p>
       <p>透视与说服各只能使用一次。透视只显示已成功看见的萨洛骰面，未透露骰面不会参与建议。</p>
       <p>胜1局获得三位队友情报。胜2局或3局，额外获得100G与云苓情报。</p>
     </aside>
@@ -210,7 +229,7 @@ function RulePanel() {
 const TAVERN_DICE_TUTORIAL: TutorialStep[] = [
   {
     title: '基本规则',
-    body: '每局你和萨洛各掷五枚骰子。你可以重投任意骰子（最多3次，说服成功增加次数），保留满意的骰面，最终提交一副5骰牌型与萨洛比大小。牌型越高、单骰点数越大，总分越高。',
+    body: '每局你和萨洛各掷五枚骰子。你可以重投任意骰子（最多3次，说服成功增加次数），萨洛每局只会跟随调整1次，最终提交一副5骰牌型与萨洛比大小。牌型越高、单骰点数越大，总分越高。',
     badge: '快艇骰子',
   },
   {
@@ -248,6 +267,7 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
   const [peekCount, setPeekCount] = useState(0);
   const [persuadeBonus, setPersuadeBonus] = useState(0);
   const [rerollsLeft, setRerollsLeft] = useState(BASE_REROLLS);
+  const [saloRerollsLeft, setSaloRerollsLeft] = useState(SALO_REROLLS_PER_ROUND);
   const [playerDice, setPlayerDice] = useState<number[]>([]);
   const [saloDice, setSaloDice] = useState<number[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -258,6 +278,7 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
   const [final, setFinal] = useState<TavernDicePokerResult | null>(null);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [serinAdvice, setSerinAdvice] = useState('「等骰子落稳。我会告诉你哪些该留，哪些该重新交给运气。」');
 
   const visibleSaloDice = useMemo(
     () => saloDice.map((die, index) => (index < peekCount ? die : null)),
@@ -279,6 +300,7 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
     setPeekCount(0);
     setPersuadeBonus(0);
     setRerollsLeft(BASE_REROLLS);
+    setSaloRerollsLeft(SALO_REROLLS_PER_ROUND);
     setPlayerDice([]);
     setSaloDice([]);
     setSelected(new Set());
@@ -335,6 +357,7 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
     if (!canAffordRound || rolling) return;
     setSpent((value) => value + stake);
     setRerollsLeft(BASE_REROLLS + persuadeBonus);
+    setSaloRerollsLeft(SALO_REROLLS_PER_ROUND);
     setSelected(new Set());
     setPlayerDice([]);
     setSaloDice([]);
@@ -363,10 +386,14 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
     if (phase !== 'play' || rerollsLeft <= 0 || rolling) return;
     const kept = new Set(selected);
     setRolling(true);
-    setMessage('你把未保留的骰子重新扣进杯里。萨洛也眯起眼，挑走几枚骰子重投。');
+    const saloWillReroll = saloRerollsLeft > 0;
+    setMessage(saloWillReroll
+      ? '你把未保留的骰子重新扣进杯里。萨洛也眯起眼，挑走几枚骰子重投。'
+      : '你把未保留的骰子重新扣进杯里。萨洛按住自己的骰杯，没有继续追你的节奏。');
     window.setTimeout(() => {
       setPlayerDice((dice) => dice.map((die, index) => (kept.has(index) ? die : rollDie())));
-      setSaloDice((dice) => improveOpponentHand(dice));
+      setSaloDice((dice) => (saloWillReroll ? improveOpponentHand(dice) : dice));
+      if (saloWillReroll) setSaloRerollsLeft((value) => Math.max(0, value - 1));
       setRerollsLeft((value) => value - 1);
       setSelected(new Set());
       setRolling(false);
@@ -448,6 +475,29 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
   }
 
   const canStart = phase === 'ready' || phase === 'skill_result';
+
+  useEffect(() => {
+    if (phase !== 'play' || rolling || !playerDice.length) return;
+    const keep = chooseKeepIndexes(playerDice);
+    const reroll = playerDice.map((_die, index) => index).filter((index) => !keep.includes(index));
+    const fallback = fallbackSerinAdvice(playerDice, visibleSaloDice, rerollsLeft);
+    setSerinAdvice(fallback);
+    let cancelled = false;
+    fetchMiniGameCommentary('serin', 'tavern_dice_advice', {
+      player_dice: playerDice,
+      visible_salo_dice: visibleSaloDice,
+      rerolls_left: rerollsLeft,
+      current_score: scoreHand(playerDice),
+      recommended_keep_indices: keep,
+      recommended_reroll_indices: reroll,
+      local_advice: advice,
+    }).then((line) => {
+      if (!cancelled && line) setSerinAdvice(line);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [advice, phase, playerDice, rerollsLeft, rolling, visibleSaloDice]);
 
   return (
     <>
@@ -637,12 +687,13 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
             <section className="tavern-status-row">
               <span>透视：{peekUsed ? '已使用' : '可用'}{peekCount ? ` · 已透露${peekCount}枚` : ''}</span>
               <span>说服：{persuadeUsed ? '已使用' : '可用'}{persuadeBonus ? ` · +${persuadeBonus}重投` : ''}</span>
+              <span>萨洛调整：{saloRerollsLeft}</span>
               <span>预计金币：{projectedGold}G</span>
             </section>
 
             <section className="tavern-kp-box">
-              <strong>KP提示</strong>
-              <p>{phase === 'play' && !rolling ? advice : message}</p>
+              <strong>{phase === 'play' && !rolling ? '瑟琳建议' : 'KP提示'}</strong>
+              <p>{phase === 'play' && !rolling ? serinAdvice : message}</p>
               {phase === 'round_result' && lastRecord && (
                 <div className="tavern-round-summary">
                   你：{formatDice(lastRecord.playerDice)}（{lastRecord.playerScore.label}）

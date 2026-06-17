@@ -85,6 +85,39 @@ class InvestigationRewardTests(unittest.TestCase):
         self.assertEqual(state["intelligence"], 1)
         self.assertEqual(change["attributes"]["intelligence"], 1)
 
+    def test_main_story_registration_syncs_quest_and_scene(self):
+        state = {
+            "current_area": "逆穹悬城·冒险者公会任务室",
+            "expedition_registered": True,
+            "questLog": {"currentObjective": "前往逆穹悬城", "updates": []},
+            "sceneState": {"currentScene": "guild_hall", "visitedScenes": ["unknown", "guild_hall"]},
+        }
+
+        ensure_investigation_state(state)
+
+        self.assertEqual(state["sceneState"]["currentScene"], "guild-final-registration")
+        self.assertEqual(state["questLog"]["currentObjective"], "前往降渊缆梯中枢，完成下潜前安全核验。")
+        self.assertIn("register_expedition_party", state["questLog"]["completedObjectives"])
+        self.assertIn("guild-final-registration", {item["id"] for item in state["questLog"]["updates"]})
+
+    def test_main_story_elevator_descent_flag_wins_over_stale_scene(self):
+        state = {
+            "current_area": "降渊缆梯·垂降途中",
+            "expedition_registered": True,
+            "elevator_hub_visited": True,
+            "elevator_descent_started": True,
+            "questLog": {"currentObjective": "前往逆穹悬城", "updates": []},
+            "sceneState": {"currentScene": "guild-final-registration", "visitedScenes": ["guild-final-registration"]},
+        }
+
+        ensure_investigation_state(state)
+
+        self.assertEqual(state["sceneState"]["currentScene"], "elevator-descent")
+        self.assertEqual(state["questLog"]["currentObjective"], "固定安全扣，适应垂降并观察下方异常孢光带。")
+        self.assertIn("reach_elevator_hub", state["questLog"]["completedObjectives"])
+        self.assertIn("start_elevator_descent", state["questLog"]["completedObjectives"])
+        self.assertIn("elevator-descent", {item["id"] for item in state["questLog"]["updates"]})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -96,9 +96,10 @@
 
 .brock-drink-table {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, auto) auto;
   gap: 14px;
   padding: 16px;
+  overflow-y: auto;
   background:
     linear-gradient(90deg, rgba(239, 213, 140, 0.08) 1px, transparent 1px),
     linear-gradient(180deg, rgba(239, 213, 140, 0.06) 1px, transparent 1px),
@@ -197,6 +198,28 @@
   font-size: 0.84rem;
 }
 
+.brock-ai-comment {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(95, 183, 167, 0.34);
+  border-radius: 8px;
+  background: rgba(95, 183, 167, 0.09);
+}
+
+.brock-ai-comment span {
+  color: #5fb7a7;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.brock-ai-comment p {
+  margin: 0;
+  color: #fff7df;
+  font-size: 0.95rem;
+  line-height: 1.58;
+}
+
 .brock-drink-final {
   display: grid;
   gap: 7px;
@@ -204,6 +227,10 @@
   border-radius: 8px;
   border: 1px solid rgba(239, 213, 140, 0.26);
   background: rgba(0, 0, 0, 0.24);
+}
+
+.brock-drink-final .tavern-tool-btn {
+  margin-top: 4px;
 }
 
 .brock-drink-final span {

@@ -152,6 +152,16 @@ interface PendingSettlement {
   isEnemy?: boolean;
 }
 
+interface AiTactic {
+  actorId: string;
+  skillId: string;
+  targetIds: string[];
+  headline: string;
+  reason: string;
+  confidence: number;
+  intent: "finish" | "pressure" | "protect" | "heal" | "control";
+}
+
 interface BattleTutorialCardProps {
   intro: NonNullable<BattleConfig["tutorialIntro"]>;
   step: number;
@@ -1547,6 +1557,128 @@ function isGroupDamageSkill(skill: BattleSkill) {
   return /范围|群体|全体|锥形/.test(text);
 }
 
+function hpRatio(unit: BattleUnit) {
+  return unit.hp / Math.max(unit.maxHp, 1);
+}
+
+function estimateSkillAmount(skill: BattleSkill) {
+  const matches = [...skill.formula.matchAll(/(\d*)d(\d+)(?:\s*[+＋]\s*(\d+))?/gi)];
+  if (matches.length) {
+    return Math.round(matches.reduce((sum, match) => {
+      const count = Number(match[1] || 1);
+      const sides = Number(match[2]);
+      const bonus = Number(match[3] || 0);
+      return sum + count * ((sides + 1) / 2) + bonus;
+    }, 0));
+  }
+  return 4;
+}
+
+function isProtectiveSkill(skill: BattleSkill) {
+  const text = `${skill.name} ${skill.effect} ${skill.tags.join(" ")}`;
+  return /护|盾|祝福|临时HP|增益|格挡|守护/.test(text);
+}
+
+function isControlSkill(skill: BattleSkill) {
+  const text = `${skill.name} ${skill.effect} ${skill.tags.join(" ")}`;
+  return /倒地|束缚|减速|压制|毒|眩晕|劣势|干扰|控制/.test(text);
+}
+
+function describeIntent(intent: AiTactic["intent"]) {
+  if (intent === "finish") return "收割";
+  if (intent === "heal") return "急救";
+  if (intent === "protect") return "保护";
+  if (intent === "control") return "控制";
+  return "压制";
+}
+
+function chooseAiTactic(
+  actor: BattleUnit,
+  allies: BattleUnit[],
+  enemies: BattleUnit[],
+  used: Partial<Record<BattleResource, boolean>> = {},
+  lastEnemySkillByUnit: Record<string, string> = {},
+): AiTactic | null {
+  if (actor.hp <= 0) return null;
+
+  const livingAllies = allies.filter((unit) => unit.hp > 0);
+  const livingEnemies = enemies.filter((unit) => unit.hp > 0);
+  const legalSkills = actor.skills.filter((skill) => !skill.locked && !resourceIsSpent(skill.resource, used));
+  let best: (AiTactic & { score: number }) | null = null;
+
+  for (const skill of legalSkills) {
+    const targets = getTargetCandidates(actor, skill, allies, enemies).filter((unit) => unit.hp > 0);
+    if (!targets.length) continue;
+
+    for (const target of targets) {
+      const ratio = hpRatio(target);
+      const amount = estimateSkillAmount(skill);
+      let score = 20;
+      let intent: AiTactic["intent"] = "pressure";
+      let reason = "";
+
+      if (isHealingSkill(skill)) {
+        if (target.faction !== actor.faction) continue;
+        score = Math.round((1 - ratio) * 100);
+        intent = "heal";
+        reason = `${target.name} 生命低于 ${Math.round(ratio * 100)}%，优先把队伍从危险线拉回来。`;
+        if (ratio < 0.35) score += 34;
+        if (target.id === actor.id) score -= 8;
+      } else if (isProtectiveSkill(skill) && target.faction === actor.faction) {
+        score = 54 + Math.round((1 - ratio) * 28);
+        intent = "protect";
+        reason = `${target.name} 承压较高，防护能让下一轮容错更稳。`;
+        if (/前排|护卫/.test(target.statuses.join(" "))) score += 8;
+      } else if (actor.faction !== target.faction) {
+        const killWindow = target.hp <= amount + 2;
+        const hitEase = Math.max(0, 18 - target.ac);
+        score = 35 + Math.round((1 - ratio) * 35) + hitEase;
+        if (killWindow) {
+          score += 40;
+          intent = "finish";
+          reason = `${target.name} 剩余 HP${target.hp}，${skill.name} 有机会直接清掉一个行动点。`;
+        } else if (isGroupDamageSkill(skill) && (actor.faction === "ally" ? livingEnemies : livingAllies).length >= 2) {
+          score += 18;
+          intent = "pressure";
+          reason = `${skill.name} 可以压到多个目标，适合削弱整条战线。`;
+          // 连续使用同一技能扣分，鼓励穿插其他技能
+          if (actor.faction === "enemy" && lastEnemySkillByUnit[actor.id] === skill.id) {
+            score -= 25;
+            reason += "（刚用过，换其他技能更好）";
+          }
+        } else if (isControlSkill(skill)) {
+          score += 16;
+          intent = "control";
+          reason = `${target.name} 仍有威胁，先用控制/干扰降低下一轮压力。`;
+        } else {
+          reason = `${target.name} 当前血线和 AC 都适合作为集火目标。`;
+        }
+      } else {
+        continue;
+      }
+
+      if (actor.faction === "enemy" && target.ac <= 15) score += 8;
+      if (actor.faction === "ally" && target.hp === Math.min(...livingEnemies.map((unit) => unit.hp))) score += 6;
+
+      const tactic = {
+        actorId: actor.id,
+        skillId: skill.id,
+        targetIds: [target.id],
+        headline: `${actor.name}：${describeIntent(intent)} / ${skill.name}`,
+        reason,
+        confidence: Math.max(54, Math.min(96, score)),
+        intent,
+        score,
+      };
+      if (!best || tactic.score > best.score) best = tactic;
+    }
+  }
+
+  if (!best) return null;
+  const { score: _score, ...tactic } = best;
+  return tactic;
+}
+
 function tuneDamageAmount(actor: BattleUnit, rawAmount: number) {
   const multiplier = actor.faction === "ally" ? BATTLE_TUNING.allyDamageMultiplier : BATTLE_TUNING.enemyDamageMultiplier;
   return Math.max(1, Math.round(rawAmount * multiplier));
@@ -2351,7 +2483,9 @@ export function BattleTestScreen({
   const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null);
   const [battleAnimation, setBattleAnimation] = useState<BattleAnimationCue | null>(null);
   const enemyActingKeyRef = useRef<string | null>(null);
+  const lastEnemySkillRef = useRef<Record<string, string>>({}); // 防敌人技能连发
   const [enemyTurnDone, setEnemyTurnDone] = useState(false);
+  const [tacticalAdvice, setTacticalAdvice] = useState<AiTactic | null>(null);
   const battleAnimationTimerRef = useRef<number | null>(null);
   const [usedResources, setUsedResources] = useState<Record<string, Partial<Record<BattleResource, boolean>>>>({});
   const [battleLog, setBattleLog] = useState<string[]>([...openingLogLines, config.initialLog].slice(0, 4));
@@ -2414,14 +2548,14 @@ export function BattleTestScreen({
   const completeInitiative = useCallback(() => {
     setPhase("battle");
     advanceTutorialStep(0);
-    showTutorialHint("📊 先攻完成！看左侧行动条，高亮的是当前行动角色。等轮到你时，点击下方技能面板选择一个技能", 8000);
+    showTutorialHint("战斗为回合制：每回合为角色选择技能→系统结算双方行动→AI主持人描述结果。击败所有敌人即获胜。\n\n📊 看左侧行动条，高亮的是当前行动角色。轮到你时点击下方技能面板选择技能", 10000);
   }, [advanceTutorialStep, showTutorialHint]);
 
   const startTutorialInitiative = useCallback(() => {
     setShowTutorialIntro(false);
     setInitiativeAutoStartToken((token) => token + 1);
     advanceTutorialStep(-1);
-    showTutorialHint("正在投掷行动顺序。结果出现后点击“进入第一回合”。", 4500);
+    showTutorialHint('正在投掷行动顺序。结果出现后点击「进入第一回合」。', 4500);
   }, [advanceTutorialStep, showTutorialHint]);
 
   function pushBattleLog(line: string) {
@@ -2480,12 +2614,14 @@ export function BattleTestScreen({
     kpReportEffectIdRef.current = null;
     setPendingSettlement(null);
     setEnemyTurnDone(false);
+    setTacticalAdvice(null);
     setAdvantage(null);
     setAttackPhase(null);
     pendingAttackRef.current = null;
     if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
     clearBattleAnimation();
     enemyActingKeyRef.current = null;
+    lastEnemySkillRef.current = {}; // 重开也重置技能记忆
     setUnitHp(Object.fromEntries(battleBaseUnits.map((unit) => [unit.id, unit.hp])));
     setUsedResources({});
     setShowTutorialIntro(Boolean(config.tutorialIntro));
@@ -2518,6 +2654,8 @@ export function BattleTestScreen({
     setActiveDice(null);
     setPendingSettlement(null);
     setEnemyTurnDone(false);
+    setTacticalAdvice(null);
+    setLastEffect(null);
     if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
     clearBattleAnimation();
     enemyActingKeyRef.current = null;
@@ -2569,8 +2707,20 @@ export function BattleTestScreen({
     let cleaned = String(text || "").replace(/\s+/g, " ").trim();
     if (!cleaned) return fallback;
     if (/炉心守卫者/.test(cleaned)) return fallback;
-    cleaned = cleaned.replace(/^KP[:：]\s*/i, "").replace(/[，、；：:—-]+$/g, "").trim();
-    if (cleaned && !/[。！？.!?」”]$/.test(cleaned)) cleaned += "。";
+    cleaned = cleaned.replace(/^KP[:：]\s*/i, "").trim();
+    const sentenceEnd = Math.max(
+      cleaned.lastIndexOf("。"),
+      cleaned.lastIndexOf("！"),
+      cleaned.lastIndexOf("？"),
+      cleaned.lastIndexOf("."),
+      cleaned.lastIndexOf("!"),
+      cleaned.lastIndexOf("?"),
+    );
+    if (sentenceEnd >= 10 && sentenceEnd < cleaned.length - 1) {
+      cleaned = cleaned.slice(0, sentenceEnd + 1).trim();
+    }
+    if (!/[。！？.!?」"]$/.test(cleaned)) return fallback;
+    if (/[，、；：:—-]$/.test(cleaned)) return fallback;
     return `KP：${cleaned}`;
   }
 
@@ -2590,8 +2740,13 @@ export function BattleTestScreen({
     const impactedTargets = getResolvedDamageTargets(unit, target, skill);
     const targetLabel = impactedTargets.length > 1 ? impactedTargets.map((item) => item.name).join("、") : target.name;
     applyHpEffect(unit, target, skill, effect);
-    // 暂存本地兜底文本，先用"KP记录中…"占位
-    const localNarration = effect.narration;
+    // 群体伤害：本地兜底描述我方全体或敌方全体
+    const aoeLabel = impactedTargets.length > 1
+      ? (unit.faction === "enemy" ? "我方全体" : "敌方全体")
+      : target.name;
+    const localNarration = impactedTargets.length > 1
+      ? `${unit.name}释放${skill.name}，${aoeLabel}受到 ${effect.amount} 点伤害。`
+      : effect.narration;
     const placeholderEffect = { ...effect, narration: "KP记录中…" };
     kpReportEffectIdRef.current = placeholderEffect.id;
     setKpReportPending(true);
@@ -2603,6 +2758,7 @@ export function BattleTestScreen({
     // 异步请求 LLM 播报
     const outcome = inferOutcome(effect.title);
     const diceInfo = parseResultLine(effect.resultLine);
+    const isAoe = impactedTargets.length > 1;
     fetchBattleNarration({
       actor_name: unit.name,
       target_name: targetLabel,
@@ -2614,6 +2770,7 @@ export function BattleTestScreen({
       damage_label: "",
       tags: visibleSkillTags(skill),
       ac_dc: diceInfo.acDc,
+      is_aoe: isAoe,
     }).then(llmNarration => {
       const finalNarration = sanitizeBattleNarration(llmNarration, localNarration);
       if (kpReportEffectIdRef.current !== placeholderEffect.id) return;
@@ -2777,6 +2934,15 @@ export function BattleTestScreen({
     }).catch(() => setAdvantage(null));
   }, [activeUnitId, activeFaction, phase, livingAllies.length, livingEnemies.length]); // eslint-disable-line
 
+  useEffect(() => {
+    if (phase !== "battle" || battleWon || battleLost || !activeUnit || activeUnit.hp <= 0) {
+      setTacticalAdvice(null);
+      return;
+    }
+    const tactic = chooseAiTactic(activeUnit, allies, enemies, usedResources[activeUnit.id] ?? {}, lastEnemySkillRef.current);
+    setTacticalAdvice(tactic);
+  }, [activeUnitId, activeFaction, phase, battleWon, battleLost, allies, enemies, usedResources]); // eslint-disable-line
+
   // 教学：检测友方受伤 — 提示治疗
   const prevAllyHpRef = useRef<Record<string, number>>({});
   useEffect(() => {
@@ -2823,13 +2989,24 @@ export function BattleTestScreen({
 
     const currentAllies = [...unitMap.values()].filter((unit) => unit.faction === "ally" && unit.hp > 0);
     const currentEnemies = [...unitMap.values()].filter((unit) => unit.faction === "enemy" && unit.hp > 0);
-    const skill = actingUnit.skills.find((item) => item.roll.kind === "attack" || item.roll.kind === "save" || item.roll.kind === "damage") ?? actingUnit.skills[0];
+    const tactic = chooseAiTactic(actingUnit, currentAllies, currentEnemies, usedResources[actingUnit.id] ?? {}, lastEnemySkillRef.current);
+    const skill = tactic
+      ? actingUnit.skills.find((item) => item.id === tactic.skillId) ?? actingUnit.skills[0]
+      : actingUnit.skills.find((item) => item.roll.kind === "attack" || item.roll.kind === "save" || item.roll.kind === "damage") ?? actingUnit.skills[0];
     const targetPool = getTargetCandidates(actingUnit, skill, currentAllies, currentEnemies);
     if (!targetPool.length) {
       advanceTurn();
       return;
     }
-    const target = targetPool[Math.floor(Math.random() * targetPool.length)];
+    const target = tactic
+      ? targetPool.find((item) => item.id === tactic.targetIds[0]) ?? targetPool[0]
+      : targetPool[Math.floor(Math.random() * targetPool.length)];
+    if (tactic) {
+      setTacticalAdvice(tactic);
+      pushBattleLog(`AI战术：${tactic.reason}`);
+    }
+    // 记录敌人使用的技能，下一轮同技能扣分以鼓励穿插
+    lastEnemySkillRef.current[actingUnit.id] = skill.id;
 
     const rollTimer = window.setTimeout(() => {
       const dice = rollSkillDice(actingUnit, skill, target);
@@ -2949,6 +3126,8 @@ export function BattleTestScreen({
           </span>
         </section>
       )}
+
+      {/* 战术建议已集成到战斗行动面板中 */}
 
       {(battleWon || battleLost) && (
         <section className={`battle-end-banner ${battleWon ? "is-win" : "is-lose"}`} aria-label="战斗结果">
@@ -3077,6 +3256,7 @@ export function BattleTestScreen({
             }}
             onCancelTarget={() => setTargetSelection(null)}
             advantage={advantage}
+            tacticalAdvice={tacticalAdvice}
           />
         )}
       </AnimatePresence>
@@ -3691,6 +3871,7 @@ function ActionPanel({
   onSelectTarget,
   onCancelTarget,
   advantage,
+  tacticalAdvice,
 }: {
   unit: BattleUnit;
   usedResources: Partial<Record<BattleResource, boolean>>;
@@ -3703,6 +3884,7 @@ function ActionPanel({
   onSelectTarget: (target: BattleUnit) => void;
   onCancelTarget: () => void;
   advantage?: { type: "advantage" | "disadvantage"; reason: string } | null;
+  tacticalAdvice?: { headline: string; reason: string; intent: string; confidence: number } | null;
 }) {
   return (
     <motion.section
@@ -3721,7 +3903,12 @@ function ActionPanel({
               {advantage.type === "advantage" ? "⚔️ 优势" : "⚠️ 劣势"}：{advantage.reason}
             </strong>
           )}
-          <small>先选技能，再指定释放对象，随后进入骰子判定与效果结算。</small>
+          {tacticalAdvice && (
+            <small style={{ color: 'var(--teal)', fontWeight: 600 }}>
+              瑟琳的建议：{tacticalAdvice.reason}
+            </small>
+          )}
+          {!tacticalAdvice && <small>先选技能，再指定释放对象，随后进入骰子判定与效果结算。</small>}
         </div>
         <div className="battle-action-buttons">
           <button type="button" className="ghost-button" onClick={onInspect}>

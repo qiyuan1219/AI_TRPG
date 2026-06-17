@@ -516,77 +516,135 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            {/* 第一行：DC/AC 目标 */}
-            {dcLabel && <div className="dice-dc-highlight">{dcLabel}</div>}
+            {/* 第一行：DC/AC 目标（攻击命中时显示AC，技能检定已融入公式行） */}
+            {dcLabel && dice?.type !== 'skill_check' && <div className="dice-dc-highlight">{dcLabel}</div>}
 
             {/* 第二行：计算式 */}
             <div className="dice-calc dice-calc-v2">
               <span className="dice-result-prefix">结果：</span>
               {result.multiDice ? (
                 <>
-                  {/* 多骰子：总计 = 骰1 + 骰2 + 加成 */}
                   <span className="dice-total dice-eq-total">{result.total}</span>
                   <span className="dice-eq-sep">=</span>
                   {result.multiDice.rolls.map((rv, idx) => (
                     <span key={idx} className="dice-eq-roll">{rv}</span>
                   ))}
                   <span className="dice-eq-note">（点数）</span>
-                  {bonus > 0 && (
-                    <>
-                      <span className="dice-eq-sep">+</span>
-                      <span className="dice-eq-bonus">{bonus}</span>
-                      <span className="dice-eq-note">（加值）</span>
-                    </>
-                  )}
-                  {bonus < 0 && (
-                    <>
-                      <span className="dice-eq-bonus">{bonus}</span>
-                      <span className="dice-eq-note">（加值）</span>
-                    </>
-                  )}
+                  {(() => {
+                    const statMod = Number(dice?.data["属性加值"] ?? bonus);
+                    const profMod = Number(dice?.data["熟练加值"] ?? 0);
+                    const ability = String(dice?.data["六维"] ?? "");
+                    if (statMod !== 0 || profMod !== 0) {
+                      return (
+                        <>
+                          <span className="dice-eq-sep">+</span>
+                          <span className="dice-eq-bonus">{statMod}</span>
+                          {ability ? <span className="dice-eq-note">（【{ability}】加值）</span> : <span className="dice-eq-note">（加值）</span>}
+                          {profMod > 0 && (
+                            <>
+                              <span className="dice-eq-sep">+</span>
+                              <span className="dice-eq-bonus">{profMod}</span>
+                              <span className="dice-eq-note">（熟练加值）</span>
+                            </>
+                          )}
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
                 </>
               ) : showD20Calc ? (
                 <>
-                  {/* 命中 D20：显示 D20+加值=总计，vs AC */}
+                  {/* 命中 D20：D20+属性加值+熟练=总计 vs AC */}
                   <span className="dice-total dice-eq-total">{result.total}</span>
                   <span className="dice-eq-sep">=</span>
                   <span className={`dice-eq-roll ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}>{result.roll}</span>
                   <span className="dice-eq-note">（点数）</span>
-                  {bonus !== 0 && (
-                    <>
-                      <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
-                      <span className="dice-eq-bonus">{bonus}</span>
-                      <span className="dice-eq-note">（加值）</span>
-                    </>
-                  )}
+                  {(() => {
+                    const statMod = Number(dice?.data["属性加值"] ?? bonus);
+                    const profMod = Number(dice?.data["熟练加值"] ?? 0);
+                    const ability = String(dice?.data["六维"] ?? "");
+                    if (statMod !== 0 || profMod !== 0) {
+                      return (
+                        <>
+                          <span className="dice-eq-sep">+</span>
+                          <span className="dice-eq-bonus">{statMod}</span>
+                          {ability ? <span className="dice-eq-note">（【{ability}】加值）</span> : <span className="dice-eq-note">（加值）</span>}
+                          {profMod > 0 && (
+                            <>
+                              <span className="dice-eq-sep">+</span>
+                              <span className="dice-eq-bonus">{profMod}</span>
+                              <span className="dice-eq-note">（熟练加值）</span>
+                            </>
+                          )}
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
                 </>
               ) : result.damageDice ? (
                 <>
-                  {/* 非攻击组合检定：D20结果和附带效果分开展示，避免混作同一次攻击伤害。 */}
                   <span className="dice-total dice-eq-total">{result.total}</span>
                   <span className="dice-eq-sep">=</span>
                   <span className="dice-eq-roll">{result.roll}</span>
                   <span className="dice-eq-note">（D20）</span>
-                  {bonus !== 0 && (
-                    <>
-                      <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
-                      <span className="dice-eq-bonus">{bonus}</span>
-                      <span className="dice-eq-note">（加值）</span>
-                    </>
-                  )}
+                  {(() => {
+                    const statMod = Number(dice?.data["属性加值"] ?? bonus);
+                    const profMod = Number(dice?.data["熟练加值"] ?? 0);
+                    const ability = String(dice?.data["六维"] ?? "");
+                    if (statMod !== 0 || profMod !== 0) {
+                      return (
+                        <>
+                          <span className="dice-eq-sep">+</span>
+                          <span className="dice-eq-bonus">{statMod}</span>
+                          {ability ? <span className="dice-eq-note">（【{ability}】加值）</span> : <span className="dice-eq-note">（加值）</span>}
+                          {profMod > 0 && (
+                            <>
+                              <span className="dice-eq-sep">+</span>
+                              <span className="dice-eq-bonus">{profMod}</span>
+                              <span className="dice-eq-note">（熟练加值）</span>
+                            </>
+                          )}
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
                 </>
               ) : (
                 <>
-                  {/* 单骰子 */}
+                  {/* 单骰子 — 拆分属性加值 + 熟练加值 */}
                   <span className="dice-total dice-eq-total">{result.total}</span>
                   <span className="dice-eq-sep">=</span>
                   <span className={`dice-eq-roll ${isNatMax ? "text-teal" : ""} ${isNat1 ? "text-danger" : ""}`}>{result.roll}</span>
                   <span className="dice-eq-note">（点数）</span>
-                  {bonus !== 0 && (
+                  {(() => {
+                    const statMod = Number(dice?.data["属性加值"] ?? 0);
+                    const profMod = Number(dice?.data["熟练加值"] ?? 0);
+                    const ability = String(dice?.data["六维"] ?? "");
+                    if (statMod !== 0 || profMod !== 0) {
+                      return (
+                        <>
+                          <span className="dice-eq-sep">+</span>
+                          <span className="dice-eq-bonus">{statMod}</span>
+                          <span className="dice-eq-note">（【{ability}】加值）</span>
+                          {profMod > 0 && (
+                            <>
+                              <span className="dice-eq-sep">+</span>
+                              <span className="dice-eq-bonus">{profMod}</span>
+                              <span className="dice-eq-note">（熟练加值）</span>
+                            </>
+                          )}
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
+                  {dcLabel && (
                     <>
-                      <span className="dice-eq-sep">{bonus > 0 ? "+" : ""}</span>
-                      <span className="dice-eq-bonus">{bonus}</span>
-                      <span className="dice-eq-note">（加值）</span>
+                      <span className="dice-eq-sep">{result.success ? "≥" : "<"}</span>
+                      <span className="dice-eq-dc">{dcLabel}</span>
                     </>
                   )}
                 </>

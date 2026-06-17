@@ -328,6 +328,7 @@ export interface BattleNarratePayload {
   d20_total: number;
   damage_label: string;
   tags: string[];
+  is_aoe?: boolean;
   ac_dc: number;
 }
 
@@ -355,6 +356,49 @@ export async function fetchBattleNarration(payload: BattleNarratePayload): Promi
     if (!response.ok) return '';
     const data = await response.json();
     return data.narration || '';
+  } catch {
+    return '';
+  }
+}
+
+export type MiniGameCommentator = 'brock' | 'serin' | 'orlan';
+
+export async function fetchMiniGameCommentary(
+  character: MiniGameCommentator,
+  event: string,
+  context: Record<string, any> = {},
+): Promise<string> {
+  try {
+    const response = await apiFetch(`${BASE}/mini-game/commentary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ character, event, context }),
+    }, '小游戏台词生成失败');
+    if (!response.ok) return '';
+    const data = await response.json();
+    return data.line || '';
+  } catch {
+    return '';
+  }
+}
+
+export async function fetchShopConsult(item: {
+  item_id: string;
+  name: string;
+  desc: string;
+  price: number;
+  type: string;
+  stat?: string | null;
+}): Promise<string> {
+  try {
+    const response = await apiFetch(`${BASE}/shop/consult`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    }, '商品咨询失败');
+    if (!response.ok) return '';
+    const data = await response.json();
+    return data.line || '';
   } catch {
     return '';
   }
@@ -421,13 +465,14 @@ export function chatStream(
   onError: (error: string) => void,
   onStateUpdate?: (change: Record<string, any>) => void,
   onSuggestions?: (suggestions: ActionSuggestion[]) => void,
+  visibleMessage?: string,
 ) {
   const ctrl = new AbortController();
 
   apiFetch(`${BASE}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ game_id: gameId, message }),
+    body: JSON.stringify({ game_id: gameId, message, visible_message: visibleMessage }),
     signal: ctrl.signal,
   }, SAFE_SERVICE_MESSAGE)
     .then(async (response) => {

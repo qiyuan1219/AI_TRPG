@@ -58,8 +58,24 @@ export function formatDiceResult(dice: DiceResult): string {
   const d = dice.data;
 
   switch (dice.type) {
-    case 'skill_check':
-      return `${d.成功 ? '检定成功' : '检定失败'} D20=${String(d.掷骰 || '').replace('D20=', '')} +${d.加值} = ${d.总计} / DC${d.DC}`;
+    case 'skill_check': {
+      const roll = String(d.掷骰 || '').replace('D20=', '') || '?';
+      const total = d.总计 ?? '?';
+      const dc = d.DC;
+      const ability = d.六维 || '智力';
+      const statMod = Number(d.属性加值 ?? 0);
+      const profMod = Number(d.熟练加值 ?? 0);
+      const success = d.成功;
+      const crit = d.大成功;
+      const fumble = d.大失败;
+
+      const parts = [`${roll}（点数）`, `${statMod >= 0 ? '+' : ''}${statMod}（【${ability}】加值）`];
+      if (profMod > 0) parts.push(`+${profMod}（熟练加值）`);
+
+      const formula = parts.join(' + ');
+      const suffix = crit ? '，大成功！' : fumble ? '，大失败！' : '';
+      return `${success ? '检定成功' : '检定失败'}！结果：${total} = ${formula}${dc ? ` ${success ? '≥' : '<'} DC${dc}` : ''}${suffix}`;
+    }
     case 'attack_roll': {
       const roll = String(d.攻击掷骰 || '').match(/D20=(\d+)/)?.[1] || '?';
       return `${d.命中 ? '命中' : '未命中'} D20=${roll}${d.伤害 ? `，造成 ${d.伤害} 点伤害` : ''} / AC${d.目标AC}`;
@@ -197,7 +213,7 @@ export const dndRuntime: GameRuntimeService = {
   id: 'dnd',
   name: '地心之门',
   createGame,
-  streamAction(gameId, message, callbacks) {
+  streamAction(gameId, message, callbacks, options) {
     return chatStream(
       gameId,
       message,
@@ -207,6 +223,7 @@ export const dndRuntime: GameRuntimeService = {
       callbacks.onError,
       callbacks.onStateUpdate,
       callbacks.onSuggestions,
+      options?.visibleMessage,
     );
   },
   applyStateChange,

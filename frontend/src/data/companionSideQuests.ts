@@ -198,21 +198,29 @@ const AILIN_SIDE_QUEST: CompanionSideQuestDef = {
   title: '白枝下的名字',
   location: '孢海据点伤员棚',
   insertion: { type: 'after', sceneId: 'spore_outpost_arrival' },
-  description: '抵达孢海据点后，艾琳检查伤员污染程度、整理阵亡者名册。体现她对"伤者不是负担、牺牲者不是数字"的底线。',
+  description: '抵达孢海据点并进入出发前整备后，艾琳利用尼布核对路线的时间检查伤员污染程度、整理阵亡者名册。体现她对"伤者不是负担、牺牲者不是数字"的底线。',
 
   fixedIntro: [
     {
       speaker: '主持人',
-      text: '尼布带你们穿过据点平台时，艾琳忽然停下脚步。旁边的伤员棚里传来压抑的咳嗽声，几只染蓝的绷带被丢在铁盆里。',
+      text: '尼布把浅层地图压在补给箱上，转身去找巡逻日志。布洛克蹲在平台边缘辨认风向，凯娅拆开第一只补给箱的封扣，队伍暂时被分成几条整备线。',
+    },
+    {
+      speaker: '主持人',
+      text: '艾琳没有打断整备，只是把药箱放到伤员棚门口。帘布后传来压抑的咳嗽声，染蓝的绷带堆在铁盆里，白枝木牌上写着上一批巡逻队的名字。',
     },
     {
       speaker: '艾琳',
-      text: '「这里还有伤员。路线可以等一刻钟，污染不会等。」',
+      text: '「给我一刻钟。我先判断污染有没有扩散，能稳定一个算一个。等尼布把路线核完，我们再一起出发。」',
       portrait: '/assets/characters/ailin/ailin_white_branch.webp',
     },
     {
       speaker: '尼布',
       text: '「他们是上一批巡逻队。能站着回来的只有两个，能说完整话的一个都没有。」',
+    },
+    {
+      speaker: '瑟琳',
+      text: '「我们不会因此耽误路线确认。相反，他们可能知道蓝伞浅滩为什么突然变亮。」',
     },
     {
       speaker: '艾琳',
@@ -221,9 +229,9 @@ const AILIN_SIDE_QUEST: CompanionSideQuestDef = {
   ],
 
   objectives: [
-    '帮艾琳确认伤员污染程度。',
+    '在据点整备时间内帮艾琳确认伤员污染程度。',
     '从伤员或遗物中获得浅滩异常线索。',
-    '决定是否花时间救治伤员。',
+    '决定如何平衡救治伤员与出发效率。',
     '整理阵亡者名册，为后续"莱因选择"做道德铺垫。',
   ],
 
@@ -245,7 +253,7 @@ const AILIN_SIDE_QUEST: CompanionSideQuestDef = {
 
   trustChoices: [
     {
-      choice: '停下协助艾琳救治伤员',
+      choice: '陪艾琳去伤员棚确认污染情况',
       trustChange: { ailin: +10 },
       result: '获得伤员线索；艾琳对玩家明显认可。',
     },
@@ -255,7 +263,7 @@ const AILIN_SIDE_QUEST: CompanionSideQuestDef = {
       result: '兼顾效率与救援，队伍节奏最好。',
     },
     {
-      choice: '只要求艾琳快速处理，别拖延主线',
+      choice: '要求艾琳只做快速分诊，别拖延进入浅滩',
       trustChange: { ailin: -4 },
       result: '艾琳会照做，但语气变冷。',
     },

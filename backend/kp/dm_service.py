@@ -882,7 +882,7 @@ boss_reply 必须是奥兰第一人称台词，60-120个中文字符，无论成
     }
 
 
-BATTLE_NARRATE_PROMPT = """你是"D&D 地心之门"的战场解说员（KP）。根据下方战斗数据，用 1-2 句话生动描述这一回合的交锋。
+BATTLE_NARRATE_PROMPT = """你是"D&D 地心之门"的战场解说员（KP）。根据下方战斗数据，用 1 句完整中文描述这一回合的交锋。
 
 要求：
 - 必须提及{actor_name}对{target_name}使用了技能"{skill_name}"
@@ -891,7 +891,7 @@ BATTLE_NARRATE_PROMPT = """你是"D&D 地心之门"的战场解说员（KP）。
 - 语言贴合《地心之门》的固定剧本风格：冷光、缆索、孢尘、黑石、祷文、破甲声等意象可以少量使用，语气像中文视觉小说/TRPG主持人
 - 绝对不要公式化，每次描述都要不同
 - 只输出叙述文字，不要加"KP："前缀，不要标点以外的格式
-- 必须是完整闭合的中文句子，不能以逗号、顿号、冒号、破折号或半截动作结尾
+- 必须是完整闭合的中文句子，70 个汉字以内，不能以逗号、顿号、冒号、破折号或半截动作结尾
 - 当前版本队伍只有冒险者、瑟琳、布洛克、艾琳、凯娅，绝对不要提及莉娅、莉亚瑟、雷铎或炉心守卫者"""
 
 
@@ -902,9 +902,13 @@ def _sanitize_battle_narration(text: str) -> str:
     forbidden_names = ("莉娅", "莉亚瑟", "雷铎", "炉心守卫者")
     if any(name in cleaned for name in forbidden_names):
         return ""
-    cleaned = cleaned.rstrip("，、；：:-— ")
-    if cleaned and cleaned[-1] not in "。！？.!?」”":
-        cleaned += "。"
+    sentence_end = max(cleaned.rfind(mark) for mark in "。！？.!?")
+    if sentence_end >= 10 and sentence_end < len(cleaned) - 1:
+        cleaned = cleaned[:sentence_end + 1].strip()
+    if not cleaned or cleaned[-1] not in "。！？.!?」”":
+        return ""
+    if cleaned[-1] in "，、；：:-—":
+        return ""
     return cleaned
 
 
@@ -953,13 +957,89 @@ async def dm_battle_narrate(
                 {"role": "user", "content": user_msg},
             ],
             temperature=1.0,
-            max_tokens=200,
+            max_tokens=120,
             stream=False,
         )
         text = resp.choices[0].message.content
         return _sanitize_battle_narration(text)
     except OpenAIError as error:
         logger.warning("battle narration fell back after LLM error: %s", error)
+        return ""
+
+
+MINI_GAME_COMMENTARY_PROMPT = """你是《地心之门》小游戏中的即时角色反馈生成器。
+
+角色口吻：
+- brock：布洛克，矮人孢海向导，粗砺、豪爽、嘴硬但认可实干。
+- serin：瑟琳，银杖术士，冷静、精准、像战术参谋，直接提示保留哪些骰子和重投哪些骰子。
+- orlan：奥兰，黑市盲盒商人，油滑、会推销、会调侃抽到的物品。
+
+要求：
+- 只输出该角色的一句中文台词，必须带中文引号。
+- 50 个汉字以内，完整闭合，不要解释规则外的剧情。
+- 不要改变数值、奖励、结果，也不要替玩家做选择。"""
+
+
+SHOP_CONSULT_PROMPT = """你是《地心之门》的黑市药剂商云苓。玩家点击商品咨询按钮后，你要根据商品功能解释用途。
+
+要求：
+- 只输出云苓的一句中文台词，必须带中文引号。
+- 70 个汉字以内，完整闭合。
+- 说明适合什么场景、注意什么限制，不要改价格，不要承诺剧情必胜。"""
+
+
+def _sanitize_single_line(text: str, max_chars: int = 90) -> str:
+    cleaned = " ".join(str(text or "").split()).strip()
+    if not cleaned:
+        return ""
+    sentence_end = max(cleaned.rfind(mark) for mark in "。！？!?")
+    if sentence_end >= 6 and sentence_end < len(cleaned) - 1:
+        cleaned = cleaned[:sentence_end + 1].strip()
+    if not cleaned or cleaned[-1] not in "。！？!?」”":
+        return ""
+    if len(cleaned) > max_chars:
+        return ""
+    return cleaned
+
+
+async def dm_mini_game_commentary(character: str, event: str, context: dict | None = None) -> str:
+    context = context or {}
+    try:
+        resp = await _create_chat_completion(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": MINI_GAME_COMMENTARY_PROMPT},
+                {"role": "user", "content": json.dumps({
+                    "character": character,
+                    "event": event,
+                    "context": context,
+                }, ensure_ascii=False)},
+            ],
+            temperature=0.8,
+            max_tokens=120,
+            stream=False,
+        )
+        return _sanitize_single_line(resp.choices[0].message.content, 90)
+    except OpenAIError as error:
+        logger.warning("mini-game commentary fell back after LLM error: %s", error)
+        return ""
+
+
+async def dm_shop_consult(item: dict) -> str:
+    try:
+        resp = await _create_chat_completion(
+            model=LLM_MODEL,
+            messages=[
+                {"role": "system", "content": SHOP_CONSULT_PROMPT},
+                {"role": "user", "content": json.dumps(item, ensure_ascii=False)},
+            ],
+            temperature=0.7,
+            max_tokens=120,
+            stream=False,
+        )
+        return _sanitize_single_line(resp.choices[0].message.content, 110)
+    except OpenAIError as error:
+        logger.warning("shop consult fell back after LLM error: %s", error)
         return ""
 
 

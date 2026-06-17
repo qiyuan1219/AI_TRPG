@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { shopItems } from '../data/shopItems';
 import type { ShopItem } from '../data/shopItems';
+import { fetchShopConsult } from '../services/api';
 import '../styles/ApothecaryShop.css';
 
 export interface ApothecaryShopResult {
@@ -26,18 +27,34 @@ function countInventory(inventoryText: string, itemName: string) {
     .filter((entry) => entry === itemName).length;
 }
 
+function fallbackYunlingConsult(item: ShopItem) {
+  if (item.id === 'purification_heart') return '「这不是普通药。黑石侵蚀没压到骨头里时，它才有救人的余地。」';
+  if (item.id === 'healing_potion') return '「治疗药水只管把命线拉回来，不负责让你继续莽。」';
+  if (item.stat === 'str') return '「力量药水适合破门、攀爬、硬扛，别拿来解决需要脑子的机关。」';
+  if (item.stat === 'dex') return '「敏捷药水给手和脚用，拆陷阱、潜行、躲开第一下都合适。」';
+  if (item.stat === 'con') return '「体质药水抗毒抗雾，适合进孢海前喝，不是倒下后才想起来。」';
+  if (item.stat === 'int') return '「智力药水适合符文、机关和旧文本。喝完以后，先看，再碰。」';
+  if (item.stat === 'wis') return '「感知药水让你先发现危险。它不能替你逃跑，只能让你早点决定。」';
+  if (item.stat === 'cha') return '「魅力药水是谈判用的，不是让别人突然变蠢。」';
+  return `「${item.name}能派上用场，但别把药效当奇迹。」`;
+}
+
 function ShopItemCard({
   item,
   gold,
   owned,
   count,
+  consulting,
   onBuy,
+  onConsult,
 }: {
   item: ShopItem;
   gold: number;
   owned: boolean;
   count: number;
+  consulting: boolean;
   onBuy: (item: ShopItem) => void;
+  onConsult: (item: ShopItem) => void;
 }) {
   const cannotAfford = gold < item.price;
   const disabled = owned || cannotAfford;
@@ -59,6 +76,9 @@ function ShopItemCard({
       </div>
       <div className="shop-item-buy">
         <strong className={cannotAfford ? 'shop-price-low' : ''}>{item.price}G</strong>
+        <button type="button" className="shop-consult-button" disabled={consulting} onClick={() => onConsult(item)}>
+          {consulting ? '咨询中' : '咨询'}
+        </button>
         <button type="button" disabled={disabled} onClick={() => onBuy(item)}>
           {owned ? '已购买' : cannotAfford ? '金币不足' : '购买'}
         </button>
@@ -80,6 +100,7 @@ export function ApothecaryShop({
   const [currentGold, setCurrentGold] = useState(gold);
   const [ownedUnique, setOwnedUnique] = useState<Set<string>>(new Set(purchasedKeys));
   const [localInventory, setLocalInventory] = useState(inventoryText);
+  const [consultingId, setConsultingId] = useState<string | null>(null);
 
   useEffect(() => setCurrentGold(gold), [gold]);
   useEffect(() => setOwnedUnique(new Set(purchasedKeys)), [purchasedKeys]);
@@ -125,6 +146,27 @@ export function ApothecaryShop({
     [currentGold, onPurchase, ownedUnique, showMessage],
   );
 
+  const handleConsult = useCallback(
+    (item: ShopItem) => {
+      const fallback = fallbackYunlingConsult(item);
+      showMessage(fallback, 'info');
+      setConsultingId(item.id);
+      fetchShopConsult({
+        item_id: item.id,
+        name: item.name,
+        desc: item.desc,
+        price: item.price,
+        type: item.type,
+        stat: item.stat ?? null,
+      }).then((line) => {
+        showMessage(line || fallback, 'info');
+      }).finally(() => {
+        setConsultingId((current) => (current === item.id ? null : current));
+      });
+    },
+    [showMessage],
+  );
+
   return (
     <div className={fullScreen ? 'apothecary-shop-overlay' : 'apothecary-shop-inline'}>
       <section className="apothecary-shop">
@@ -153,7 +195,9 @@ export function ApothecaryShop({
               gold={currentGold}
               owned={!item.repeatable && ownedUnique.has(item.id)}
               count={inventoryCounts.get(item.id) ?? 0}
+              consulting={consultingId === item.id}
               onBuy={handleBuy}
+              onConsult={handleConsult}
             />
           ))}
         </div>

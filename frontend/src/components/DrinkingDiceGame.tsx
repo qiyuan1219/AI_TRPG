@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DiceRollOverlay } from './DiceRollOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
+import { fetchMiniGameCommentary } from '../services/api';
 
 const INITIAL_ALCOHOL = 10;
-const INITIAL_AC = 8;
+const INITIAL_AC = 5;
 const AC_STEP = 2;
 const MAX_AC = 18;
 
@@ -48,12 +49,13 @@ interface DrinkingDiceGameProps {
 
 export function getBrockTrustGain(totalRounds: number) {
   if (totalRounds === 1) return 15;
-  if (totalRounds === 2) return 13;
-  if (totalRounds === 3) return 10;
-  if (totalRounds === 4) return 8;
-  if (totalRounds === 5) return 5;
-  if (totalRounds === 6) return 3;
-  return 0;
+  if (totalRounds === 2) return 14;
+  if (totalRounds === 3) return 13;
+  if (totalRounds === 4) return 12;
+  if (totalRounds === 5) return 10;
+  if (totalRounds === 6) return 8;
+  if (totalRounds === 7) return 6;
+  return 5;
 }
 
 export function getBrockFinalDialogue(totalRounds: number) {
@@ -142,19 +144,13 @@ const DRINKING_TUTORIAL: TutorialStep[] = [
     title: 'AC递增',
     badge: '越来越烈',
     placement: 'center',
-    body: '第一回合 AC8。每回合结束后，如果酒还没喝完，AC +2，最高到 AC18。\n\n越拖到后面，酒劲越冲，体质豁免越难通过。',
+    body: '第一回合 AC5。每回合结束后，如果酒还没喝完，AC +2，最高到 AC17。\n\n越拖到后面，酒劲越冲，体质豁免越难通过。',
   },
   {
     title: '喝酒与自然20',
     badge: '1D4酒量骰',
     placement: 'center',
     body: '体质豁免成功后，投 1D4，当前酒量减少对应点数。\n\n如果体质豁免投出自然20，直接把酒喝见底，游戏立即结束，不再投 1D4。',
-  },
-  {
-    title: '信任结算',
-    badge: '布洛克评价',
-    placement: 'center',
-    body: '酒量归零后，根据完成回合数增加布洛克信任：1回合+15，2回合+13，3回合+10，4回合+8，5回合+5，6回合+3，超过6回合+0。\n\n无论结果如何，布洛克都会加入队伍。',
   },
 ];
 
@@ -164,6 +160,9 @@ function createSkillDice(log: DrinkingRoundLog): DiceResult {
     data: {
       掷骰: `D20=${log.d20}`,
       加值: log.conMod,
+      属性加值: log.conMod,
+      熟练加值: 0,
+      六维: '体质',
       总计: log.total,
       DC: log.ac,
       成功: log.success,
@@ -174,11 +173,33 @@ function createSkillDice(log: DrinkingRoundLog): DiceResult {
   };
 }
 
+function createDrinkDice(log: DrinkingRoundLog): DiceResult | null {
+  if (log.drinkRoll == null) return null;
+  return {
+    type: 'dice_test',
+    data: {
+      骰子: `1D4`,
+      结果: String(log.drinkRoll),
+      总计: log.drinkRoll,
+      全部掷骰: [log.drinkRoll],
+      属性: '酒量骰',
+    },
+  };
+}
+
 function resultTone(trustGain: number) {
   if (trustGain >= 10) return 'excellent';
   if (trustGain >= 5) return 'steady';
   if (trustGain > 0) return 'strained';
   return 'rough';
+}
+
+function fallbackBrockRoundComment(log: DrinkingRoundLog) {
+  if (log.natural20) return '「……一口见底？哈！这杯子今天算是撞见硬茬了。」';
+  if (log.success && (log.drinkRoll ?? 0) >= 3) return '「够狠，喉咙没打哆嗦，手也没抖。孢海里就该有这口气。」';
+  if (log.success) return '「行，至少酒进去了。别急，下一口才开始咬人。」';
+  if (log.d20 === 1) return '「咳成这样还坐得住？有骨气，但别把桌子也喷了。」';
+  return '「被酒气顶回来了吧？别装没事，我这酒可不哄人。」';
 }
 
 function GameTutorialPrompt({
@@ -250,7 +271,9 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
   const [visibleRounds, setVisibleRounds] = useState(0);
   const [rolling, setRolling] = useState(false);
   const [currentDice, setCurrentDice] = useState<DiceResult | null>(null);
+  const pendingDrinkDiceRef = useRef<DiceResult | null>(null);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const [brockComment, setBrockComment] = useState('「先说好，铁锅烈酒不讲礼貌。你要是倒了，我只笑三声。」');
 
   const visibleLogs = result?.logs.slice(0, visibleRounds) ?? [];
   const lastLog = visibleLogs[visibleLogs.length - 1] ?? null;
@@ -274,6 +297,8 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
     setVisibleRounds(0);
     setRolling(false);
     setCurrentDice(null);
+    pendingDrinkDiceRef.current = null;
+    setBrockComment('「杯子端稳。喝酒看起来简单，能不能站着下孢海才是正事。」');
   }
 
   function revealNextRound() {
@@ -281,11 +306,45 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
     const log = result.logs[visibleRounds];
     if (!log) return;
     setRolling(true);
+    // 阶段1：体质豁免 D20（关闭后自动展示 1D4 酒量骰）
+    pendingDrinkDiceRef.current = log.success ? createDrinkDice(log) : null;
     setCurrentDice(createSkillDice(log));
-    window.setTimeout(() => {
-      setVisibleRounds((value) => Math.min(result.logs.length, value + 1));
-      setRolling(false);
-    }, 720);
+  }
+
+  function finishRound(log: DrinkingRoundLog) {
+    if (!result) return;
+    setVisibleRounds((value) => Math.min(result.logs.length, value + 1));
+    setRolling(false);
+    const fallback = fallbackBrockRoundComment(log);
+    setBrockComment(fallback);
+    fetchMiniGameCommentary('brock', 'drinking_round_end', {
+      round: log.round,
+      ac: log.ac,
+      d20: log.d20,
+      con_mod: log.conMod,
+      total: log.total,
+      success: log.success,
+      natural20: log.natural20,
+      drink_roll: log.drinkRoll,
+      alcohol_before: log.alcoholBefore,
+      alcohol_after: log.alcoholAfter,
+    }).then((line) => {
+      if (line) setBrockComment(line);
+    });
+  }
+
+  // 骰子关闭时：若还有待展示的酒量骰则接力展示
+  function handleDiceClose() {
+    const pending = pendingDrinkDiceRef.current;
+    pendingDrinkDiceRef.current = null;
+    if (pending) {
+      setCurrentDice(pending);
+    } else {
+      setCurrentDice(null);
+      if (result && visibleRounds < result.logs.length) {
+        finishRound(result.logs[visibleRounds]);
+      }
+    }
   }
 
   function finish() {
@@ -310,7 +369,7 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
         <header className="brock-drink-header">
           <div>
             <span>布洛克的烈酒考验</span>
-            <small>酒量10 · 初始AC8 · 每回合AC+2 · 自然20直接见底</small>
+            <small>酒量10 · 起始AC5 · 每回合AC+2 · 自然20直接见底</small>
           </div>
           <button type="button" className="brock-drink-close" onClick={onBack} aria-label="关闭喝酒游戏">×</button>
         </header>
@@ -356,11 +415,17 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
               <p>{statusText}</p>
               {lastLog && (
                 <div className={`brock-drink-last ${lastLog.success ? 'success' : 'fail'}`}>
-                  <b>{lastLog.natural20 ? '自然20' : lastLog.success ? '豁免成功' : '豁免失败'}</b>
-                  <span>D20={lastLog.d20} + {lastLog.conMod} = {lastLog.total} / AC{lastLog.ac}</span>
-                  <small>{lastLog.drinkRoll ? `酒量骰 1D4=${lastLog.drinkRoll}` : lastLog.natural20 ? '直接见底' : '本回合未喝下'}</small>
+                  <b>{lastLog.natural20 ? '自然20！直接见底' : lastLog.success ? '豁免成功' : '豁免失败'}</b>
+                  <span>D20={lastLog.d20} + {lastLog.conMod}（【体质】加值）= {lastLog.total} / AC{lastLog.ac}</span>
+                  {lastLog.drinkRoll != null && <small>酒量骰 1D4={lastLog.drinkRoll}，酒量 {lastLog.alcoholBefore} → {lastLog.alcoholAfter}</small>}
+                  {lastLog.natural20 && <small>自然20，酒量直接归零</small>}
+                  {!lastLog.success && <small>本回合未喝下，酒量不变</small>}
                 </div>
               )}
+              <div className="brock-ai-comment">
+                <span>布洛克</span>
+                <p>{brockComment}</p>
+              </div>
             </section>
 
             {isComplete && result && (
@@ -368,6 +433,9 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
                 <span>{result.totalRounds} 回合完成</span>
                 <strong>布洛克信任 +{result.trustGain}</strong>
                 <p>{result.finalDialogue}</p>
+                <button type="button" className="tavern-tool-btn primary" onClick={finish}>
+                  结算并返回剧情
+                </button>
               </section>
             )}
           </main>
@@ -392,7 +460,7 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
         </section>
       </motion.section>
 
-      <DiceRollOverlay dice={currentDice} dieType="d20" onClose={() => setCurrentDice(null)} />
+      <DiceRollOverlay dice={currentDice} dieType="d20" onClose={handleDiceClose} />
 
       <AnimatePresence>
         {tutorialStep >= 0 && (

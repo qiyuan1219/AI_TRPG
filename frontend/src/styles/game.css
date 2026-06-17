@@ -2112,6 +2112,7 @@
   line-height: 1.65;
   overflow-wrap: anywhere;
   text-align: left;
+  white-space: pre-wrap;
 }
 
 .opening-action-tutorial-card footer {
@@ -2224,10 +2225,12 @@
   font-weight: 700;
   line-height: 1.45;
   text-align: center;
+  white-space: pre-wrap;
 }
 
 .vn-choice-btn {
   width: 100%;
+  height: auto;
   min-height: 64px;
   padding: 14px 22px;
   border: 1px solid rgba(231, 211, 161, 0.25);
@@ -2240,7 +2243,9 @@
   text-align: center;
   letter-spacing: 0;
   white-space: normal;
+  overflow: visible;
   overflow-wrap: anywhere;
+  word-break: break-word;
   font-family: "Noto Serif SC", Georgia, serif;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;

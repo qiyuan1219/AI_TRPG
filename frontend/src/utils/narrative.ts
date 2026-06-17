@@ -10,6 +10,7 @@ const ASCII_HINT_RE = /[\[\u3010]\s*HINTS\s*[:\uFF1A]\s*([\s\S]*?)[\]\u3011]/gi;
 const ASCII_HINT_START_RE = /[\[\u3010]\s*HINTS\s*[:\uFF1A]/i;
 const MACHINE_PROTOCOL_RE = /(?:[ \t]*(?:\[[^\]\r\n]{1,12}\]\s*)?)?[\[\u3010]\s*(?:STATE|SYSTEM|CMD|DIRECTIVE|SCENE)\s*[:\uFF1A][\s\S]*?(?:[\]\u3011]|$)/gi;
 const MACHINE_PROTOCOL_START_RE = /(?:[ \t]*(?:\[[^\]\r\n]{1,12}\]\s*)?)?[\[\u3010]\s*(?:STATE|SYSTEM|CMD|DIRECTIVE|SCENE)\s*[:\uFF1A]/i;
+const PHASE_LIMIT_NOTICE_RE = /(?:\r?\n)?[\[【]\s*系统提示\s*[:：]\s*这是本阶段第\s*\d+\s*\/\s*\d+\s*次选择行动。?请在完成本次叙事后直接推进到下一段剧情，不要继续停留在当前选择阶段。?\s*[\]】]/g;
 
 const HINT_RE = /[\[【]\s*HINTS\s*[:：]\s*([\s\S]*?)[\]】]/gi;
 const HINT_START_RE = /[\[【]\s*HINTS\s*[:：]/i;
@@ -107,7 +108,7 @@ function mergeOrDropDanglingClosingQuotes(lines: string[]) {
 }
 
 export function stripMachineProtocolText(input: string) {
-  return String(input || '').replace(MACHINE_PROTOCOL_RE, '').trim();
+  return String(input || '').replace(MACHINE_PROTOCOL_RE, '').replace(PHASE_LIMIT_NOTICE_RE, '').trim();
 }
 
 export function stripAllMachineProtocolText(input: string) {
@@ -133,7 +134,17 @@ function findHintStart(input: string) {
 }
 
 function findHintEnd(input: string, start: number) {
-  for (let index = start; index < input.length; index += 1) {
+  for (let index = start + 1; index < input.length; index += 1) {
+    const char = input[index];
+    if (char === '[' || char === '【') {
+      const close = char === '[' ? ']' : '】';
+      const nestedEnd = input.indexOf(close, index + 1);
+      if (nestedEnd > index) {
+        index = nestedEnd;
+        continue;
+      }
+    }
+
     if (input[index] !== ']' && input[index] !== '】') continue;
     const next = input.slice(index + 1).match(/\S/)?.[0] ?? '';
     if (next === '|' || next === ']' || next === '】') continue;
@@ -275,6 +286,28 @@ function findExactRegisteredSpeaker(candidate: string) {
   return '';
 }
 
+function findLeadingRegisteredSpeaker(candidate: string): { speaker: string; cue: string } | null {
+  const cleaned = candidate.trim();
+  const normalizedCandidate = cleaned.replace(/[「」『』“”"']/g, '').replace(/\s+/g, '');
+  if (!normalizedCandidate) return null;
+
+  for (const alias of SPEAKER_ALIASES_SORTED) {
+    const speaker = SPEAKER_ALIASES[alias];
+    const normalizedAlias = alias.replace(/[「」『』“”"']/g, '').replace(/\s+/g, '');
+    const normalizedSpeaker = speaker.replace(/[「」『』“”"']/g, '').replace(/\s+/g, '');
+    const matchedAlias = normalizedCandidate.startsWith(normalizedAlias) ? normalizedAlias : '';
+    const matchedSpeaker = normalizedCandidate.startsWith(normalizedSpeaker) ? normalizedSpeaker : '';
+    const matched = matchedAlias || matchedSpeaker;
+    if (!speaker || !matched || normalizedCandidate === matched) continue;
+
+    const rest = normalizedCandidate.slice(matched.length);
+    if (!rest || rest.length > 8 || /^(的|和|与|及|以及|、)/.test(rest)) continue;
+    return { speaker, cue: cleaned };
+  }
+
+  return null;
+}
+
 function stripSpeechVerbSuffix(candidate: string) {
   let cleaned = candidate.trim();
   for (const verb of SPEECH_VERBS.slice().sort((a, b) => b.length - a.length)) {
@@ -286,13 +319,17 @@ function stripSpeechVerbSuffix(candidate: string) {
   return cleaned;
 }
 
-function explicitDialogueSpeaker(candidate: string) {
+function explicitDialogueSpeaker(candidate: string): { speaker: string; cue: string } | null {
   const suffix = candidate.trim().split(/[。！？.!?；;\n]/).pop()?.trim() ?? '';
-  if (!suffix || /[，,、]/.test(suffix)) return '';
+  if (!suffix || /[，,、]/.test(suffix)) return null;
 
   const cleaned = stripSpeechVerbSuffix(suffix);
-  if (!cleaned || /^(他|她|它|他们|她们|有人|对方|那人|她们俩|他们俩)$/.test(cleaned)) return '';
-  return findExactRegisteredSpeaker(cleaned);
+  if (!cleaned || /^(他|她|它|他们|她们|有人|对方|那人|她们俩|他们俩)$/.test(cleaned)) return null;
+
+  const exactSpeaker = findExactRegisteredSpeaker(cleaned);
+  if (exactSpeaker) return { speaker: exactSpeaker, cue: '' };
+
+  return findLeadingRegisteredSpeaker(cleaned);
 }
 
 function findSpeakerNearQuote(before: string, after: string) {
@@ -411,6 +448,12 @@ function isPureSpeechAttribution(text: string) {
   return false;
 }
 
+function pureRegisteredSpeaker(text: string) {
+  const cleaned = normalizeNarrationPiece(stripOuterSquareBrackets(text)).replace(/[【】\s：:，,。.!！?？；;]+$/g, '');
+  if (!cleaned) return '';
+  return findExactRegisteredSpeaker(cleaned);
+}
+
 function pushNarration(segments: NarrativeSegment[], text: string, speaker: string) {
   if (looksLikeActionSuggestionArtifact(text)) return;
   if (isPureSpeechAttribution(text)) return;
@@ -429,7 +472,7 @@ function pushNarration(segments: NarrativeSegment[], text: string, speaker: stri
 }
 
 function pushDialogue(segments: NarrativeSegment[], text: string, speaker: string) {
-  const cleaned = text.trim();
+  const cleaned = text.trim().replace(/\s*\n+\s*/g, '');
   if (looksLikeActionSuggestionArtifact(cleaned)) return;
   if (isDanglingClosingQuoteLine(cleaned)) return;
   if (!cleaned) return;
@@ -439,26 +482,10 @@ function pushDialogue(segments: NarrativeSegment[], text: string, speaker: strin
 function mergeShortSegments(segments: NarrativeSegment[]) {
   const merged = [...segments];
 
-  for (let index = 0; index <= merged.length - 3; index += 1) {
-    const current = merged[index];
-    const middle = merged[index + 1];
-    const next = merged[index + 2];
-    const sameSpeakerAroundNarration = current.speaker !== '主持人' && middle.speaker === '主持人' && next.speaker === current.speaker;
-    const shortBridge = isShortText(current.text) || isShortText(middle.text);
-
-    if (sameSpeakerAroundNarration && shortBridge) {
-      merged.splice(index, 3, {
-        speaker: current.speaker,
-        text: joinSegmentText(current.text, middle.text, next.text),
-      });
-      index = Math.max(-1, index - 2);
-    }
-  }
-
   for (let index = 0; index < merged.length; index += 1) {
     const current = merged[index];
     if (!current || !isShortText(current.text) || merged.length <= 1) continue;
-    if (current.speaker !== '主持人') continue;
+    if (current.speaker === '主持人') continue;
 
     const previous = merged[index - 1];
     const next = merged[index + 1];
@@ -475,19 +502,6 @@ function mergeShortSegments(segments: NarrativeSegment[]) {
       merged.splice(index, 1);
       index = Math.max(-1, index - 2);
       continue;
-    }
-
-    if (next) {
-      next.text = joinSegmentText(current.text, next.text);
-      merged.splice(index, 1);
-      index = Math.max(-1, index - 2);
-      continue;
-    }
-
-    if (previous) {
-      previous.text = joinSegmentText(previous.text, current.text);
-      merged.splice(index, 1);
-      index = Math.max(-1, index - 2);
     }
   }
 
@@ -532,6 +546,41 @@ function mergeShortLines(lines: string[]) {
   return merged;
 }
 
+function splitNarrativeBlocks(text: string) {
+  const blocks: string[] = [];
+  let start = 0;
+  let quoteClose = '';
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+
+    if (!quoteClose) {
+      const close = closingQuoteFor(char);
+      if (close) {
+        quoteClose = close;
+        continue;
+      }
+    } else if (isQuoteClose(char, quoteClose)) {
+      quoteClose = '';
+      continue;
+    }
+
+    if (char !== '\n' || quoteClose) continue;
+
+    const block = text.slice(start, i).trim();
+    if (block) blocks.push(block);
+
+    while (i + 1 < text.length && text[i + 1] === '\n') {
+      i += 1;
+    }
+    start = i + 1;
+  }
+
+  const tail = text.slice(start).trim();
+  if (tail) blocks.push(tail);
+  return blocks;
+}
+
 export function parseNarrativeSegments(
   input: string,
   defaultSpeaker = '主持人',
@@ -543,7 +592,8 @@ export function parseNarrativeSegments(
 
   if (!text) return { segments, lastSpeaker };
 
-  const blocks = text.split(/\n+/).map((block) => block.trim()).filter(Boolean);
+  const blocks = splitNarrativeBlocks(text);
+  let pendingSpeaker = fallbackSpeaker;
 
   // 合并孤立的 「」 后引号：AI 偶尔在引号内换行导致 」 单独成行
   for (let i = blocks.length - 1; i > 0; i -= 1) {
@@ -557,14 +607,28 @@ export function parseNarrativeSegments(
   }
 
   for (const block of blocks) {
+    const blockSpeaker = pureRegisteredSpeaker(block);
+    if (blockSpeaker) {
+      pendingSpeaker = blockSpeaker;
+      lastSpeaker = blockSpeaker;
+      continue;
+    }
+
+    const pendingDialogue = block.match(/^["「“]([\s\S]*?)["」”]$/);
+    if (pendingDialogue && pendingSpeaker) {
+      pushDialogue(segments, pendingDialogue[1], pendingSpeaker);
+      lastSpeaker = pendingSpeaker;
+      continue;
+    }
+
     const dialogueRe = /([^「」“”\n。！？.!?]+?)\s*[:：]\s*([「“])([\s\S]*?)([」”])/g;
     let cursor = 0;
     let hasDialogue = false;
     let match: RegExpExecArray | null;
 
     while ((match = dialogueRe.exec(block))) {
-      const speaker = explicitDialogueSpeaker(match[1]);
-      if (!speaker) {
+      const speakerInfo = explicitDialogueSpeaker(match[1]);
+      if (!speakerInfo) {
         pushNarration(segments, block.slice(cursor, match.index + match[0].length), defaultSpeaker);
         cursor = match.index + match[0].length;
         continue;
@@ -575,8 +639,10 @@ export function parseNarrativeSegments(
       const actor = findSpeaker(before);
       const narrationSpeaker = before.includes('【') && actor ? actor : defaultSpeaker;
       pushNarration(segments, before, narrationSpeaker);
-      pushDialogue(segments, match[3], speaker);
-      lastSpeaker = speaker;
+      pushNarration(segments, speakerInfo.cue, defaultSpeaker);
+      pushDialogue(segments, match[3], speakerInfo.speaker);
+      lastSpeaker = speakerInfo.speaker;
+      pendingSpeaker = speakerInfo.speaker;
 
       cursor = match.index + match[0].length;
     }

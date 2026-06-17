@@ -327,6 +327,17 @@
   font-size: 0.9rem;
 }
 
+.orlan-reward-comment {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(97, 204, 184, 0.3);
+  border-radius: 10px;
+  background: rgba(97, 204, 184, 0.08);
+  color: #f7e6b6;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
 .orlan-reward-card button {
   min-width: 120px;
   min-height: 40px;
