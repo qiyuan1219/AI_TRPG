@@ -32,6 +32,8 @@ import type {
 import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrativeSegments, splitNarrative, stripAllMachineProtocolText, stripMachineProtocolText } from './utils/narrative';
 import { buildTrustPatch, COMPANION_ID_BY_EVENT_ID, getCompanionTrust, getTrustTier } from './utils/trust';
 
+
+
 const TitleMenu = lazy(() => import('./components/TitleMenu').then((module) => ({ default: module.TitleMenu })));
 const StartDND = lazy(() => import('./components/StartDND').then((module) => ({ default: module.StartDND })));
 const LoadGameScreen = lazy(() => import('./components/LoadGameScreen').then((module) => ({ default: module.LoadGameScreen })));
@@ -682,8 +684,11 @@ function linearRecruitmentHints(state: GameState): string[] {
   const serinSideDone = hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3');
   const bossDone = hasStateFlag(state, 'boss_defeated', 'bossDefeated');
 
-  if (state.expedition_registered && arrivedSporeOutpost && !ailinSideDone) {
+  if (state.expedition_registered && arrivedSporeOutpost && !ailinSideDone && !state.ailin_request_ignored) {
     return ['陪艾琳去伤员棚确认污染情况', '向尼布索要巡逻日志【魅力DC11】', '检查据点补给箱【智力DC12】', '整理阵亡者木牌与伤员名册【智力DC13】'];
+  }
+  if (state.expedition_registered && arrivedSporeOutpost && state.ailin_request_ignored && !blueShoalDone) {
+    return ['前往蓝伞浅滩', '留意浅滩边缘的巡逻队遗物【感知DC14】', '确认蓝伞浅滩安全路线【感知DC13】'];
   }
 
   if (ailinSideDone && !blueShoalDone) {
@@ -1363,6 +1368,7 @@ export default function App() {
   const eventTimersRef = useRef<number[]>([]);
   const rewardNoticeIdRef = useRef(1);
   const passphraseHintShownRef = useRef(false);
+  const pendingBattleRef = useRef<string>(''); // 前置剧情结束后触发战斗
   const rewardBaselineRef = useRef<GameState | null>(null);
   const rewardNoticeDeferRef = useRef(false);
   const queuedRewardNoticesRef = useRef<RewardNotice[]>([]);
@@ -1660,12 +1666,23 @@ export default function App() {
         }
       }
 
+      // 条件行过滤
+      const checkFlag = (flag: string) => {
+        const negate = flag.startsWith('!');
+        const key = negate ? flag.slice(1) : flag;
+        const parts = key.split('.');
+        let val: any = stateRef.current;
+        for (const p of parts) { val = val?.[p]; }
+        return negate ? !val : Boolean(val);
+      };
+      const filteredLines = scene.lines.filter((l) => !l.condition || checkFlag(l.condition));
+
       setStory((prev) => {
-        const newLines: StoryLine[] = [...injectedLines, ...scene.lines].map((line) => ({
+        const newLines: StoryLine[] = [...injectedLines, ...filteredLines].map((line) => ({
           id: lineId.current++,
           role: 'kp' as const,
           speaker: line.speaker,
-          text: line.text,
+          text: line.text.replace(/\{name\}/g, gameState.player_name || '你'),
           portrait: line.portrait || getScriptedPortraitOverride(scene.id, line.speaker),
           bgImage: line.bgImage,
           bgm: line.bgm || scene.bgm,
@@ -1679,10 +1696,26 @@ export default function App() {
       });
 
       scene.events?.forEach((eventText) => addEvent(eventText, 'state'));
-      const hints = options.dynamicHints ?? scene.hints;
-      setSuggestions(options.dynamicHints ? makeSuggestions(hints) : constrainActionSuggestions({ ...stateRef.current, ...statePatch }, makeSuggestions(hints)));
+      const nextState = { ...stateRef.current, ...statePatch };
+
+      // 孢海据点调查门控
+      let finalHints = options.dynamicHints ?? scene.hints;
+      if (nextState.outpost_name_list_checked && nextState.patrol_log_checked && !nextState.ailin_wounded_pre_seen) {
+        finalHints = ['确认据点调查结果'];
+      } else if (scene.id === 'outpost-name-list' || scene.id === 'outpost-patrol-log' || scene.id === 'spore-outpost-arrival') {
+        const remaining: string[] = [];
+        if (!nextState.outpost_name_list_checked) remaining.push('整理阵亡者名册');
+        if (!nextState.patrol_log_checked) remaining.push('翻看旧巡逻记录');
+        if (remaining.length) finalHints = remaining;
+      }
+
+      setSuggestions(options.dynamicHints ? makeSuggestions(finalHints) : constrainActionSuggestions(nextState, makeSuggestions(finalHints)));
       setScriptedBgOverride(scene.bgImage || null);
       scriptedBgSceneRef.current = scene.setArea || '';
+      // 蓝伞浅滩前置剧情后触发战斗
+      if (scene.id === 'enter-blue-shoal') {
+        pendingBattleRef.current = 'enemy_pack_blue_shoal';
+      }
       setPhase('narrating');
     },
     [addEvent, appendStoryLines, gameId, gameState.player_name],
@@ -2470,6 +2503,38 @@ export default function App() {
         return;
       }
 
+      // 孢海据点调查完成 → 进入艾琳支线前置
+      if (currentState.outpost_name_list_checked && currentState.patrol_log_checked && !currentState.ailin_wounded_pre_seen && /确认据点调查结果/.test(action)) {
+        const preScene = getScriptedScene('ailin-wounded-pre');
+        if (preScene) { appendStoryLines([action], 'player', gameState.player_name || '你', true); playScriptedScene(preScene, { focus: false }); }
+        return;
+      }
+      // 艾琳支线入口
+      if (currentState.ailin_wounded_pre_seen && /停下协助艾琳救治伤员/.test(action)) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        const sqScene = getScriptedScene('ailin-sidequest');
+        if (sqScene) { const ct = getCompanionTrust(currentState,'ailin'); const tp = buildTrustPatch(currentState,{ailin:Math.min(100,ct+15)}); playScriptedScene(sqScene,{focus:false,extraStatePatch:tp}); addEvent('艾琳信任+15','state'); }
+        return;
+      }
+      // 艾琳支线内选择
+      if (/帮艾琳记录伤员说出的名字/.test(action) && !currentState.ailin_wounded_names_done) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        const ct = getCompanionTrust(currentState,'ailin'); const tp = buildTrustPatch(currentState,{ailin:Math.min(100,ct+5)});
+        const sq = getScriptedScene('ailin-sidequest-complete'); if(sq){playScriptedScene(sq,{focus:false,extraStatePatch:{...tp,player_helped_record_names:true}});addEvent('艾琳信任+5','state');}
+        return;
+      }
+      if (/优先追问第三巡逻队路线/.test(action) && !currentState.ailin_wounded_names_done) {
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        const sq = getScriptedScene('ailin-sidequest-complete'); if(sq){playScriptedScene(sq,{focus:false,extraStatePatch:{player_prioritized_route_info:true}});}
+        return;
+      }
+      // 无视艾琳→信任-20
+      if (/无视伤员继续前进/.test(action)) {
+        const ig = getScriptedScene('ignore-ailin');
+        if(ig){const ct=getCompanionTrust(currentState,'ailin');const tp=buildTrustPatch(currentState,{ailin:Math.max(0,ct-20)});stateRef.current={...currentState,...tp};setGameState(stateRef.current);appendStoryLines([action],'player',gameState.player_name||'你',true);playScriptedScene(ig,{focus:false});addEvent('艾琳信任-20','state');}
+        return;
+      }
+
       // 🔴 固定剧情脚本拦截：不需要AI生成，直接逐条显示
       const scripted = matchScriptedScene(action);
       if (scripted) {
@@ -2553,20 +2618,21 @@ export default function App() {
         return;
       }
 
-      // ====== 深层主线触发：蓝伞浅滩战斗 ======
+      // 蓝伞浅滩入口拦截：未完成艾琳支线时阻止前往
+      if (currentState.spore_outpost_reached && !currentState.ailin_wounded_names_done && !currentState.ailin_request_ignored && /前往蓝伞浅滩|进入蓝伞/.test(action)) {
+        blockRoute('艾琳把药箱扣好，朝伤员棚看了一眼：「尼布还在核对浅滩路线。给我这段时间确认污染程度，至少别让我们把一个能说话的线索留在身后。」', ['陪艾琳去伤员棚确认污染情况','判断伤员污染程度【医疗DC12】','整理阵亡者木牌与伤员名册【智力DC13】']);
+        return;
+      }
+
+      // ====== 深层主线触发：蓝伞浅滩前置→战斗 ======
       if (currentState.spore_outpost_reached && !currentState.blue_shoal_battle_done && /前往蓝伞浅滩|进入蓝伞|蓝伞浅滩|穿过浅滩/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
-        startDeepBattle('enemy_pack_blue_shoal', () => {
-          // 胜利：进入战后结算
-          const afterBattle = getScriptedScene('after-battle-blue-shoal');
-          if (afterBattle) playScriptedScene(afterBattle, { focus: false });
-        }, () => {
-          appendStoryLines([
-            '蓝伞浅滩的孢光将队伍逼退。你们退回据点边缘重新整队，确认路线后还可以再次进入浅滩。',
-          ], 'kp', '主持人', true);
-          setSuggestions(makeSuggestions(['前往蓝伞浅滩', '确认蓝伞浅滩安全路线【感知DC13】', '让艾琳评估队伍污染状态']));
-          setPhase('narrating');
-        });
+        const enterScene = getScriptedScene('enter-blue-shoal');
+        if (enterScene && !currentState.enter_blue_shoal_played) {
+          playScriptedScene(enterScene, { focus: false, extraStatePatch: { enter_blue_shoal_played: true } });
+        } else {
+          startDeepBattle('enemy_pack_blue_shoal', () => { const af = getScriptedScene('after-battle-blue-shoal'); if(af)playScriptedScene(af,{focus:false}); }, () => { appendStoryLines(['蓝伞浅滩的孢光将队伍逼退。你们退回据点边缘重新整队，确认路线后还可以再次进入浅滩。'],'kp','主持人',true);setSuggestions(makeSuggestions(['前往蓝伞浅滩','确认蓝伞浅滩安全路线【感知DC13】','让艾琳评估队伍污染状态']));setPhase('narrating'); });
+        }
         return;
       }
 
@@ -3317,6 +3383,19 @@ export default function App() {
     }
 
     if (!streaming) {
+      if (pendingBattleRef.current) {
+        const battleId = pendingBattleRef.current;
+        pendingBattleRef.current = '';
+        startDeepBattle(battleId, () => {
+          const afterBattle = getScriptedScene('after-battle-blue-shoal');
+          if (afterBattle) playScriptedScene(afterBattle, { focus: false });
+        }, () => {
+          appendStoryLines(['蓝伞浅滩的孢光将队伍逼退。你们退回据点边缘重新整队，确认路线后还可以再次进入浅滩。'], 'kp', '主持人', true);
+          setSuggestions(makeSuggestions(['前往蓝伞浅滩', '确认蓝伞浅滩安全路线【感知DC13】', '让艾琳评估队伍污染状态']));
+          setPhase('narrating');
+        });
+        return;
+      }
       const forcedCompanionEventId = getForcedCompanionEventId(stateRef.current);
       if (forcedCompanionEventId) {
         setCompanionEventId(forcedCompanionEventId);
@@ -3608,6 +3687,7 @@ export default function App() {
               onSubmit={submitAction}
               placeholder={actionInputPlaceholder}
               helperText={choiceHelperText}
+              hideFreeInput={visibleSuggestions.some((s) => /整理阵亡者名册|翻看旧巡逻记录|确认据点调查结果|停下协助艾琳|无视伤员继续前进|帮艾琳记录|优先追问第三巡逻队/.test(s.text))}
             />
           ) : undefined
         }

@@ -9,6 +9,7 @@ export interface ScriptedLine {
   portrait?: string;
   bgImage?: string;
   bgm?: string;
+  condition?: string;
 }
 
 export interface ScriptedScene {
@@ -16,6 +17,7 @@ export interface ScriptedScene {
   triggers: string[];
   lines: ScriptedLine[];
   hints: string[];
+  battlePrep?: Array<{ id: string; label: string; type: 'battlePrep'; desc: string; autoSuccessWhen?: string; greatSuccessWhen?: string; alwaysSuccess?: boolean; check?: { skill: string; altSkill?: string; dc: number; label: string }; successText: string; greatSuccessText?: string; failText?: string; successEffect: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> }; greatSuccessEffect?: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> }; failEffect?: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> } }>;
   setArea?: string;
   bgImage?: string;
   bgm?: string;
@@ -23,7 +25,7 @@ export interface ScriptedScene {
   events?: string[];
   lastEvent?: string;
   autoDicePoker?: boolean;
-  clues?: Array<{ id: string; name: string; description: string; source: string; tags: string[]; icon?: string; relatedDocuments?: string[] }>;
+  clues?: Array<{ id: string; name: string; description: string; source: string; tags: string[]; icon?: string; relatedDocuments?: string[]; imageUrl?: string }>;
   manualOnly?: boolean;
 }
 
@@ -800,30 +802,262 @@ const SPORE_OUTPOST_ARRIVAL: ScriptedScene = {
       { speaker: '主持人', text: '他把一卷卷边发潮的地图拍在补给箱上，手指随即按住其中几处被深蓝墨水反复圈出的区域。' },
       { speaker: '尼布', text: '「第一，别追那些异常荧光。它们有些会移动，有些会引路，还有些专门把人带到菌毯边界外面去。」' },
       { speaker: '尼布', text: '「第二，别回应远处的喊声。会喊人的东西，不一定还是人；有些声音甚至不是在叫你，只是在学你们城里人说话。」' },
-
-      { speaker: '艾琳', text: '「这里还有伤员。」' },
-      { speaker: '主持人', text: '她的目光落向平台角落。两名守卫裹着毛毯靠在补给箱旁，呼吸急促，指缝和颈侧残留着没能完全净化掉的暗色孢痕。' },
-      { speaker: '艾琳', text: '「我先确认孢毒和污染程度。能稳定一个算一个。」' },
-
-      { speaker: '布洛克', text: '「蓝伞浅滩最近不该这么亮。」' },
-      { speaker: '主持人', text: '布洛克蹲下身，捻起护栏边的一层孢尘放到鼻前闻了闻，眉头很快皱紧。' },
-      { speaker: '布洛克', text: '「先看风向、孢尘厚度和菌毯边界，再决定从哪条路进去。亮成这样，下面的东西八成已经开始换季了。」' },
-
-      { speaker: '凯娅', text: '「补给箱少了两个封扣，锁痕很新。」' },
-      { speaker: '主持人', text: '她用匕首尖轻轻挑了一下箱角的金属片，发出清脆的一声。' },
-      { speaker: '凯娅', text: '「这里有人走得很急，也可能有人拿走了不该拿的东西。要么是逃命，要么是提前知道自己用不上了。」' },
-
-      { speaker: '瑟琳', text: '「先确认据点记录、队伍状态和进入路线。离开这里之后，就是真正的无光孢海。」' },
-      { speaker: '尼布', text: '「对。」' },
-      { speaker: '主持人', text: '尼布把地图递到你手里，纸面冰冷潮湿，边缘还沾着几粒发亮的孢粉。' },
-      { speaker: '尼布', text: '「出了这道平台，符文灯就照不到你们了。到那时候，能带路的不是墙上的标记，而是你们自己还能不能分清前后左右。」' },
-      { speaker: '尼布', text: '「欢迎来到孢海据点——也是大多数人最后一个还能安心喘气的地方。」' }
   ],
   hints: [
-    '停下协助艾琳救治伤员',
-    '判断伤员污染程度【医疗DC12】',
-    '整理阵亡者名册【调查DC13】',
+    '整理阵亡者名册',
+    '翻看旧巡逻记录',
   ],
+  clues: [
+    {
+      id: 'spore_sea_map',
+      name: '无光孢海地图',
+      description: '尼布交给你的浅层巡逻地图。标注了蓝伞浅滩、骨柱湿地、废弃据点和黑石之门的大致方位，但更深处仍是一片空白。',
+      source: '孢海据点 · 尼布',
+      tags: ['孢海', '地图', '关键道具'],
+      imageUrl: '/assets/icons/items/map.png',
+    },
+  ],
+};
+
+// ============================================================
+// 孢海据点 · 整理阵亡者名册
+// ============================================================
+const OUTPOST_NAME_LIST: ScriptedScene = {
+  id: 'outpost-name-list',
+  triggers: ['整理阵亡者名册'],
+  setArea: '无光孢海·孢海据点',
+  bgImage: '/assets/scenes/jidi.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { outpost_name_list_checked: true,third_patrol_names_confirmed: true,last_event:'整理了第三巡逻队的残缺名册' },
+  events: ['整理第三巡逻队名册','艾琳信任+5'],
+  lastEvent: '在孢海据点整理阵亡者名册，确认第三巡逻队部分成员',
+  hints: [],
+  lines: [
+    { speaker: '主持人', text: '你走到据点内侧的记录板前。几枚身份牌被临时钉在木板上，有的完整，有的只剩半截，旁边的姓名栏还空着。' },
+    { speaker: '艾琳', text: '「这些不是数字。每一个空格后面，都有一个等不到消息的人。」' },
+    { speaker: '主持人', text: '你逐一核对身份牌、遗物和残缺名册，从被孢尘浸花的字迹里整理出第三巡逻队的部分名单。' },
+    { speaker: '尼布', text: '「……原来他们最后还是留下了名字。」' },
+    { speaker: '艾琳', text: '「只要还有人记得，就不算完全留在黑暗里。」' },
+  ],
+  clues: [{ id:'clue_third_patrol_roster',name:'第三巡逻队残缺名册',description:'你在孢海据点整理出的残缺名册，记录了第三巡逻队的部分姓名与遗物。',source:'孢海据点·记录板',tags:['巡逻队','名册','调查'] }],
+};
+
+// ============================================================
+// 孢海据点 · 翻看旧巡逻记录
+// ============================================================
+const OUTPOST_PATROL_LOG: ScriptedScene = {
+  id: 'outpost-patrol-log',
+  triggers: ['翻看旧巡逻记录'],
+  setArea: '无光孢海·孢海据点',
+  bgImage: '/assets/scenes/jidi.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { patrol_log_checked: true,clue_voice_mimic: true,route_broken_bridge_unlocked: true,last_event:'翻看了旧巡逻记录' },
+  events: ['发现巡逻记录中的偏航线索'],
+  lastEvent: '翻看旧巡逻记录，发现第三巡逻队因回应远处的喊声而偏离路线',
+  hints: [],
+  lines: [
+    { speaker: '主持人', text: '你翻开旧巡逻记录。最近几页的墨迹比前面潦草，路线标记被反复划掉，又用深蓝墨水重新圈起。' },
+    { speaker: '瑟琳', text: '「这里。第三巡逻队原本不该靠近东侧断梁。」' },
+    { speaker: '布洛克', text: '「他们偏航了。风向不对，脚印却往荧光更亮的地方去了。」' },
+    { speaker: '主持人', text: '最后一行记录写得极重：东侧断梁后方传来求救声，疑似失踪队员，第三巡逻队改变路线，随后未归。' },
+    { speaker: '尼布', text: '「我告诉过他们，别回应远处的喊声。」' },
+    { speaker: '凯娅', text: '「他们还是去了。」' },
+    { speaker: '尼布', text: '「人就是这样。明知道可能是陷阱，还是会希望那真的是同伴。」' },
+  ],
+  clues: [{ id:'clue_patrol_log_page',name:'巡逻记录残页',description:'第三巡逻队在东侧断梁附近听见求救声后偏离路线，随后未归。',source:'孢海据点·巡逻记录本',tags:['巡逻队','记录','调查'] }],
+};
+
+// ============================================================
+// 艾琳支线前置 · 发现伤员
+// ============================================================
+const AILIN_WOUNDED_PRE: ScriptedScene = {
+  id: 'ailin-wounded-pre',
+  manualOnly: true,
+  triggers: ['艾琳支线前置'],
+  setArea: '无光孢海·孢海据点',
+  bgImage: '/assets/scenes/jidi.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { ailin_wounded_pre_seen: true,last_event:'艾琳发现两名重伤的第三巡逻队幸存者' },
+  events: ['艾琳发现重伤员'],
+  lastEvent: '在孢海据点发现第三巡逻队两名重伤幸存者，艾琳请求停下救治',
+  lines: [
+    { speaker: '艾琳', text: '「等等。」' },
+    { speaker: '主持人', text: '艾琳的脚步忽然停下。她的目光越过补给箱，落向平台角落。那里有两名守卫裹着毛毯靠在墙边，呼吸急促，指缝和颈侧残留着没能完全净化掉的暗色孢痕。' },
+    { speaker: '主持人', text: '其中一人似乎已经烧得神志不清，嘴唇不断开合，反复念着几个模糊的名字。另一人怀里攥着半截断裂的身份牌，指节因为用力而发白。' },
+    { speaker: '艾琳', text: '「他们不是普通孢毒。污染已经进了伤口，还伴随精神错乱。」' },
+    { speaker: '尼布', text: '「第三巡逻队带回来的。活着回来的只有这两个，其他人……还没来得及写进名册。」' },
+    { speaker: '艾琳', text: '「没写进名册，就等于还没人替他们确认死亡。」' },
+    { speaker: '尼布', text: '「据点人手不够。我们只能先守住平台，没人有空慢慢核对遗物和证词。」' },
+    { speaker: '艾琳', text: '「伤者要稳定，阵亡者也要有名字。」' },
+    { speaker: '主持人', text: '她握紧药箱提带，指尖因为用力而微微发白。你想起她在静默神殿说过的话：能救的人要救，无法带回的人，至少要带回名字。' },
+    { speaker: '瑟琳', text: '「如果现在停下，进入孢海的时间会延后。但这些伤员也许知道第三巡逻队遭遇了什么。」' },
+    { speaker: '布洛克', text: '「耽误一点时间，总比带着瞎眼情报往菌毯里撞强。」' },
+    { speaker: '凯娅', text: '「而且那半截身份牌看起来不是自然断的。有人在混乱里抢过它。」' },
+    { speaker: '艾琳', text: '「{name}，我想留下来先处理他们。不是为了拖慢队伍，而是因为我们接下来要走的路，可能正是他们没能走完的那条。」' },
+  ],
+  hints: ['停下协助艾琳救治伤员【进入艾琳支线】','无视伤员继续前进'],
+};
+
+// ============================================================
+// 艾琳支线 · 白枝下的名字（固定剧情，无检定）
+// ============================================================
+const AILIN_SIDEQUEST: ScriptedScene = {
+  id: 'ailin-sidequest',
+  manualOnly: true,
+  triggers: ['艾琳支线白枝下的名字'],
+  setArea: '无光孢海·孢海据点伤员棚',
+  bgImage: '/assets/scenes/ailin_side_tent_interior.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { ailin_backstory_revealed: true,third_patrol_names_recorded: true,wounded_guard_stabilized: true },
+  events: ['艾琳揭露身世','记录了第三巡逻队姓名','稳定了伤员'],
+  lastEvent: '艾琳揭露了成为修女的真正原因，并完整记录了第三巡逻队的失踪成员姓名',
+  lines: [
+    { speaker: '主持人', text: '你们将两名伤员抬到避风的符文灯下。平台外侧的孢光一明一暗，像有什么东西正在黑暗里缓慢呼吸。' },
+    { speaker: '艾琳', text: '「把他们的面罩解开一半，别完全摘掉。布洛克，压住他的肩膀；凯娅，帮我找身份牌和随身物。」' },
+    { speaker: '布洛克', text: '「这人烧得不轻。孢毒进血了。」' },
+    { speaker: '艾琳', text: '「还没到放弃的时候。」' },
+    { speaker: '主持人', text: '艾琳取出白枝圣徽，将净化光压进伤员发黑的伤口。伤员猛地弓起身体，像是被什么看不见的东西从梦里拖了出来。' },
+    { speaker: '伤员', text: '「队长……别过去……那不是她……那声音不是她……」' },
+    { speaker: '瑟琳', text: '「他在重复巡逻记录里的异常呼喊。」' },
+    { speaker: '艾琳', text: '「先别追问路线。他现在分不清眼前和记忆。」' },
+    { speaker: '凯娅', text: '「找到了。半截身份牌，还有一张被孢尘泡烂的巡逻名册。」' },
+    { speaker: '艾琳', text: '「给我。」' },
+    { speaker: '主持人', text: '艾琳接过身份牌，小心擦去上面的孢尘。牌面只剩半个名字，边缘像是被人硬生生掰断。' },
+    { speaker: '艾琳', text: '「名字不能只剩半个。」' },
+    { speaker: '凯娅', text: '「你对这种事很执着。」' },
+    { speaker: '艾琳', text: '「是。」' },
+    { speaker: '主持人', text: '短暂的沉默里，只有伤员急促的呼吸声和远处绞盘的回响。艾琳没有立刻解释，而是先把伤口重新包好。' },
+    { speaker: '艾琳', text: '「我小时候住在城市下缘。那时候我父亲是缆梯守卫，负责接应从深层回来的远征队。」' },
+    { speaker: '艾琳', text: '「有一年，深层回来的吊舱只带回了三只补给箱和一面烧黑的队旗。名单上写着：失踪十二人。」' },
+    { speaker: '艾琳', text: '「其中一个是我父亲。」' },
+    { speaker: '主持人', text: '她说得很平静，像这段话已经在心里重复过无数遍，早就磨去了最锋利的痛。' },
+    { speaker: '艾琳', text: '「公会那时候很忙。新的事故、新的失踪、新的委托，一件接一件。对他们来说，那只是十二个未归名额。」' },
+    { speaker: '艾琳', text: '「可对我来说，那不是十二。那是一个会在换班后给我带热面包的人，是会把破掉的护腕重新缝好的人。」' },
+    { speaker: '瑟琳', text: '「后来呢？」' },
+    { speaker: '艾琳', text: '「静默神殿的一位白枝修女陪我找了三个月。最后，她只找到一枚烧裂的身份牌。」' },
+    { speaker: '艾琳', text: '「她把身份牌交给我时说：\u2018人也许回不来了，但名字不能留在下面。名字是死者回家的路。\u2019」' },
+    { speaker: '主持人', text: '艾琳低头看着手中的半截身份牌，拇指轻轻擦过残缺的刻痕。' },
+    { speaker: '艾琳', text: '「所以我去了静默神殿。起初只是想学会怎么替父亲祈祷，后来才明白，祈祷不是让痛苦消失。」' },
+    { speaker: '艾琳', text: '「祈祷是提醒活着的人，不要把别人的痛苦整理成一串方便归档的数字。」' },
+    { speaker: '伤员', text: '「名字……我记得……队长叫……」' },
+    { speaker: '主持人', text: '伤员忽然攥住艾琳的袖口，像是拼命抓住一根即将断开的缆绳。' },
+    { speaker: '艾琳', text: '「慢慢说，我在听。」' },
+    { speaker: '伤员', text: '「罗德……伊芙……还有……还有卡恩……别让他们……别让他们没人知道……」' },
+    { speaker: '主持人', text: '艾琳没有打断他。她一边维持净化术，一边用另一只手把这些名字写在名册残页上。每写下一个名字，笔尖都停顿片刻。' },
+    { speaker: '艾琳', text: '「我记下了。你没有把他们丢在外面。」' },
+  ],
+  hints: ['帮艾琳记录伤员说出的名字','优先追问第三巡逻队路线'],
+};
+
+// ============================================================
+// 艾琳支线 · 收束剧情
+// ============================================================
+const AILIN_SIDEQUEST_COMPLETE: ScriptedScene = {
+  id: 'ailin-sidequest-complete',
+  manualOnly: true,
+  triggers: ['艾琳支线收束'],
+  setArea: '无光孢海·孢海据点出口',
+  bgImage: '/assets/scenes/jidi.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { ailin_wounded_names_done: true, completedAilinSideQuest: true, currentNodeId: 'battle_blue_shoal_01' },
+  events: ['伤员稳定','姓名记录完成'],
+  lastEvent: '伤员稳定后，尼布承诺会将姓名补进据点名册',
+  lines: [
+    { speaker: '主持人', text: '伤员的呼吸终于平稳下来。尼布叫来守卫，将他们抬回据点内侧的临时病床。' },
+    { speaker: '尼布', text: '「我会把这些名字补进据点名册。至少他们不会只剩一句未归。」' },
+    { speaker: '艾琳', text: '「谢谢。」' },
+    { speaker: '尼布', text: '「该谢的是你们。这里的人守久了，有时候会忘记自己不是石头。」' },
+    { speaker: '布洛克', text: '「走吧。再拖下去，风向该变了。」' },
+    { speaker: '凯娅', text: '「而且我们现在知道了：浅滩外的声音不可信，身份牌也可能被人动过。比空着手进去强。」' },
+    { speaker: '瑟琳', text: '「我已将伤员证词和第三巡逻队姓名记录标入路线备注。进入孢海后，若听见呼喊，全队不得擅自回应。」' },
+    { speaker: '艾琳', text: '「我准备好了。」' },
+    { speaker: '主持人', text: '艾琳重新背起药箱。白枝圣徽在孢光下泛着柔和的亮，像一盏不愿熄灭的小灯。' },
+  ],
+  clues: [
+    { id: 'clue_third_patrol_names', name: '第三巡逻队姓名记录', description: '艾琳根据伤员证词整理出的姓名记录。上面写着罗德、伊芙、卡恩等名字。', source: '孢海据点·伤员证词', tags: ['巡逻队','姓名','调查'] },
+    { id: 'clue_broken_identity_tag', name: '断裂的身份牌', description: '第三巡逻队伤员身上的半截身份牌，断口很新，似乎有人在混乱中争抢过它。', source: '孢海据点·伤员随身物', tags: ['巡逻队','身份牌','调查'] },
+  ],
+  hints: ['前往蓝伞浅滩','让布洛克判断前方风向【感知DC13】','确认旧巡逻路线上的荧光标记【感知DC14】'],
+};
+
+// ============================================================
+// 无视艾琳请求 · 继续主线（信任-20）
+// ============================================================
+const IGNORE_AILIN: ScriptedScene = {
+  id: 'ignore-ailin',
+  triggers: ['无视伤员继续前进'],
+  setArea: '无光孢海·孢海据点',
+  bgImage: '/assets/scenes/jidi.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { ailin_request_ignored: true,wounded_testimony_missed: true,ailin_sidequest_skipped: true },
+  events: ['拒绝艾琳救治请求','艾琳信任-20'],
+  lastEvent: '拒绝了艾琳救治伤员的请求，失去伤员证词线索',
+  lines: [
+    { speaker: '主持人', text: '你没有停下。平台外侧的孢光仍在闪烁，吊舱后的符文灯把你们的影子拉得很长。' },
+    { speaker: '艾琳', text: '「……现在就走？」' },
+    { speaker: '瑟琳', text: '「继续前进能节省时间，但我们会失去确认伤员证词的机会。」' },
+    { speaker: '布洛克', text: '「路是你选的。只是别忘了，孢海里没问清楚的事，通常会在更糟的时候追上来。」' },
+    { speaker: '凯娅', text: '「无视麻烦不等于麻烦消失。只是它会换个地方等你。」' },
+    { speaker: '主持人', text: '艾琳沉默地收紧药箱提带。她没有争辩，也没有离队，只是走回队伍时，脚步比之前慢了一些。' },
+    { speaker: '艾琳', text: '「我会继续履行队伍职责。伤者、孢毒和污染，我都会处理。」' },
+    { speaker: '主持人', text: '她停顿片刻，没有看你。' },
+    { speaker: '艾琳', text: '「但有些名字，错过了就不一定还能找回来。」' },
+    { speaker: '尼布', text: '「那就走吧。愿你们别在下面听见他们的声音。」' },
+  ],
+  hints: ['前往蓝伞浅滩','让布洛克判断前方风向【感知DC13】','确认旧巡逻路线上的荧光标记【感知DC14】'],
+};
+
+// ============================================================
+// 蓝伞浅滩前置 · 抵达 + 发现异常
+// ============================================================
+const ENTER_BLUE_SHOAL: ScriptedScene = {
+  id: 'enter-blue-shoal',
+  manualOnly: true,
+  triggers: ['进入蓝伞浅滩前置'],
+  setArea: '无光孢海·蓝伞浅滩',
+  bgImage: '/assets/scenes/16blue-umbrella-shoal.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: {},
+  events: ['踏入蓝伞浅滩','发现孢化兽和拟声菌团'],
+  lastEvent: '进入蓝伞浅滩，菌毯下爬出孢化兽和拟声菌团',
+  lines: [
+    { speaker: '主持人', text: '你们离开孢海据点时，身后的符文灯一点点远去。钢木平台的轮廓被孢尘吞没，只剩尼布最后一句警告还像冷铁一样压在耳边。' },
+    { speaker: '尼布', text: '「记住，别追异常荧光，别回应远处喊声。能分清同伴声音的人，才有机会回来。」' },
+    { speaker: '主持人', text: '前方没有真正意义上的道路，只有几条被旧巡逻队踩出的浅痕，在蓝绿色孢光里若隐若现。每走一步，靴底都会陷进柔软的菌毯，发出潮湿而细小的声响。' },
+    { speaker: '布洛克', text: '「跟着我踩过的地方走。别嫌慢，孢海里走快的人通常都被埋得很浅。」' },
+    { speaker: '凯娅', text: '「听起来像是经验之谈。」' },
+    { speaker: '布洛克', text: '「是。也是别人用命留下来的教程。」' },
+    { speaker: '主持人', text: '空气里的味道渐渐变甜，像发酵的果酒，又像潮湿木头长出霉斑后的气息。抗孢面罩隔住了大部分孢尘，却挡不住那股让人隐隐犯困的闷意。' },
+    { speaker: '艾琳', text: '「如果有人胸口发紧、眼前发亮，立刻告诉我。不要等到自己站不稳。」' },
+    { speaker: '瑟琳', text: '「主缆残响正在减弱，孢尘浓度上升。我们已经离开据点防护范围。」' },
+    { speaker: '主持人', text: '继续向前后，黑暗忽然开阔起来。无数巨大的蓝伞真菌从浅滩中升起，菌柄粗得像石柱，菌盖层层舒展，像一片倒扣在地底的幽蓝森林。', bgImage: '/assets/scenes/16blue-umbrella-shoal.webp' },
+    { speaker: '主持人', text: '菌盖边缘垂下细长的发光菌丝，随风轻轻摇晃。远远望去，它们像一盏盏沉在黑暗里的灯，又像许多悬在半空的水母。' },
+    { speaker: '主持人', text: '浅滩地面覆盖着厚厚的蓝色菌毯，积水在菌毯缝隙间缓慢流动，倒映出头顶菌盖的冷光。偶尔有孢泡从水面浮起，破裂时散出一圈细小的荧光尘。' },
+    { speaker: '凯娅', text: '「这里漂亮得不像安全地方。」' },
+    { speaker: '布洛克', text: '「你终于说了句对的。蓝伞浅滩平时不会亮成这样。」' },
+    { speaker: '瑟琳', text: '「亮度变化有规律吗？」' },
+    { speaker: '布洛克', text: '「没有。正常蓝伞菌会跟风向一起闪，像呼吸。现在这些……更像是在互相传信。」' },
+    { speaker: '主持人', text: '话音刚落，远处一片菌盖忽然亮起，随后另一片、第三片、第四片接连回应。冷蓝色光斑沿着浅滩深处一路扩散，像有什么看不见的东西正在水面下移动。' },
+    { speaker: '艾琳', text: '「那里有人影。」' },
+    { speaker: '主持人', text: '菌丝帘幕后，几个模糊的轮廓一闪而过。它们的高度接近人类，动作却过于僵硬，像被看不见的线吊着前行。' },
+    { speaker: '凯娅', text: '「不对。没有脚步声。」' },
+    { speaker: '布洛克', text: '「也没有呼吸声。」' },
+    { speaker: '主持人', text: '风从浅滩深处吹来，带来一阵极轻的呼喊。那声音断断续续，像被厚厚的菌毯捂住，又像有人隔着很远的水面喊你们。' },
+    { condition: 'flags.clue_voice_mimic', speaker: '瑟琳', text: '「别回应。巡逻记录里提到过，第三巡逻队就是在听见求救声后偏离路线。」' },
+    { condition: 'flags.wounded_guard_stabilized', speaker: '艾琳', text: '「伤员说过，那声音会模仿死者。所有人保持队形，不要离开灯光范围。」' },
+    { condition: '!flags.clue_voice_mimic', speaker: '瑟琳', text: '「声音来源不稳定。它不像正常回声，更像在试探我们的反应。」' },
+    { speaker: '主持人', text: '你们没有回应。那声音停顿片刻，忽然变得更近。菌毯深处鼓起几个圆形凸包，像有什么东西正从下面顶开湿软的地面。' },
+    { speaker: '布洛克', text: '「后退半步，别踩到鼓起来的地方！」' },
+    { speaker: '主持人', text: '第一团凸包猛地破开，喷出一阵蓝绿色孢尘。几只覆满菌丝的兽形生物从菌毯下爬出，骨刺与菌壳纠缠在一起，空洞的眼窝里亮着冷光。' },
+    { speaker: '艾琳', text: '「孢化兽……它们已经不是普通野兽了。」' },
+    { speaker: '主持人', text: '与此同时，先前那些人影也从菌丝帘幕后滑了出来。它们没有五官，身体像由一团团湿软菌块拼成，却从腹腔里发出断续的人声。' },
+    { speaker: '菌团', text: '「……别走……救我……」' },
+    { speaker: '凯娅', text: '「我现在更讨厌会说话的东西了。」' },
+    { speaker: '布洛克', text: '「拟声菌团。别听它们说什么，打散核心，不然它们会一直学你们的声音。」' },
+    { speaker: '瑟琳', text: '「第七远征小队，准备战斗。保持距离，不要让孢尘包围队伍。」' },
+    { speaker: '主持人', text: '蓝伞浅滩的冷光骤然变亮。孢兽压低身体，菌团在水面上缓慢铺开，战斗已经无法避免。' },
+  ],
+  hints: [],
 };
 
 // ============================================================
@@ -834,6 +1068,7 @@ const AFTER_BATTLE_BLUE_SHOAL: ScriptedScene = {
   manualOnly: true,
   triggers: ['蓝伞浅滩战后结算'],
   setArea: '无光孢海·蓝伞浅滩出口',
+  bgImage: '/assets/scenes/blue-shoal-aftermath.webp',
   bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
   statePatch: {
     blue_shoal_battle_done: true,
@@ -1000,6 +1235,13 @@ export const SCRIPTED_SCENES: ScriptedScene[] = [
   GUILD_FINAL_REGISTRATION,
   ELEVATOR_DESCENT,
   SPORE_OUTPOST_ARRIVAL,
+  OUTPOST_NAME_LIST,
+  OUTPOST_PATROL_LOG,
+  AILIN_WOUNDED_PRE,
+  AILIN_SIDEQUEST,
+  AILIN_SIDEQUEST_COMPLETE,
+  IGNORE_AILIN,
+  ENTER_BLUE_SHOAL,
   AFTER_BATTLE_BLUE_SHOAL,
   ABANDONED_FORWARD_POST,
   RHEIN_ENCOUNTER,

@@ -8,6 +8,7 @@ interface ActionPanelProps {
   placeholder?: string;
   helperText?: string;
   suggestionMode?: 'submit' | 'fill';
+  hideFreeInput?: boolean;
 }
 
 export function ActionPanel({
@@ -17,6 +18,7 @@ export function ActionPanel({
   placeholder = '输入你的行动……',
   helperText,
   suggestionMode = 'submit',
+  hideFreeInput = false,
 }: ActionPanelProps) {
   const [customAction, setCustomAction] = useState('');
 
@@ -47,23 +49,12 @@ export function ActionPanel({
           {item.label}
         </button>
       ))}
-      <form
-        className="vn-choice-custom"
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit(customAction);
-        }}
-      >
-        <input
-          value={customAction}
-          onChange={(event) => setCustomAction(event.target.value)}
-          placeholder={placeholder}
-          disabled={disabled}
-        />
-        <button type="submit" disabled={disabled || !customAction.trim()}>
-          执行
-        </button>
+      {!hideFreeInput && (
+      <form className="vn-choice-custom" onSubmit={(event) => { event.preventDefault(); submit(customAction); }}>
+        <input value={customAction} onChange={(event) => setCustomAction(event.target.value)} placeholder={placeholder} disabled={disabled} />
+        <button type="submit" disabled={disabled || !customAction.trim()}>执行</button>
       </form>
+      )}
     </div>
   );
 }
