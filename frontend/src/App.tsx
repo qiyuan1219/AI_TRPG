@@ -6,7 +6,6 @@ import type { BargainCompleteResult } from './components/BargainTestScreen';
 import type { CompanionEventCompleteResult } from './components/CompanionEventTestScreen';
 import { DiceRollOverlay } from './components/DiceRollOverlay';
 import type { EventFeedItem } from './components/EventFeed';
-import InventoryPanel from './components/InventoryPanel';
 import { LoadingScreen } from './components/LoadingScreen';
 import { VisualNovelStage } from './components/VisualNovelStage';
 import type { DrinkingDiceResult } from './components/DrinkingDiceGame';
@@ -47,6 +46,10 @@ import { SelectionActionCheck } from './utils/selectionAction';
 import './core/actions/battlePrepResolver';
 import { randomIntInclusive as secureRandomIntInclusive } from './core/random/secureRandom';
 import { AiStreamController } from './features/ai/AiStreamController';
+import { AppModals } from './features/app/AppModals';
+import { AppTopActions } from './features/app/AppTopActions';
+import { SaveLoadBinding } from './features/save/SaveLoadBinding';
+import { StoryRewardNotices, type RewardNotice } from './features/story/StoryRewardNotices';
 
 
 
@@ -59,12 +62,9 @@ const BargainTestScreen = lazy(() => import('./components/BargainTestScreen').th
 const DrinkingDiceGame = lazy(() => import('./components/DrinkingDiceGame').then((module) => ({ default: module.DrinkingDiceGame })));
 const OrlanBoxGame = lazy(() => import('./components/OrlanBoxGame'));
 const ApothecaryShop = lazy(() => import('./components/ApothecaryShop'));
-const CharacterPanel = lazy(() => import('./components/CharacterPanel'));
-const DialogueLog = lazy(() => import('./components/DialogueLog').then((module) => ({ default: module.DialogueLog })));
 const DicePokerGame = lazy(() => import('./components/DicePokerGame').then((module) => ({ default: module.DicePokerGame })));
 const CityMap = lazy(() => import('./components/CityMap').then((module) => ({ default: module.CityMap })));
 const TavernDicePoker = lazy(() => import('./components/TavernDicePoker').then((module) => ({ default: module.TavernDicePoker })));
-const SaveLoadPanel = lazy(() => import('./components/SaveLoadPanel').then((module) => ({ default: module.SaveLoadPanel })));
 
 function LazyBoundary({ children }: { children: ReactNode }) {
   return <Suspense fallback={<LoadingScreen />}>{children}</Suspense>;
@@ -277,24 +277,6 @@ function getDiceMargin(dice: DiceResult | null) {
 
 function hasStateFlag(state: GameState, ...keys: string[]) {
   return keys.some((key) => state[key] === true);
-}
-
-type RewardNoticeKind = 'item' | 'document' | 'clue';
-
-interface RewardNotice {
-  id: number;
-  kind: RewardNoticeKind;
-  name: string;
-  icon: string;
-  image: string;
-  quantity?: number;
-  summary?: string;
-}
-
-function rewardNoticeLabel(kind: RewardNoticeKind) {
-  if (kind === 'document') return '获得档案';
-  if (kind === 'clue') return '记录线索';
-  return '获得物品';
 }
 
 function rewardEntryId(entry: any) {
@@ -1312,54 +1294,6 @@ function getPreDescentTrustLines(state: GameState): ScriptedLineLike[] {
     lines.push({ speaker: '主持人', text: '没有人再多说话。安全扣逐一锁紧，金属声在吊舱里显得格外清楚。' });
   }
   return lines;
-}
-
-function RewardAcquisitionModal({
-  notices,
-  onDismiss,
-}: {
-  notices: RewardNotice[];
-  onDismiss: (id: number) => void;
-}) {
-  const notice = notices[0];
-  if (!notice) return null;
-
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={notice.id}
-        className="reward-acquisition-backdrop"
-        role="presentation"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <motion.section
-          className={`reward-acquisition-modal reward-acquisition-${notice.kind}`}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${rewardNoticeLabel(notice.kind)}：${notice.name}`}
-          initial={{ opacity: 0, scale: 0.9, y: 18 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 16 }}
-          transition={{ duration: 0.2 }}
-        >
-          <span className="reward-acquisition-kicker">{rewardNoticeLabel(notice.kind)}</span>
-          <div className="reward-acquisition-image">
-            <img
-              src={notice.image}
-              alt={notice.name}
-              onError={(event) => { event.currentTarget.src = resolveItemIconPath('default'); }}
-            />
-          </div>
-          <h2>{notice.name}{notice.quantity && notice.quantity > 1 ? ` x${notice.quantity}` : ''}</h2>
-          <p>{notice.summary || getItemSummaryByName(notice.name)}</p>
-          {notices.length > 1 && <small>还有 {notices.length - 1} 项待确认</small>}
-          <button type="button" onClick={() => onDismiss(notice.id)}>收下</button>
-        </motion.section>
-      </motion.div>
-    </AnimatePresence>
-  );
 }
 
 export default function App() {
@@ -4694,7 +4628,7 @@ export default function App() {
         })()}
       />
 
-      <RewardAcquisitionModal notices={rewardNotices} onDismiss={dismissRewardNotice} />
+      <StoryRewardNotices notices={rewardNotices} onDismiss={dismissRewardNotice} />
 
       {showLuckyBoxEntry && (
         <button
@@ -4713,126 +4647,32 @@ export default function App() {
         </div>
       )}
 
-      <div className="game-top-actions">
-        <button type="button" className="game-log-btn" onClick={() => setShowDialogueLog(true)}>
-          📜 对话日志
-        </button>
-        {canUseCityMap && (
-          <button
-            type="button"
-            className="game-map-btn"
-            onClick={() => setShowCityMap(true)}
-          >
-            🗺️ 城市地图
-          </button>
-        )}
-        <button type="button" className="game-title-btn" onClick={() => setShowReturnTitleConfirm(true)}>
-          回到标题界面
-        </button>
-        <button
-          type="button"
-          className="game-save-btn"
-          onClick={() => setShowGameSaves(true)}
-        >
-          📂 冒险存档
-        </button>
-        <div className="game-inventory-entry">
-          <InventoryPanel state={gameState} onStatePatch={patchStateFromPanel} />
-        </div>
-        <button
-          type="button"
-          className="game-character-btn"
-          aria-haspopup="dialog"
-          aria-expanded={showCharacterInfo}
-          onClick={() => setShowCharacterInfo(true)}
-        >
-          角色信息
-        </button>
-      </div>
+      <AppTopActions
+        canUseCityMap={canUseCityMap}
+        gameState={gameState}
+        characterInfoOpen={showCharacterInfo}
+        onOpenDialogueLog={() => setShowDialogueLog(true)}
+        onOpenCityMap={() => setShowCityMap(true)}
+        onOpenReturnTitle={() => setShowReturnTitleConfirm(true)}
+        onOpenSaves={() => setShowGameSaves(true)}
+        onOpenCharacterInfo={() => setShowCharacterInfo(true)}
+        onInventoryStatePatch={patchStateFromPanel}
+      />
 
-      <AnimatePresence>
-        {showReturnTitleConfirm && (
-          <motion.div
-            className="return-title-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowReturnTitleConfirm(false)}
-          >
-            <motion.section
-              className="return-title-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-label="返回标题界面确认"
-              initial={{ opacity: 0, scale: 0.94, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 12 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="return-title-copy">
-                <span>返回标题界面</span>
-                <p>请先确认当前冒险进度已经存档。未保存的剧情和状态不会自动保存。</p>
-              </div>
-              <div className="return-title-actions">
-                <button type="button" className="return-title-cancel" onClick={() => setShowReturnTitleConfirm(false)}>
-                  取消
-                </button>
-                <button type="button" className="return-title-confirm" onClick={returnToTitleMenu}>
-                  确定
-                </button>
-              </div>
-            </motion.section>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showCharacterInfo && (
-          <motion.div
-            className="character-modal-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowCharacterInfo(false)}
-          >
-            <motion.section
-              className="character-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-label="角色信息"
-              initial={{ opacity: 0, scale: 0.94, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: 12 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="character-modal-header">
-                <div>
-                  <span>角色信息</span>
-                  <small>
-                    {gameState.player_name || '冒险者'} · {getDisplayedStyleName(gameState)}
-                  </small>
-                </div>
-                <button type="button" aria-label="关闭角色信息" onClick={() => setShowCharacterInfo(false)}>
-                  ×
-                </button>
-              </div>
-              <CharacterPanel state={gameState} />
-            </motion.section>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 对话日志弹窗 */}
-      <AnimatePresence>
-        {showDialogueLog && (
-          <DialogueLog
-            story={story}
-            activeIndex={activeIndex}
-            isStreaming={streaming}
-            onClose={() => setShowDialogueLog(false)}
-          />
-        )}
-      </AnimatePresence>
+      <AppModals
+        showReturnTitleConfirm={showReturnTitleConfirm}
+        showCharacterInfo={showCharacterInfo}
+        showDialogueLog={showDialogueLog}
+        gameState={gameState}
+        displayedStyleName={getDisplayedStyleName(gameState)}
+        story={story}
+        activeIndex={activeIndex}
+        streaming={streaming}
+        onCloseReturnTitle={() => setShowReturnTitleConfirm(false)}
+        onConfirmReturnTitle={returnToTitleMenu}
+        onCloseCharacterInfo={() => setShowCharacterInfo(false)}
+        onCloseDialogueLog={() => setShowDialogueLog(false)}
+      />
 
       {/* 快艇骰子游戏弹窗 */}
       <AnimatePresence>
@@ -5073,42 +4913,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* 游戏内存档弹窗 */}
-      <AnimatePresence>
-        {showGameSaves && (
-          <motion.div
-            className="save-modal-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowGameSaves(false)}
-          >
-            <motion.div
-              className="save-modal"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="save-modal-header">
-                <span>冒险存档</span>
-                <button type="button" onClick={() => setShowGameSaves(false)}>✕</button>
-              </div>
-              <SaveLoadPanel
-                title="冒险存档"
-                saves={saves}
-                busySlot={saveBusySlot}
-                disabled={streaming}
-                message={saveMessage}
-                messageTone={saveMessageTone}
-                onRefresh={refreshSaves}
-                onSave={(slotKey, customTitle) => { saveCurrentGame(slotKey, { customTitle }); setShowGameSaves(false); }}
-                onLoad={loadSavedGame}
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SaveLoadBinding
+        open={showGameSaves}
+        saves={saves}
+        busySlot={saveBusySlot}
+        disabled={streaming}
+        message={saveMessage}
+        messageTone={saveMessageTone}
+        onClose={() => setShowGameSaves(false)}
+        onRefresh={refreshSaves}
+        onSave={(slotKey, customTitle) => {
+          void saveCurrentGame(slotKey, { customTitle });
+          setShowGameSaves(false);
+        }}
+        onLoad={loadSavedGame}
+      />
       </motion.div>
     </LazyBoundary>
   );
