@@ -1,20 +1,22 @@
 from __future__ import annotations
 
 """D&D D20 规则引擎 —— 基于 D&D 2024 战斗规则"""
-import random
 from dataclasses import dataclass
 from typing import Optional
+from engine.dice_service import DiceService
 
+_DICE = DiceService()
 
 def roll_d20() -> int:
-    return random.randint(1, 20)
+    return _DICE.roll_die(20, "rules_dnd d20", "story_check", "story_check")
 
 def roll_dice(dice_str: str) -> int:
     if "d" not in dice_str:
         return int(dice_str)
     count, sides = dice_str.split("d")
     count = int(count) if count else 1
-    return sum(random.randint(1, int(sides)) for _ in range(count))
+    event = _DICE.roll_formula(f"{count}d{int(sides)}", "rules_dnd formula", "story_check", "story_check")
+    return event["total"]
 
 
 # ============================================================

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { rollDiceEvent } from '../core/dice/createDiceEvent';
 
 interface LuckyBoxGameProps {
   gold: number;
@@ -7,7 +8,7 @@ interface LuckyBoxGameProps {
 }
 
 function rollD20() {
-  return Math.floor(Math.random() * 20) + 1;
+  return rollDiceEvent('shop_lottery', 'shop', 20).rolls[0];
 }
 
 export function LuckyBoxGame({ gold, onBack, onComplete }: LuckyBoxGameProps) {

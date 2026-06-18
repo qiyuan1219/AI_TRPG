@@ -1,6 +1,13 @@
+import type { CompatibleGameState } from '../core/state/gameState';
+import type { DiceEvent } from '../core/events/GameEvent';
+
+export type { DiceEvent } from '../core/events/GameEvent';
+
 export interface DiceResult {
   type: string;
   data: Record<string, any>;
+  /** P0 权威战斗的规范化骰子事件；data 仅供旧 UI 兼容。 */
+  event?: DiceEvent;
 }
 
 export interface ActionSuggestion {
@@ -84,29 +91,8 @@ export interface SceneBgStage {
   image: string;        // 背景图路径
 }
 
-export interface GameState {
-  [key: string]: any;
-  documents?: ArchiveDocument[];
-  clues?: InvestigationClue[];
-  flags?: Record<string, any>;
-  questLog?: QuestLog;
-  sceneState?: {
-    currentScene?: string;
-    visitedScenes?: string[];
-  };
-  equipment?: Partial<Record<'weapon' | 'shield' | 'armor' | 'accessory', string | null>>;
-  companionTrust?: Partial<Record<CompanionId, number>>;
-  trustLogs?: TrustLog[];
-  companionMemories?: CompanionMemory[];
-  se_trust?: number;
-  al_trust?: number;
-  sl_trust?: number;   // 布洛克(森洛)
-  kl_trust?: number;
-  trust_sl?: number;   // 瑟琳
-  trust_block?: number;
-  trust_al?: number;
-  trust_kl?: number;
-}
+export type { CanonicalGameState } from '../core/state/gameState';
+export type GameState = CompatibleGameState;
 
 export type CompanionId = 'serin' | 'ailin' | 'brock' | 'kaiya';
 

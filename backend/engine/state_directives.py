@@ -9,6 +9,7 @@ game state, and never shown as narrative text.
 from __future__ import annotations
 
 import json
+import copy
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
@@ -17,6 +18,7 @@ from engine.trust_system import (
     canonicalize_trust_state,
     resolve_companion_id,
 )
+from engine.game_state import PatchOperation, apply_state_patch
 
 
 @dataclass
@@ -287,7 +289,7 @@ DIRECTIVE_HANDLERS: dict[str, ChangeHandler] = {
 }
 
 
-def apply_directive(state: dict, directive: Directive | dict) -> dict:
+def apply_directive(state: dict, directive: Directive | dict, source: str = "system") -> dict:
     canonicalize_trust_state(state)
     if isinstance(directive, Directive):
         name, data = directive.name, directive.data
@@ -300,7 +302,25 @@ def apply_directive(state: dict, directive: Directive | dict) -> dict:
         return {"type": "unknown", "reason": f"未知状态指令: {name}"}
 
     try:
-        return handler(state, data)
+        candidate_state = copy.deepcopy(state)
+        legacy_change = handler(candidate_state, data)
+        operations = [
+            PatchOperation("set", key, value)
+            for key, value in candidate_state.items()
+            if state.get(key) != value
+        ]
+        candidate_patch = [{"op": item.op, "path": item.path, "value": item.value} for item in operations]
+        next_state, validation = apply_state_patch(state, operations, source)
+        if not validation.valid:
+            return {
+                "type": "candidate_patch",
+                "applied": False,
+                "candidatePatch": candidate_patch,
+                "errors": validation.errors,
+            }
+        state.clear()
+        state.update(next_state)
+        return {**legacy_change, "applied": True, "candidatePatch": candidate_patch}
     except (KeyError, TypeError, ValueError) as exc:
         return {"type": "unknown", "reason": f"状态指令失败: {exc}"}
 

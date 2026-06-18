@@ -9,6 +9,62 @@
 
 export type BattlePrepResultType = 'success' | 'failed' | 'greatSuccess';
 
+/**
+ * 战前选择行动规则：
+ *
+ * 每场战斗前只允许玩家进行一次战前选择行动。
+ * 完成一次选择、骰子判定、可选重投和结果确认后，
+ * 必须立即锁定 battlePrep，并进入 AI 续写。
+ *
+ * AI 续写期间不得再显示新的战前选择面板。
+ * AI 续写结束后必须直接进入战斗。
+ *
+ * 禁止恢复旧版 3 次战前行动逻辑。
+ */
+export const BATTLE_PREP_ACTION_LIMIT = 1;
+
+export type BattlePrepPhase =
+  | 'idle'
+  | 'selecting'
+  | 'rolling'
+  | 'reroll_pending'
+  | 'confirmed'
+  | 'ai_narrating'
+  | 'transitioning_to_battle'
+  | 'completed';
+
+export interface BattlePrepFlowState {
+  active: boolean;
+  consumed: boolean;
+  remainingActions: number;
+  phase: BattlePrepPhase;
+}
+
+export function createBattlePrepFlowState(phase: BattlePrepPhase = 'selecting'): BattlePrepFlowState {
+  return { active: true, consumed: false, remainingActions: BATTLE_PREP_ACTION_LIMIT, phase };
+}
+
+export function lockBattlePrepForNarration(): BattlePrepFlowState {
+  return { active: true, consumed: true, remainingActions: 0, phase: 'ai_narrating' };
+}
+
+export function shouldShowBattlePrepPanel(flow?: Partial<BattlePrepFlowState> | null): boolean {
+  return Boolean(
+    flow?.active === true
+    && flow.consumed !== true
+    && (flow.phase === 'selecting' || flow.phase === 'rolling' || flow.phase === 'reroll_pending'),
+  );
+}
+
+export function shouldSuppressBattlePrepSuggestions(flow?: Partial<BattlePrepFlowState> | null): boolean {
+  return Boolean(flow?.consumed === true && (
+    flow.phase === 'confirmed'
+    || flow.phase === 'ai_narrating'
+    || flow.phase === 'transitioning_to_battle'
+    || flow.phase === 'completed'
+  ));
+}
+
 export interface BattlePrepChoice {
   id: string;
   label: string;
@@ -66,8 +122,12 @@ export interface StoryCheckResult {
   dc: number;
   modifier: number;
   initialRoll: StoryRoll;
+  initialRollId: string;
   reroll?: StoryRoll & { itemId: RerollItemId };
+  rerollRollId?: string;
   finalRoll: StoryRoll & { source: 'initial' | RerollItemId };
+  finalRollId: string;
+  diceEvents: DiceEvent[];
   rerollUsed: boolean;
   finalized: boolean;
 }
@@ -173,10 +233,6 @@ export function evaluateCondition(
 // ============================================================
 // D20 骰子判定
 // ============================================================
-function rollD20(): number {
-  return Math.floor(Math.random() * 20) + 1;
-}
-
 type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 
 const SKILL_TO_ABILITY: Record<string, AbilityKey> = {
@@ -226,7 +282,7 @@ function getSkillModifier(skill: string, state: any, explicitAbility?: AbilityKe
 function rollBattlePrepCheck(
   check: NonNullable<BattlePrepChoice['check']>,
   state: any,
-): BattlePrepRoll {
+): BattlePrepRoll & { diceEvent: DiceEvent } {
   const mainModifier = getSkillModifier(check.skill, state, check.attribute);
   const altModifier = check.altSkill
     ? getSkillModifier(check.altSkill, state)
@@ -235,10 +291,11 @@ function rollBattlePrepCheck(
   const usedSkill = useAlt ? check.altSkill! : check.skill;
   const modifier = useAlt ? altModifier : mainModifier;
 
-  const d20 = rollD20();
-  const total = d20 + modifier;
+  const diceEvent = rollDiceEvent('story_check', 'story_check', 20, 1, modifier);
+  const d20 = diceEvent.rolls[0];
+  const total = diceEvent.total;
 
-  return { d20, modifier, total, dc: check.dc, skill: usedSkill, altSkill: check.altSkill };
+  return { d20, modifier, total, dc: check.dc, skill: usedSkill, altSkill: check.altSkill, diceEvent };
 }
 
 // ============================================================
@@ -288,15 +345,25 @@ export function resolveBattlePrepChoice(
   const roll = rollBattlePrepCheck(choice.check, state);
   const success = roll.total >= choice.check.dc;
   const storyRoll = { d20: roll.d20, total: roll.total, success };
+  const checkId = `${choice.id}-${Date.now()}`;
+  const initialEvent = {
+    ...roll.diceEvent,
+    checkId,
+    dc: roll.dc,
+    success,
+  };
   const storyCheck: StoryCheckResult = {
-    checkId: `${choice.id}-${Date.now()}`,
+    checkId,
     actionId: choice.id,
     attribute: resolveSkillAbility(roll.skill, choice.check.attribute),
     skillName: roll.skill,
     dc: roll.dc,
     modifier: roll.modifier,
     initialRoll: storyRoll,
+    initialRollId: initialEvent.rollId,
     finalRoll: { ...storyRoll, source: 'initial' },
+    finalRollId: initialEvent.rollId,
+    diceEvents: [initialEvent],
     rerollUsed: false,
     finalized: false,
   };
@@ -343,14 +410,28 @@ export function useFictionDice(choice: BattlePrepChoice, base: BattlePrepResolve
   if (!check || check.finalized) throw new Error('当前判定不能重投');
   if (check.rerollUsed) throw new Error('本次判定已经使用过重投道具');
   const nextState = consumeRerollItem(state, 'fiction-dice');
-  const d20 = rollD20();
-  const total = d20 + check.modifier;
+  const diceEvent = rollDiceEvent('reroll', 'fiction_dice', 20, 1, check.modifier, {
+    checkId: check.checkId,
+    itemId: 'fiction_dice',
+    metadata: { rerollRule: 'take_max', previousRollId: check.finalRollId },
+  });
+  const d20 = diceEvent.rolls[0];
+  const total = diceEvent.total;
   const reroll = { itemId: 'fiction-dice' as const, d20, total, success: total >= check.dc };
   const useReroll = total >= check.initialRoll.total;
   const finalRoll = useReroll
     ? { d20, total, success: reroll.success, source: 'fiction-dice' as const }
     : { ...check.initialRoll, source: 'initial' as const };
-  const storyCheck = { ...check, reroll, finalRoll, rerollUsed: true };
+  const finalRollId = useReroll ? diceEvent.rollId : check.initialRollId;
+  const storyCheck = {
+    ...check,
+    reroll,
+    rerollRollId: diceEvent.rollId,
+    finalRoll,
+    finalRollId,
+    diceEvents: [...check.diceEvents, diceEvent],
+    rerollUsed: true,
+  };
   return { state: nextState, result: resultFromFinalRoll(choice, base, storyCheck) };
 }
 
@@ -360,9 +441,22 @@ export function useOmniDice(choice: BattlePrepChoice, base: BattlePrepResolveRes
   if (check.rerollUsed) throw new Error('本次判定已经使用过重投道具');
   if (!Number.isInteger(chosenD20) || chosenD20 < 1 || chosenD20 > 20) throw new Error('万能骰子的指定点数必须在 1 到 20 之间');
   const nextState = consumeRerollItem(state, 'omni-dice');
-  const total = chosenD20 + check.modifier;
+  const diceEvent = forcedDiceEvent(chosenD20, check.modifier, {
+    checkId: check.checkId,
+    itemId: 'omni_dice',
+    metadata: { previousRollId: check.finalRollId },
+  });
+  const total = diceEvent.total;
   const reroll = { itemId: 'omni-dice' as const, d20: chosenD20, total, success: total >= check.dc };
-  const storyCheck = { ...check, reroll, finalRoll: { ...reroll, source: 'omni-dice' as const }, rerollUsed: true };
+  const storyCheck = {
+    ...check,
+    reroll,
+    rerollRollId: diceEvent.rollId,
+    finalRoll: { ...reroll, source: 'omni-dice' as const },
+    finalRollId: diceEvent.rollId,
+    diceEvents: [...check.diceEvents, diceEvent],
+    rerollUsed: true,
+  };
   return { state: nextState, result: resultFromFinalRoll(choice, base, storyCheck) };
 }
 
@@ -484,3 +578,5 @@ export function getBattlePrepLog(
 
   return logs[choiceId]?.[result] || '';
 }
+import type { DiceEvent } from '../core/dice/DiceEvent';
+import { forcedDiceEvent, rollDiceEvent } from '../core/dice/createDiceEvent';

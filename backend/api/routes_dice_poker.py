@@ -3,7 +3,7 @@
 提供骰子游戏的全部后端操作 + AI策略建议 + NPC信任联动
 """
 import json
-import random
+import secrets
 import uuid
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -219,7 +219,7 @@ def score_endpoint(req: ScoreRequest):
     state.used_categories.add(req.category)
     
     # NPC出分（模拟NPC的骰子水平）
-    npc_base = [random.randint(1, 6) for _ in range(5)]
+    npc_base = roll_dice(5)
     npc_score = max(
         calculate_score(npc_base, cat)
         for cat in CATEGORY_NAMES_CN
@@ -366,4 +366,4 @@ def _generate_ai_dice_narration(dice: list[int], category: str,
     result_narration = result_lines.get(result, [f"得分：{player_score}"])
     
     import random
-    return f"{random.choice(cat_narration)}\n\n{random.choice(result_narration)}"
+    return f"{secrets.choice(cat_narration)}\n\n{secrets.choice(result_narration)}"

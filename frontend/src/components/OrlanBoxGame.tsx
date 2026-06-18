@@ -5,6 +5,7 @@ import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
 import { fetchMiniGameCommentary } from '../services/api';
 import '../styles/orlan-box.css';
+import { rollDiceEvent } from '../core/dice/createDiceEvent';
 
 interface RewardItem {
   itemId: string;
@@ -154,7 +155,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 ];
 
 function rollD20() {
-  return Math.floor(Math.random() * 20) + 1;
+  return rollDiceEvent('shop_lottery', 'shop', 20).rolls[0];
 }
 
 function getRewardByD20(d20: number) {

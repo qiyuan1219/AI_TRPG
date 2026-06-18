@@ -7,9 +7,12 @@ remaining damage is absorbed by armor before HP.
 from __future__ import annotations
 
 import copy
+import random
+import re
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from .dice_service import DiceService
 
@@ -22,6 +25,46 @@ VALIDATE_ACTION = "VALIDATE_ACTION"
 RESOLVE_ACTION = "RESOLVE_ACTION"
 TURN_END = "TURN_END"
 BATTLE_END = "BATTLE_END"
+
+
+def _canonical_dice_event(event_type: str, formula: str, rolls: list[int], modifier: int, total: int,
+                          actor: dict | None = None, target: dict | None = None, skill: dict | None = None,
+                          dc: int | None = None, ac: int | None = None, success: bool | None = None,
+                          outcome: str | None = None, metadata: dict | None = None) -> dict:
+    """Stable transport contract consumed by the battle UI.
+
+    Legacy BattleEvent fields remain in place while P0 screens migrate.
+    """
+    match = re.search(r"d(\d+)", str(formula), re.I)
+    roll_id = str(uuid.uuid4())
+    result = {
+        "schemaVersion": 1,
+        "rollId": roll_id,
+        "id": roll_id,
+        "type": event_type,
+        "formula": formula,
+        "diceSides": int(match.group(1)) if match else 20,
+        "rolls": [int(value) for value in rolls],
+        "modifier": int(modifier),
+        "total": int(total),
+        "source": "battle_engine",
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }
+    optional = {
+        "actorId": actor.get("id") if actor else None,
+        "actorName": actor.get("name") if actor else None,
+        "targetId": target.get("id") if target else None,
+        "targetName": target.get("name") if target else None,
+        "skillId": skill.get("id") if skill else None,
+        "skillName": skill.get("name") if skill else None,
+        "dc": dc,
+        "ac": ac,
+        "success": success,
+        "outcome": outcome,
+        "metadata": metadata,
+    }
+    result.update({key: value for key, value in optional.items() if value is not None})
+    return result
 
 
 SKILLS: dict[str, dict] = {
@@ -251,12 +294,14 @@ class BattleEngine:
     state: dict
 
     @classmethod
-    def create(cls, characters: list[dict] | None = None, seed: int | None = None, fixed_rolls: list[int] | None = None) -> tuple["BattleEngine", list[dict]]:
+    def create(cls, characters: list[dict] | None = None, seed: int | None = None, fixed_rolls: list[int] | None = None, skills: dict | None = None, game_id: str | None = None, encounter_id: str | None = None) -> tuple["BattleEngine", list[dict]]:
+        seed = int(seed if seed is not None else random.SystemRandom().randint(1, 2_147_483_647))
         dice = DiceService(seed=seed, fixed_rolls=list(fixed_rolls or []))
         roster = copy.deepcopy(characters or DEFAULT_CHARACTERS)
         initiative = []
         for index, character in enumerate(roster):
-            roll = dice.roll_die(20, f"{character['name']} initiative")
+            roll = dice.roll_die(20, f"{character['name']} initiative", "initiative",
+                                 metadata={"actorId": character["id"]})
             dex = character["attributes"].get("dexterity", 0)
             bonus = character["combatStats"].get("initiativeBonus", dex)
             total = roll + bonus
@@ -266,7 +311,8 @@ class BattleEngine:
                 "initiativeBonus": bonus,
                 "dexterity": dex,
                 "teamPriority": 1 if character["team"] == "player" else 0,
-                "randomTie": dice.roll_die(20, f"{character['name']} initiative tie"),
+                "randomTie": dice.roll_die(20, f"{character['name']} initiative tie", "initiative",
+                                           metadata={"actorId": character["id"], "tieBreak": True}),
                 "total": total,
                 "initialIndex": index,
             })
@@ -277,15 +323,22 @@ class BattleEngine:
             "round": 1,
             "turnIndex": 0,
             "characters": roster,
-            "skills": copy.deepcopy(SKILLS),
+            "skills": copy.deepcopy(skills or SKILLS),
             "initiative": initiative,
             "events": [{"type": "battle_start"}, {"type": "initiative_order", "order": initiative}],
             "diceEvents": dice.events,
             "rngSeed": seed,
+            "rngCursor": 1,
+            "gameId": game_id,
+            "encounterId": encounter_id,
+            "actionLog": [],
+            "eventLog": [],
+            "diceLog": copy.deepcopy(dice.events),
             "createdAt": time.time(),
         }
         engine = cls(state)
         engine._skip_dead()
+        engine._record_events(state["events"], None)
         return engine, state["events"]
 
     def current_actor(self) -> dict | None:
@@ -310,6 +363,8 @@ class BattleEngine:
         return actions
 
     def submit_action(self, action: dict, seed: int | None = None, fixed_rolls: list[int] | None = None) -> list[dict]:
+        action_id = str(action.get("id") or uuid.uuid4())
+        submitted_at = time.time()
         events: list[dict] = []
         self.state["phase"] = VALIDATE_ACTION
         actor = self.current_actor()
@@ -322,6 +377,16 @@ class BattleEngine:
         if "stunned" in actor.get("statuses", []):
             events.append({"type": "turn_skipped", "actorId": actor["id"], "reason": "stunned"})
             self._end_turn(events)
+            self.state.setdefault("actionLog", []).append({
+                "id": action_id,
+                "type": "battle.skill",
+                "actorId": action.get("actorId"),
+                "skillId": action.get("skillId"),
+                "targetIds": list(action.get("targetIds") or []),
+                "createdAt": submitted_at,
+                "skipped": True,
+            })
+            self._record_events(events, action_id)
             return events
         skill = self.state["skills"].get(action.get("skillId"))
         if not skill or skill["id"] not in actor.get("skillIds", []):
@@ -346,26 +411,63 @@ class BattleEngine:
             raise ValueError("illegal target")
 
         self.state["phase"] = RESOLVE_ACTION
-        dice = DiceService(seed=seed, fixed_rolls=list(fixed_rolls or []))
+        action_seed = int(seed if seed is not None else int(self.state.get("rngSeed", 1)) + int(self.state.get("rngCursor", 0)))
+        self.state["rngCursor"] = int(self.state.get("rngCursor", 0)) + 1
+        dice = DiceService(seed=action_seed, fixed_rolls=list(fixed_rolls or []))
         target = targets[0]
         if action.get("aiTactic"):
             events.append({"type": "ai_tactic", **action["aiTactic"]})
         events.append({"type": "action_declared", "actorId": actor["id"], "skillId": skill["id"], "targetIds": [target["id"] for target in targets]})
         if skill.get("requiresHitRoll"):
-            roll = dice.roll_die(20, f"{actor['name']} {skill['name']} attack")
+            roll = dice.roll_die(20, f"{actor['name']} {skill['name']} attack", "attack",
+                                 metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]})
             total = roll + actor["combatStats"].get("attackBonus", 0) + skill.get("hitBonus", 0)
             defense = self._defense(target)
             hit = roll == 20 or (roll != 1 and total >= defense)
             critical = roll == 20
-            events.append({"type": "attack_roll", "actorId": actor["id"], "targetId": target["id"], "dice": "1d20", "rawRoll": roll, "modifier": actor["combatStats"].get("attackBonus", 0) + skill.get("hitBonus", 0), "total": total, "targetDefense": defense, "result": "critical" if critical else "hit" if hit else "miss"})
+            attack_modifier = actor["combatStats"].get("attackBonus", 0) + skill.get("hitBonus", 0)
+            attack_outcome = "critical_success" if roll == 20 else "critical_fail" if roll == 1 else "success" if hit else "fail"
+            events.append({"type": "attack_roll", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": "1d20", "rawRoll": roll, "modifier": attack_modifier, "total": total, "targetDefense": defense, "result": "critical" if critical else "hit" if hit else "miss", "diceEvent": _canonical_dice_event("attack", "1d20", [roll], attack_modifier, total, actor, target, skill, ac=defense, success=hit, outcome=attack_outcome)})
             if hit:
                 shared_damage_roll = None
                 if len(targets) > 1:
                     damage_formula = _double_dice(skill.get("damageDice", "1d4")) if critical else skill.get("damageDice", "1d4")
-                    shared_damage_roll = dice.roll_formula(damage_formula, f"{actor['name']} {skill['name']} damage")
+                    shared_damage_roll = dice.roll_formula(
+                        damage_formula, f"{actor['name']} {skill['name']} damage", "damage",
+                        metadata={"actorId": actor["id"], "skillId": skill["id"]},
+                    )
                 for resolved_target in targets:
                     primary_bonus = skill.get("primaryTargetBonus", 0) if resolved_target["id"] == target["id"] else 0
                     self._apply_damage(actor, resolved_target, skill, dice, critical, events, primary_bonus, shared_damage_roll)
+        elif skill.get("requiresAbilityCheck"):
+            check_roll = dice.roll_die(20, f"{actor['name']} {skill['name']} check", "story_check",
+                                       metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]})
+            check_bonus = int(skill.get("checkBonus", 0))
+            check_total = check_roll + check_bonus
+            check_dc = int(skill.get("checkDC", 10))
+            succeeded = check_roll == 20 or (check_roll != 1 and check_total >= check_dc)
+            check_outcome = "critical_success" if check_roll == 20 else "critical_fail" if check_roll == 1 else "success" if succeeded else "fail"
+            events.append({"type": "skill_check", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "rawRoll": check_roll, "modifier": check_bonus, "total": check_total, "dc": check_dc, "result": "success" if succeeded else "failure", "diceEvent": _canonical_dice_event("story_check", "1d20", [check_roll], check_bonus, check_total, actor, target, skill, dc=check_dc, success=succeeded, outcome=check_outcome)})
+            if succeeded and skill.get("damageDice"):
+                self._apply_damage(actor, target, skill, dice, False, events)
+            elif succeeded:
+                events.append({"type": "effect", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]})
+        elif skill.get("requiresSaveRoll"):
+            shared_damage_roll = dice.roll_formula(
+                skill.get("damageDice", "1d4"), f"{actor['name']} {skill['name']} damage", "damage",
+                metadata={"actorId": actor["id"], "skillId": skill["id"]},
+            ) if skill.get("damageDice") else None
+            for resolved_target in targets:
+                save_roll = dice.roll_die(20, f"{resolved_target['name']} {skill['name']} save", "saving_throw",
+                                          metadata={"actorId": actor["id"], "targetId": resolved_target["id"], "skillId": skill["id"]})
+                save_bonus = int(skill.get("saveBonusOverride")) if skill.get("saveBonusOverride") is not None else self._attr_bonus(resolved_target, skill.get("saveAbility"))
+                save_total = save_roll + save_bonus
+                save_dc = int(skill.get("saveDC", 10))
+                succeeded = save_roll == 20 or (save_roll != 1 and save_total >= save_dc)
+                save_outcome = "critical_success" if save_roll == 20 else "critical_fail" if save_roll == 1 else "success" if succeeded else "fail"
+                events.append({"type": "saving_throw", "actorId": actor["id"], "targetId": resolved_target["id"], "skillId": skill["id"], "rawRoll": save_roll, "modifier": save_bonus, "total": save_total, "dc": save_dc, "result": "success" if succeeded else "failure", "diceEvent": _canonical_dice_event("saving_throw", "1d20", [save_roll], save_bonus, save_total, actor, resolved_target, skill, dc=save_dc, success=succeeded, outcome=save_outcome)})
+                if shared_damage_roll:
+                    self._apply_damage(actor, resolved_target, skill, dice, False, events, damage_roll=shared_damage_roll, damage_multiplier=0.5 if succeeded else 1.0)
         elif skill.get("damageDice"):
             for resolved_target in targets:
                 self._apply_damage(actor, resolved_target, skill, dice, False, events)
@@ -380,8 +482,27 @@ class BattleEngine:
 
         actor.setdefault("cooldowns", {})[skill["id"]] = skill.get("cooldown", 0)
         self.state["diceEvents"].extend(dice.events)
+        self.state.setdefault("diceLog", []).extend(copy.deepcopy(dice.events))
         self._end_turn(events)
+        self.state.setdefault("actionLog", []).append({
+            "id": action_id,
+            "type": "battle.skill",
+            "actorId": action.get("actorId"),
+            "skillId": action.get("skillId"),
+            "targetIds": list(action.get("targetIds") or []),
+            "createdAt": submitted_at,
+            "rngCursor": self.state.get("rngCursor"),
+        })
+        self._record_events(events, action_id)
         return events
+
+    def _record_events(self, events: list[dict], action_id: str | None):
+        event_log = self.state.setdefault("eventLog", [])
+        for event in events:
+            event.setdefault("eventId", str(uuid.uuid4()))
+            event.setdefault("actionId", action_id)
+            event.setdefault("createdAt", time.time())
+            event_log.append(copy.deepcopy(event))
 
     def choose_basic_enemy_action(self) -> dict:
         actor = self.current_actor()
@@ -484,13 +605,16 @@ class BattleEngine:
             return 0
         return int(actor.get("attributes", {}).get(key, 0))
 
-    def _apply_damage(self, actor: dict, target: dict, skill: dict, dice: DiceService, critical: bool, events: list[dict], flat_bonus: int = 0, damage_roll: dict | None = None):
+    def _apply_damage(self, actor: dict, target: dict, skill: dict, dice: DiceService, critical: bool, events: list[dict], flat_bonus: int = 0, damage_roll: dict | None = None, damage_multiplier: float = 1.0):
         damage_formula = skill.get("damageDice", "1d4")
         if critical:
             damage_formula = _double_dice(damage_formula)
-        roll = damage_roll or dice.roll_formula(damage_formula, f"{actor['name']} {skill['name']} damage")
+        roll = damage_roll or dice.roll_formula(
+            damage_formula, f"{actor['name']} {skill['name']} damage", "damage",
+            metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]},
+        )
         attr_bonus = self._attr_bonus(actor, skill.get("damageBonusAttribute"))
-        raw_damage = max(0, roll["total"] + attr_bonus + flat_bonus)
+        raw_damage = max(0, int((roll["total"] + attr_bonus + flat_bonus) * damage_multiplier))
         pierce = min(raw_damage, int(skill.get("armorPierce", 0)))
         armor_damage = min(target["combatStats"].get("armor", 0), raw_damage - pierce)
         hp_damage = raw_damage - armor_damage
@@ -498,22 +622,34 @@ class BattleEngine:
         target["combatStats"]["hp"] = max(0, target["combatStats"]["hp"] - hp_damage)
         if target["combatStats"]["hp"] <= 0:
             target["alive"] = False
-        events.append({"type": "damage", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "attributeBonus": attr_bonus, "flatBonus": flat_bonus, "rawDamage": raw_damage, "armorPierce": pierce, "armorDamage": armor_damage, "hpDamage": hp_damage, "targetArmor": target["combatStats"]["armor"], "targetHp": target["combatStats"]["hp"], "targetAlive": target["alive"], "critical": critical})
+        display_modifier = raw_damage - sum(roll["rolls"])
+        formula_base = re.sub(r"[+-]\d+$", "", roll["dice"].replace(" ", ""))
+        display_formula = f"{formula_base}{display_modifier:+d}" if display_modifier else formula_base
+        dice_event = _canonical_dice_event("damage", display_formula, roll["rolls"], display_modifier, raw_damage, actor, target, skill, metadata={"hpDamage": hp_damage, "armorDamage": armor_damage, "multiplier": damage_multiplier, "targetHp": target["combatStats"]["hp"]})
+        events.append({"type": "damage", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "attributeBonus": attr_bonus, "flatBonus": flat_bonus, "multiplier": damage_multiplier, "rawDamage": raw_damage, "armorPierce": pierce, "armorDamage": armor_damage, "hpDamage": hp_damage, "targetArmor": target["combatStats"]["armor"], "targetHp": target["combatStats"]["hp"], "targetAlive": target["alive"], "critical": critical, "diceEvent": dice_event})
 
     def _apply_healing(self, actor: dict, target: dict, skill: dict, dice: DiceService, events: list[dict]):
         if not target.get("alive", True):
             raise ValueError("dead target cannot be healed")
-        roll = dice.roll_formula(skill["healingDice"], f"{actor['name']} {skill['name']} healing")
+        roll = dice.roll_formula(
+            skill["healingDice"], f"{actor['name']} {skill['name']} healing", "healing",
+            metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]},
+        )
         before = target["combatStats"]["hp"]
         target["combatStats"]["hp"] = min(target["combatStats"]["maxHp"], before + roll["total"])
-        events.append({"type": "healing", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "total": roll["total"], "targetHp": target["combatStats"]["hp"]})
+        modifier = roll["total"] - sum(roll["rolls"])
+        dice_event = _canonical_dice_event("healing", roll["dice"], roll["rolls"], modifier, roll["total"], actor, target, skill, metadata={"targetHp": target["combatStats"]["hp"]})
+        events.append({"type": "healing", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "total": roll["total"], "targetHp": target["combatStats"]["hp"], "diceEvent": dice_event})
 
     def _apply_temp_hp(self, actor: dict, target: dict, skill: dict, dice: DiceService, events: list[dict]):
-        roll = dice.roll_formula(skill["tempHpDice"], f"{actor['name']} {skill['name']} temp hp")
+        roll = dice.roll_formula(
+            skill["tempHpDice"], f"{actor['name']} {skill['name']} temp hp", "healing",
+            metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "tempHp": True},
+        )
         target["combatStats"]["armor"] = min(target["combatStats"]["maxArmor"] + roll["total"], target["combatStats"].get("armor", 0) + roll["total"])
         for effect in skill.get("effects", []):
             target.setdefault("statuses", []).append(copy.deepcopy(effect))
-        events.append({"type": "buff", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "tempHp": roll["total"], "defenseBonus": skill.get("defenseBonus", 0), "targetArmor": target["combatStats"]["armor"]})
+        events.append({"type": "buff", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "total": roll["total"], "tempHp": roll["total"], "defenseBonus": skill.get("defenseBonus", 0), "targetArmor": target["combatStats"]["armor"]})
 
     def _end_turn(self, events: list[dict]):
         actor = self.current_actor()

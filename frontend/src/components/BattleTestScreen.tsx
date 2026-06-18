@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Dice3DView, DiceRollOverlay, type DieType } from "./DiceRollOverlay";
 import type { DiceResult } from "../types/game";
-import { fetchBattleNarration, fetchAdvantage } from "../services/api";
+import { fetchBattleNarration, type AuthoritativeBattleResult } from "../services/api";
+import { authoritativeAmountByTarget, authoritativeDice, authoritativeEffect, authoritativeHp, authoritativeInitiative, toAuthoritativeBattlePayload } from "../core/battle/authoritativeAdapter";
+import { dispatchGameAction } from "../core/actions/registry";
+import "../core/actions/battleResolver";
+import { rollDiceEvent } from "../core/dice/createDiceEvent";
+import { battleController } from "../features/battle/BattleController";
+import { createBattleViewModel } from "../features/battle/BattleViewModel";
 
 const BATTLE_BGM_TRACK = "/assets/bgm/bgm_05_battle_general.mp3";
 const BGM_TRACK_EVENT = "dnd-bgm-track";
@@ -32,6 +38,8 @@ const SPRITE_SHEET_MAP: Record<string, string> = {
 };
 
 interface BattleTestScreenProps {
+  gameId?: string;
+  encounterId?: string;
   onBack?: () => void;
   mode?: "test" | "tutorial" | "side-event";
   onComplete?: (result?: BattleResult) => void;
@@ -129,6 +137,7 @@ interface BattleAnimationCue {
     text: string;
     tone: "damage" | "heal" | "miss" | "effect";
   };
+  feedbackByTargetId?: Record<string, { text: string; tone: "damage" | "heal" | "miss" | "effect" }>;
 }
 
 interface BattleEffect {
@@ -1385,7 +1394,7 @@ function visibleSkillTags(skill: BattleSkill) {
 }
 
 function rollDie(sides: number) {
-  return Math.floor(Math.random() * sides) + 1;
+  return rollDiceEvent('test', 'test', sides, 1, 0, { metadata: { deprecatedFallback: true } }).rolls[0];
 }
 
 function rollD20() {
@@ -2450,6 +2459,8 @@ function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
 }
 
 export function BattleTestScreen({
+  gameId,
+  encounterId,
   onBack,
   mode = "test",
   onComplete,
@@ -2468,20 +2479,18 @@ export function BattleTestScreen({
     };
   }, []);
 
-  const [initiative, setInitiative] = useState(() => buildInitiative(battleBaseUnits));
+  const [initiative, setInitiative] = useState<InitiativeEntry[]>([]);
   const [phase, setPhase] = useState<BattlePhase>("initiative");
-  const [rollRunId, setRollRunId] = useState(1);
+  const [rollRunId] = useState(1);
   const [turnIndex, setTurnIndex] = useState(0);
   const [unitHp, setUnitHp] = useState(() => Object.fromEntries(battleBaseUnits.map((unit) => [unit.id, unit.hp])));
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [actionUnitId, setActionUnitId] = useState<string | null>(null);
   const [targetSelection, setTargetSelection] = useState<TargetSelection | null>(null);
   const [activeDice, setActiveDice] = useState<DiceResult | null>(null);
-  const [attackPhase, setAttackPhase] = useState<"d20" | "damage" | null>(null);
+  const [attackPhase, setAttackPhase] = useState<"d20" | "save" | "damage" | null>(null);
   const pendingAttackRef = useRef<{ unit: BattleUnit; target: BattleUnit; skill: BattleSkill; hit: boolean; isEnemy?: boolean } | null>(null);
   const [advantage, setAdvantage] = useState<{ type: "advantage" | "disadvantage"; reason: string } | null>(null);
-  const advantageRef = useRef(advantage);
-  advantageRef.current = advantage;
   const [lastEffect, setLastEffect] = useState<BattleEffect | null>(null);
   const [kpReportPending, setKpReportPending] = useState(false);
   const kpReportEffectIdRef = useRef<number | null>(null);
@@ -2500,6 +2509,12 @@ export function BattleTestScreen({
   const [showQuickRules, setShowQuickRules] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(-2);
   const [tutorialHint, setTutorialHint] = useState<string | null>(null);
+  const [authoritativeBattle, setAuthoritativeBattle] = useState<AuthoritativeBattleResult | null>(null);
+  const [authorityError, setAuthorityError] = useState<string | null>(null);
+  const authorityPendingRef = useRef<AuthoritativeBattleResult | null>(null);
+  const authorityDamageDiceRef = useRef<DiceResult | null>(null);
+  const authorityEffectRef = useRef<BattleEffect | null>(null);
+  const authorityBusyRef = useRef(false);
   const tutorialHintTimerRef = useRef<number | null>(null);
 
   const showTutorialHint = useCallback((text: string, durationMs = 5000) => {
@@ -2523,7 +2538,7 @@ export function BattleTestScreen({
     [battleBaseUnits, unitHp],
   );
   const unitMap = useMemo(() => new Map(battleUnits.map((unit) => [unit.id, unit])), [battleUnits]);
-  const orderedInitiative = useMemo(() => sortInitiative(initiative, unitMap, battleBaseUnits), [battleBaseUnits, initiative, unitMap]);
+  const orderedInitiative = initiative;
   const activeEntry = orderedInitiative[turnIndex % orderedInitiative.length];
   const activeUnit = activeEntry ? unitMap.get(activeEntry.unitId) : undefined;
   const activeUnitId = activeUnit?.id;
@@ -2534,8 +2549,9 @@ export function BattleTestScreen({
   const enemies = useMemo(() => battleUnits.filter((unit) => unit.faction === "enemy"), [battleUnits]);
   const livingAllies = useMemo(() => allies.filter((unit) => unit.hp > 0), [allies]);
   const livingEnemies = useMemo(() => enemies.filter((unit) => unit.hp > 0), [enemies]);
-  const battleWon = phase === "battle" && enemies.length > 0 && livingEnemies.length === 0;
-  const battleLost = phase === "battle" && allies.length > 0 && livingAllies.length === 0;
+  const authorityViewModel = useMemo(() => createBattleViewModel(authoritativeBattle), [authoritativeBattle]);
+  const battleWon = authorityViewModel.won;
+  const battleLost = authorityViewModel.lost;
   const pendingSkill = targetSelection
     ? unitMap.get(targetSelection.unitId)?.skills.find((skill) => skill.id === targetSelection.skillId)
     : undefined;
@@ -2543,6 +2559,36 @@ export function BattleTestScreen({
   const pendingTargets = pendingActor && pendingSkill ? getTargetCandidates(pendingActor, pendingSkill, allies, enemies) : [];
   const pendingTargetIds = useMemo(() => new Set(pendingTargets.map((unit) => unit.id)), [pendingTargets]);
   const enemyTurn = phase === "battle" && activeUnit?.faction === "enemy";
+
+  const syncAuthoritativeTurn = useCallback((result: AuthoritativeBattleResult, includeHp = true) => {
+    setAuthoritativeBattle(result);
+    setInitiative(authoritativeInitiative(result));
+    if (includeHp) setUnitHp(authoritativeHp(result));
+    const currentId = result.currentActor?.id;
+    const nextIndex = result.battleState.initiative.findIndex((entry) => entry.characterId === currentId);
+    if (nextIndex >= 0) setTurnIndex(nextIndex);
+  }, []);
+
+  const beginAuthoritativeBattle = useCallback(async () => {
+    const payload = toAuthoritativeBattlePayload(config, battleBaseUnits);
+    try {
+      const result = await battleController.start({
+        gameId,
+        encounterId: encounterId ?? payload.encounterId,
+        characters: payload.characters,
+        skills: payload.skills,
+      });
+      syncAuthoritativeTurn(result);
+      if (result.battleState.actionLog.length > 0) setPhase("battle");
+      setAuthorityError(null);
+    } catch (error) {
+      setAuthorityError(error instanceof Error ? error.message : "权威战斗引擎连接失败");
+    }
+  }, [battleBaseUnits, config, encounterId, gameId, syncAuthoritativeTurn]);
+
+  useEffect(() => {
+    void beginAuthoritativeBattle();
+  }, [beginAuthoritativeBattle]);
 
   useEffect(() => {
     if (phase !== "battle" || battleWon || battleLost || activeUnit?.faction !== "ally" || !activeUnitId || activeUnit.hp <= 0) return;
@@ -2598,61 +2644,32 @@ export function BattleTestScreen({
     const feedback = buildBattleFeedback(unit, target, skill, effect);
     const effectKind = feedback?.tone === "miss" ? "fail" : getBattleFxKind(unit, skill);
     const targetIds = impactedTargets.length ? impactedTargets.map((item) => item.id) : [target.id];
-    setBattleAnimation({ id, actorId: unit.id, targetId: target.id, targetIds, skillId: skill.id, effectKind, feedback });
+    const amounts = authorityPendingRef.current ? authoritativeAmountByTarget(authorityPendingRef.current) : {};
+    const feedbackByTargetId = Object.fromEntries(impactedTargets.flatMap((item) => {
+      const amount = amounts[item.id];
+      if (!Number.isFinite(amount)) return [];
+      const healing = skill.roll.kind === "healing" || unit.faction === item.faction;
+      return [[item.id, { text: `${healing ? "+" : "-"}${amount}`, tone: healing ? "heal" as const : "damage" as const }]];
+    }));
+    setBattleAnimation({ id, actorId: unit.id, targetId: target.id, targetIds, skillId: skill.id, effectKind, feedback,
+      feedbackByTargetId: Object.keys(feedbackByTargetId).length ? feedbackByTargetId : undefined });
     battleAnimationTimerRef.current = window.setTimeout(() => {
       setBattleAnimation((current) => (current?.id === id ? null : current));
       battleAnimationTimerRef.current = null;
     }, effectKind === "heal" || effectKind === "shield" || effectKind === "arcane" || feedback ? 1150 : 860);
   }
 
-  function rerollInitiative() {
-    setInitiative(buildInitiative(battleBaseUnits));
-    setPhase("initiative");
-    setRollRunId((id) => id + 1);
-    setTurnIndex(0);
-    setSelectedUnitId(null);
-    setActionUnitId(null);
-    setTargetSelection(null);
-    setActiveDice(null);
-    setLastEffect(null);
-    setKpReportPending(false);
-    kpReportEffectIdRef.current = null;
-    setPendingSettlement(null);
-    setEnemyTurnDone(false);
-    setTacticalAdvice(null);
-    setAdvantage(null);
-    setAttackPhase(null);
-    pendingAttackRef.current = null;
-    if (settlementTimerRef.current) { window.clearTimeout(settlementTimerRef.current); settlementTimerRef.current = null; }
-    clearBattleAnimation();
-    enemyActingKeyRef.current = null;
-    lastEnemySkillRef.current = {}; // 重开也重置技能记忆
-    setUnitHp(Object.fromEntries(battleBaseUnits.map((unit) => [unit.id, unit.hp])));
-    setUsedResources({});
-    setShowTutorialIntro(Boolean(config.tutorialIntro));
-    setTutorialIntroStep(0);
-    setInitiativeAutoStartToken(0);
-    setShowQuickRules(false);
-    setTutorialStep(-2);
-    setTutorialHint(null);
-    prevAllyHpRef.current = {};
-    pushBattleLog(config.rerollLog);
-  }
-
   function advanceTurn() {
-    setTurnIndex((index) => {
-      for (let offset = 1; offset <= orderedInitiative.length; offset += 1) {
-        const nextIndex = (index + offset) % orderedInitiative.length;
-        const nextUnit = unitMap.get(orderedInitiative[nextIndex]?.unitId);
-        if (nextUnit && nextUnit.hp > 0) return nextIndex;
-      }
-      return index;
-    });
+    const result = authorityPendingRef.current ?? authoritativeBattle;
+    if (result) syncAuthoritativeTurn(result);
   }
 
   function nextTurn() {
     if (kpReportPending) return;
-    advanceTurn();
+    if (authorityPendingRef.current) {
+      syncAuthoritativeTurn(authorityPendingRef.current);
+      authorityPendingRef.current = null;
+    }
     setActionUnitId(null);
     setTargetSelection(null);
     setUsedResources({});
@@ -2742,10 +2759,13 @@ export function BattleTestScreen({
 
   function executeSettlement(settlement: PendingSettlement) {
     const { unit, target, skill, effect } = settlement;
-    const attackMissed = skill.roll.kind === "attack" && effect.success === false;
+    const attackMissed = effect.success === false;
     const impactedTargets = attackMissed ? [target] : getResolvedDamageTargets(unit, target, skill);
     const targetLabel = impactedTargets.length > 1 ? impactedTargets.map((item) => item.name).join("、") : target.name;
-    applyHpEffect(unit, target, skill, effect);
+    if (authorityPendingRef.current) {
+      setUnitHp(authoritativeHp(authorityPendingRef.current));
+      setAuthoritativeBattle(authorityPendingRef.current);
+    }
     // 群体伤害：本地兜底描述我方全体或敌方全体
     const aoeLabel = impactedTargets.length > 1
       ? (unit.faction === "enemy" ? "我方全体" : "敌方全体")
@@ -2831,8 +2851,13 @@ export function BattleTestScreen({
     };
   }, []);
 
-  function resolveAction(unit: BattleUnit, skill: BattleSkill, target: BattleUnit) {
-    if (battleWon || battleLost || unit.hp <= 0 || target.hp <= 0 || skill.locked || resourceIsSpent(skill.resource, usedResources[unit.id] ?? {})) return;
+  async function resolveAction(unit: BattleUnit, skill: BattleSkill, target: BattleUnit, isEnemy = false) {
+    if (authorityBusyRef.current || battleWon || battleLost || unit.hp <= 0 || target.hp <= 0 || skill.locked || resourceIsSpent(skill.resource, usedResources[unit.id] ?? {})) return;
+
+    if (!authoritativeBattle) {
+      showTutorialHint(authorityError || "权威战斗引擎正在连接，请稍候。", 4000);
+      return;
+    }
 
     setUsedResources((current) => ({
       ...current,
@@ -2844,57 +2869,61 @@ export function BattleTestScreen({
 
     setTargetSelection(null);
     setAdvantage(null); // 消耗优势/劣势
+    authorityBusyRef.current = true;
 
-    // 攻击技能：两阶段流程（D20命中 → 伤害骰）
-    if (skill.roll.kind === "attack") {
-      const dice = rollSkillDice(unit, skill, target, advantageRef.current?.type);
-      const hit = Boolean(dice?.data["命中"]);
-      setAttackPhase("d20");
-      pendingAttackRef.current = { unit, target, skill, hit };
-      setActiveDice(dice);
-      advanceTutorialStep(3);
-      showTutorialHint("⚔️ 先投 D20 命中骰：总计达到目标 AC，才会继续投伤害骰", 5000);
-      return;
-    }
-
-    // 非攻击技能：原有流程
-    const dice = rollSkillDice(unit, skill, target);
-    const effect = buildBattleEffect(unit, target, skill, dice);
-    setActiveDice(dice);
-    setPendingSettlement({ unit, target, skill, effect });
-
-    advanceTutorialStep(3);
-    if (skill.roll.kind === "healing") {
-      showTutorialHint("💚 治疗骰已投出！观察骰子恢复量 → 点击任意处关闭 → 关闭后HP才会恢复", 5000);
-    } else {
-      showTutorialHint("⚔️ 骰子已投出！观察结果 → 点击任意处关闭 → 关闭后结算", 5000);
-    }
-  }
-
-  function applyHpEffect(actor: BattleUnit, target: BattleUnit, skill: BattleSkill, effect: BattleEffect) {
-    if (!effect.amount || effect.amount <= 0) return;
-
-    if (skill.roll.kind === "healing" || (actor.faction === target.faction && skill.tags.some((tag) => ["临时HP", "增益", "祝福", "护盾"].includes(tag)))) {
-      setUnitHp((current) => ({
-        ...current,
-        [target.id]: Math.min(target.maxHp, (current[target.id] ?? target.hp) + effect.amount!),
-      }));
-      return;
-    }
-
-    if (effect.success && isDamagingAction(actor, target, skill)) {
-      const damageTargets = getResolvedDamageTargets(actor, target, skill);
-      setUnitHp((current) => {
-        const next = { ...current };
-        damageTargets.forEach((damageTarget) => {
-          const primaryTargetBonus = skill.primaryTargetBonus ?? 0;
-          const targetDamage = damageTarget.id === target.id
-            ? effect.amount!
-            : Math.max(0, effect.amount! - primaryTargetBonus);
-          next[damageTarget.id] = Math.max(0, (current[damageTarget.id] ?? damageTarget.hp) - targetDamage);
-        });
-        return next;
+    try {
+      const actionResult = await dispatchGameAction({ battle: authoritativeBattle.battleState }, {
+        id: `battle-${Date.now()}-${unit.id}`,
+        type: 'battle.skill',
+        actorId: unit.id,
+        skillId: skill.id,
+        targetIds: [target.id],
+        createdAt: Date.now(),
       });
+      if (!actionResult.accepted) throw new Error(actionResult.errors[0] || '行动未通过规则验证');
+      const result = actionResult.metadata?.authoritativeBattle as AuthoritativeBattleResult;
+      if (!result) throw new Error('权威战斗结果缺失');
+      authorityPendingRef.current = result;
+      authorityDamageDiceRef.current = authoritativeDice(result, "damage");
+      authorityEffectRef.current = authoritativeEffect(result, unit, target, skill) as BattleEffect;
+      const attackDice = authoritativeDice(result, "attack");
+      const checkDice = authoritativeDice(result, "check");
+      const hit = Boolean(attackDice?.data["命中"]);
+
+      // 攻击技能仍分两段展示，但两次骰值均来自后端同一次 ActionResult。
+      if (attackDice) {
+        setAttackPhase("d20");
+        pendingAttackRef.current = { unit, target, skill, hit, isEnemy };
+        setActiveDice(attackDice);
+        advanceTutorialStep(3);
+        showTutorialHint("⚔️ 先投 D20 命中骰：总计达到目标 AC，才会继续投伤害骰", 5000);
+        return;
+      }
+
+      if (checkDice) {
+        setAttackPhase("save");
+        pendingAttackRef.current = { unit, target, skill, hit: true, isEnemy };
+        setActiveDice(checkDice);
+        advanceTutorialStep(3);
+        return;
+      }
+
+      const dice = authoritativeDice(result, "damage");
+      const effect = authorityEffectRef.current;
+      setActiveDice(dice);
+      if (effect) setPendingSettlement({ unit, target, skill, effect, isEnemy });
+
+      advanceTutorialStep(3);
+      if (skill.roll.kind === "healing") {
+        showTutorialHint("💚 治疗骰已投出！观察骰子恢复量 → 点击任意处关闭 → 关闭后HP才会恢复", 5000);
+      } else {
+        showTutorialHint("⚔️ 骰子已投出！观察结果 → 点击任意处关闭 → 关闭后结算", 5000);
+      }
+    } catch (error) {
+      pushBattleLog(error instanceof Error ? error.message : "行动提交失败");
+      setUsedResources((current) => ({ ...current, [unit.id]: { ...(current[unit.id] ?? {}), [skill.resource]: false } }));
+    } finally {
+      authorityBusyRef.current = false;
     }
   }
 
@@ -2931,22 +2960,10 @@ export function BattleTestScreen({
     showTutorialHint(`🎮 轮到${unit.name}了！点击下方技能面板选择一个技能：攻击（稳步斩击）、检定（盾牌压制）、治疗（回气）`, 6000);
   }, [activeUnitId, activeFaction, phase, tutorialStep]); // eslint-disable-line
 
-  // 优势/劣势判定：每个 ally 回合开始时调用 LLM
+  // 优势/劣势只能来自规则状态；未登记规则效果时保持普通检定。
   useEffect(() => {
-    if (phase !== "battle" || !activeUnitId || activeFaction !== "ally") { setAdvantage(null); return; }
-    const unit = unitMap.get(activeUnitId);
-    if (!unit) { setAdvantage(null); return; }
-    const ctxAllies = livingAllies.map(u => `${u.name} HP${u.hp}`).join("，");
-    const ctxEnemies = livingEnemies.map(u => `${u.name} HP${u.hp}`).join("，");
-    const context = `当前行动：${unit.name}。我方：${ctxAllies || "无"}。敌方：${ctxEnemies || "无"}。`;
-    fetchAdvantage(unit.name, context).then(({ advantage, flavor }) => {
-      if (advantage === "advantage" || advantage === "disadvantage") {
-        setAdvantage({ type: advantage, reason: flavor || `本回合${advantage === "advantage" ? "优势" : "劣势"}` });
-      } else {
-        setAdvantage(null);
-      }
-    }).catch(() => setAdvantage(null));
-  }, [activeUnitId, activeFaction, phase, livingAllies.length, livingEnemies.length]); // eslint-disable-line
+    setAdvantage(null);
+  }, [activeUnitId, activeFaction, phase]);
 
   useEffect(() => {
     if (phase !== "battle" || battleWon || battleLost || !activeUnit || activeUnit.hp <= 0) {
@@ -3004,17 +3021,21 @@ export function BattleTestScreen({
     const currentAllies = [...unitMap.values()].filter((unit) => unit.faction === "ally" && unit.hp > 0);
     const currentEnemies = [...unitMap.values()].filter((unit) => unit.faction === "enemy" && unit.hp > 0);
     const tactic = chooseAiTactic(actingUnit, currentAllies, currentEnemies, usedResources[actingUnit.id] ?? {}, lastEnemySkillRef.current);
-    const skill = tactic
-      ? actingUnit.skills.find((item) => item.id === tactic.skillId) ?? actingUnit.skills[0]
-      : actingUnit.skills.find((item) => item.roll.kind === "attack" || item.roll.kind === "save" || item.roll.kind === "damage") ?? actingUnit.skills[0];
-    const targetPool = getTargetCandidates(actingUnit, skill, currentAllies, currentEnemies);
+    const legalActions = authoritativeBattle?.legalActions.filter((action) => action.actorId === actingUnit.id) ?? [];
+    const legalSkillIds = new Set(legalActions.map((action) => action.skillId));
+    const skill = (tactic && legalSkillIds.has(tactic.skillId) ? actingUnit.skills.find((item) => item.id === tactic.skillId) : undefined)
+      ?? actingUnit.skills.find((item) => legalSkillIds.has(item.id))
+      ?? actingUnit.skills[0];
+    const legalAction = legalActions.find((action) => action.skillId === skill.id);
+    const targetPool = getTargetCandidates(actingUnit, skill, currentAllies, currentEnemies)
+      .filter((candidate) => !legalAction || legalAction.allowedTargetIds.includes(candidate.id));
     if (!targetPool.length) {
       advanceTurn();
       return;
     }
     const target = tactic
       ? targetPool.find((item) => item.id === tactic.targetIds[0]) ?? targetPool[0]
-      : targetPool[Math.floor(Math.random() * targetPool.length)];
+      : targetPool[0];
     if (tactic) {
       setTacticalAdvice(tactic);
       pushBattleLog(`AI战术：${tactic.reason}`);
@@ -3023,20 +3044,7 @@ export function BattleTestScreen({
     lastEnemySkillRef.current[actingUnit.id] = skill.id;
 
     const rollTimer = window.setTimeout(() => {
-      const dice = rollSkillDice(actingUnit, skill, target);
-      if (skill.roll.kind === "attack") {
-        const hit = Boolean(dice?.data["命中"]);
-        setAttackPhase("d20");
-        pendingAttackRef.current = { unit: actingUnit, target, skill, hit, isEnemy: true };
-        setActiveDice(dice);
-        pushBattleLog(`${actingUnit.name} 对 ${target.name} 使用 ${skill.name}：先投命中骰`);
-        return;
-      }
-
-      const effect = buildBattleEffect(actingUnit, target, skill, dice);
-      if (dice) setActiveDice(dice);
-      // 延迟结算：骰子关闭后由 settleEffect 处理
-      setPendingSettlement({ unit: actingUnit, target, skill, effect, isEnemy: true });
+      void resolveAction(actingUnit, skill, target, true);
     }, BATTLE_TUNING.enemyRollDelayMs);
 
     return () => {
@@ -3169,7 +3177,7 @@ export function BattleTestScreen({
               impacted={isAnimationTarget(unit)}
               animationKey={battleAnimation?.id}
               effectKind={isAnimationTarget(unit) ? battleAnimation?.effectKind : undefined}
-              feedback={isAnimationTarget(unit) ? battleAnimation?.feedback : undefined}
+              feedback={isAnimationTarget(unit) ? battleAnimation?.feedbackByTargetId?.[unit.id] ?? battleAnimation?.feedback : undefined}
               onClick={() => handleModelClick(unit)}
             />
           ))}
@@ -3185,7 +3193,7 @@ export function BattleTestScreen({
               impacted={isAnimationTarget(unit)}
               animationKey={battleAnimation?.id}
               effectKind={isAnimationTarget(unit) ? battleAnimation?.effectKind : undefined}
-              feedback={isAnimationTarget(unit) ? battleAnimation?.feedback : undefined}
+              feedback={isAnimationTarget(unit) ? battleAnimation?.feedbackByTargetId?.[unit.id] ?? battleAnimation?.feedback : undefined}
               onClick={() => handleModelClick(unit)}
             />
           ))}
@@ -3273,11 +3281,12 @@ export function BattleTestScreen({
       <DiceRollOverlay
         dice={activeDice}
         dieType="d20"
-        attackMode={attackPhase === "d20" || attackPhase === "damage"}
+        attackMode={attackPhase === "d20" || attackPhase === "save"}
         attackMissed={attackPhase === "d20" && pendingAttackRef.current?.hit === false}
         targetAc={pendingAttackRef.current?.target.ac ?? 0}
         diceKind={
           attackPhase === "d20" ? "命中判定" :
+          attackPhase === "save" ? "豁免掷骰" :
           attackPhase === "damage" ? "伤害掷骰" :
           activeDice?.type === "skill_check" ?
             (activeDice.data["成功"] !== undefined && activeDice.data["DC"] ? "豁免掷骰" : "检定掷骰") :
@@ -3291,21 +3300,20 @@ export function BattleTestScreen({
             ? `${pendingAttackRef.current.unit.name} · ${pendingAttackRef.current.skill.name}`
             : activeDice?.data["武器"] || activeDice?.data["属性"] || ""
         }
-        showD20Calc={attackPhase === "d20"}
+        showD20Calc={attackPhase === "d20" || attackPhase === "save"}
         onClose={() => {
           // 攻击技能两阶段流程
-          if (attackPhase === "d20" && pendingAttackRef.current) {
+          if ((attackPhase === "d20" || attackPhase === "save") && pendingAttackRef.current) {
             const { unit, target, skill, hit, isEnemy } = pendingAttackRef.current;
-            if (hit) {
+            if (hit || attackPhase === "save") {
               // 命中 → 进入伤害骰阶段
-              const dmgDice = rollDamageOnly(skill, unit.name);
+              const dmgDice = authorityDamageDiceRef.current;
               if (!dmgDice) {
-                const effect = buildBattleEffect(unit, target, skill, activeDice);
+                const effect = authorityEffectRef.current;
                 setAttackPhase(null);
                 setActiveDice(null);
                 pendingAttackRef.current = null;
-                const settlement: PendingSettlement = { unit, target, skill, effect, isEnemy };
-                executeSettlement(settlement);
+                if (effect) executeSettlement({ unit, target, skill, effect, isEnemy });
                 if (isEnemy) {
                   setEnemyTurnDone(true);
                   enemyActingKeyRef.current = null;
@@ -3317,12 +3325,11 @@ export function BattleTestScreen({
               pushBattleLog(`${unit.name} 对 ${target.name} 使用 ${skill.name}：D20命中 → 投掷伤害骰`);
             } else {
               // 未命中 → 直接结算
-              const effect = buildBattleEffect(unit, target, skill, activeDice);
+              const effect = authorityEffectRef.current;
               setAttackPhase(null);
               setActiveDice(null);
               pendingAttackRef.current = null;
-              const settlement: PendingSettlement = { unit, target, skill, effect, isEnemy };
-              executeSettlement(settlement);
+              if (effect) executeSettlement({ unit, target, skill, effect, isEnemy });
               if (isEnemy) {
                 setEnemyTurnDone(true);
                 enemyActingKeyRef.current = null;
@@ -3331,12 +3338,11 @@ export function BattleTestScreen({
           } else if (attackPhase === "damage" && pendingAttackRef.current) {
             // 伤害骰关闭 → 完整结算
             const { unit, target, skill, isEnemy } = pendingAttackRef.current;
-            const effect = buildBattleEffect(unit, target, skill, activeDice);
+            const effect = authorityEffectRef.current;
             setAttackPhase(null);
             setActiveDice(null);
             pendingAttackRef.current = null;
-            const settlement: PendingSettlement = { unit, target, skill, effect, isEnemy };
-            executeSettlement(settlement);
+            if (effect) executeSettlement({ unit, target, skill, effect, isEnemy });
             if (isEnemy) {
               setEnemyTurnDone(true);
               enemyActingKeyRef.current = null;

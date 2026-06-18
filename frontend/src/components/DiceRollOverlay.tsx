@@ -8,6 +8,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import type { DiceResult } from "../types/game";
+import type { DiceEventType } from "../core/events/GameEvent";
 
 export type DieType = "d4" | "d6" | "d8" | "d10" | "d12" | "d20";
 
@@ -72,6 +73,10 @@ interface FormattedDiceResult {
   success?: boolean;
   attr?: string;
   verdict?: string;
+  eventType?: DiceEventType;
+  formula?: string;
+  rolls?: number[];
+  modifier?: number;
   /** 纯伤害/治疗骰多骰子（dice_test类型） */
   multiDice?: { count: number; dieType: DieType; rolls: number[] };
   /** attack_roll / skill_check 附带的伤害骰 */
@@ -81,6 +86,8 @@ interface FormattedDiceResult {
 }
 
 function dieTypeFromDice(dice: DiceResult, fallback: DieType): DieType {
+  const canonical = dice.event?.diceSides;
+  if (canonical && [4, 6, 8, 10, 12, 20].includes(canonical)) return `d${canonical}` as DieType;
   const raw = String(dice.data["骰子"] ?? dice.data.die ?? fallback).toLowerCase();
   if (raw.includes("d4")) return "d4";
   if (raw.includes("d6")) return "d6";
@@ -123,10 +130,41 @@ function dieTypeFromRaw(raw: string): DieType | null {
   return null;
 }
 
-function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDiceResult {
+export function getFinalFace(diceSides: number, rolls: number[]): number | null {
+  const face = Number(rolls[0]);
+  return Number.isInteger(face) && face >= 1 && face <= diceSides ? face : null;
+}
+
+export function formatResult(dice: DiceResult, fallbackDieType: DieType): FormattedDiceResult {
   const d = dice.data;
   const resolvedDieType = dieTypeFromDice(dice, fallbackDieType);
   const dieLabel = `D${DIE_SIDES[resolvedDieType]}`;
+
+  if (dice.event) {
+    const event = dice.event;
+    const finalFace = getFinalFace(event.diceSides, event.rolls);
+    const multiDice = event.rolls.length > 1
+      ? { count: event.rolls.length, dieType: resolvedDieType, rolls: event.rolls }
+      : undefined;
+    const isDamage = event.type === 'damage';
+    const isHealing = event.type === 'healing';
+    return {
+      dieLabel,
+      roll: finalFace === null ? '?' : String(finalFace),
+      total: String(event.total),
+      dc: event.type === 'attack' && event.ac !== undefined
+        ? `AC${event.ac}`
+        : event.dc !== undefined ? String(event.dc) : undefined,
+      success: event.success,
+      attr: [event.actorName, event.skillName].filter(Boolean).join(' · '),
+      verdict: isDamage ? `造成 ${event.total} 点伤害` : isHealing ? `恢复 ${event.total} 点生命` : undefined,
+      eventType: event.type,
+      formula: event.formula,
+      rolls: event.rolls,
+      modifier: event.modifier,
+      multiDice,
+    };
+  }
 
   if (dice.type === "dice_test") {
     const raw = String(d["结果"] ?? d.roll ?? d["掷骰"]?.match(/D\d+=(\d+)/)?.[1] ?? "?");
@@ -357,6 +395,7 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
   const isNatMax = Number(result?.roll) === resultSides;
   const isNat1 = result?.roll === "1";
   const dcLabel = result?.dc ? (String(result.dc).startsWith("AC") ? String(result.dc).replace(/\s+/g, "") : `DC${String(result.dc).replace(/^DC\s*/i, "")}`) : "";
+  const isDamageLike = result?.eventType === 'damage' || result?.eventType === 'healing';
 
   // 推断技能特效类型
   const skillEffect = useMemo(() => (dice ? inferSkillEffect(dice.data) : null), [dice]);
@@ -551,12 +590,32 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
             transition={{ duration: 0.3 }}
           >
             {/* 第一行：DC/AC 目标（攻击命中时显示AC，技能检定已融入公式行） */}
-            {dcLabel && dice?.type !== 'skill_check' && <div className="dice-dc-highlight">{dcLabel}</div>}
+            {dcLabel && dice?.type !== 'skill_check' && !isDamageLike && <div className="dice-dc-highlight">{dcLabel}</div>}
+
+            {isDamageLike && result.formula && <div className="dice-dc-highlight">公式：{result.formula}</div>}
 
             {/* 第二行：计算式 */}
             <div className="dice-calc dice-calc-v2">
               <span className="dice-result-prefix">结果：</span>
-              {result.multiDice ? (
+              {isDamageLike ? (
+                <>
+                  {(result.rolls ?? []).map((rv, idx) => (
+                    <span key={idx} className="dice-eq-roll">
+                      {idx > 0 && <span className="dice-eq-sep">+</span>}{rv}
+                    </span>
+                  ))}
+                  <span className="dice-eq-note">（点数）</span>
+                  {Number(result.modifier ?? 0) !== 0 && (
+                    <>
+                      <span className="dice-eq-sep">{Number(result.modifier) >= 0 ? '+' : '-'}</span>
+                      <span className="dice-eq-bonus">{Math.abs(Number(result.modifier))}</span>
+                      <span className="dice-eq-note">（修正）</span>
+                    </>
+                  )}
+                  <span className="dice-eq-sep">=</span>
+                  <span className="dice-total dice-eq-total">{result.total}</span>
+                </>
+              ) : result.multiDice ? (
                 <>
                   <span className="dice-total dice-eq-total">{result.total}</span>
                   <span className="dice-eq-sep">=</span>
@@ -912,12 +971,13 @@ export function Dice3DView({
 
   useEffect(() => {
     const rollNumber = Number(roll);
-    if (rolling || !Number.isFinite(rollNumber) || rollNumber < 1) return;
+    const sides = DIE_SIDES[dieType];
+    if (rolling || !Number.isInteger(rollNumber) || rollNumber < 1 || rollNumber > sides) return;
 
     spinningRef.current = false;
     const ud = sceneRef.current?.diceGroup.userData as any;
     if (ud?.faceToCamera) ud.faceToCamera(rollNumber - 1);
-  }, [rolling, roll]);
+  }, [dieType, rolling, roll]);
 
   const sides = DIE_SIDES[dieType];
   const rollNumber = Number(roll);

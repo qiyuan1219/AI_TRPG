@@ -4,6 +4,7 @@ import { DiceRollOverlay } from './DiceRollOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
 import { fetchMiniGameCommentary } from '../services/api';
+import { rollDiceEvent } from '../core/dice/createDiceEvent';
 
 type Phase = 'prep' | 'skill_result' | 'ready' | 'rolling' | 'play' | 'round_result' | 'plead' | 'final';
 type SkillChoice = 'peek' | 'persuade' | 'none';
@@ -58,7 +59,7 @@ const PIPS: Record<number, number[]> = {
 };
 
 function rollDie(sides = 6) {
-  return Math.floor(Math.random() * sides) + 1;
+  return rollDiceEvent('dice_poker', 'minigame', sides).rolls[0];
 }
 
 function rollDice(count: number) {

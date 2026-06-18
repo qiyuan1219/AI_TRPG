@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SelectionActionCheck } from './selectionAction';
+import { setDiceFaceProviderForTests } from '../core/dice/createDiceEvent';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  setDiceFaceProviderForTests();
+});
 
 describe('SelectionActionCheck', () => {
   it('只接管带 DC 标记的非战斗选择行动', () => {
@@ -12,7 +16,7 @@ describe('SelectionActionCheck', () => {
   });
 
   it('确认后生成锁定结果提示，禁止 AI 再次投骰', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.7);
+    setDiceFaceProviderForTests(() => 15);
     const check = SelectionActionCheck.fromAction('调查封印【智力DC12】', { int: 12, inventory: '虚构骰子x3,万能骰子x3' })!;
     check.finalize();
     expect(check.lockedPrompt).toContain('禁止再次投骰');

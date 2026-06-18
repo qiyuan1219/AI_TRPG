@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { animationRandom } from "../core/random/secureRandom";
 
 export interface SkillEffectConfig {
   kind: "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail" | "poison" | "shadow" | "wind" | "earth" | "water" | "shield" | "buff" | "debuff" | "critical";
@@ -38,7 +39,7 @@ const FX_CONFIG = {
 type FxKind = keyof typeof FX_CONFIG;
 
 function rand(min: number, max: number) {
-  return Math.random() * (max - min) + min;
+  return animationRandom(min, max);
 }
 
 interface Particle {

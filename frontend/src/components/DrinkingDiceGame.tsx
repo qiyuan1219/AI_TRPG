@@ -4,6 +4,7 @@ import { DiceRollOverlay } from './DiceRollOverlay';
 import type { TutorialStep } from './TutorialOverlay';
 import type { DiceResult } from '../types/game';
 import { fetchMiniGameCommentary } from '../services/api';
+import { rollDiceEvent } from '../core/dice/createDiceEvent';
 
 const INITIAL_ALCOHOL = 10;
 const INITIAL_AC = 5;
@@ -11,7 +12,7 @@ const AC_STEP = 2;
 const MAX_AC = 16;
 
 function rollDie(sides: number) {
-  return Math.floor(Math.random() * sides) + 1;
+  return rollDiceEvent('drinking_game', 'minigame', sides).rolls[0];
 }
 
 function conModifier(con: number) {

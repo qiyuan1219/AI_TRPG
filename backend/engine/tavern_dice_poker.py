@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import random
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -19,6 +18,9 @@ from engine.dice_poker import (
     describe_dice,
     CATEGORY_NAMES_CN,
 )
+from engine.dice_service import DiceService
+
+_DICE = DiceService()
 
 
 @dataclass
@@ -106,7 +108,7 @@ def tavern_roll_serlin_skill(skill_id: str, bonus: int = 0) -> dict:
     返回: {roll, total, dc, success, margin, revealed_count, skill_id}
     """
     skill_def = SERLIN_SKILLS[skill_id]
-    roll = random.randint(1, 20)
+    roll = _DICE.roll_die(20, "tavern serlin skill", "story_check", "minigame")
     total = roll + bonus
     dc = skill_def["dc"]
     success = total >= dc
@@ -190,7 +192,7 @@ def tavern_resolve_round(state: TavernDicePokerState, category: str) -> dict:
     game.used_categories.add(category)
 
     # NPC 出分
-    npc_dice = [random.randint(1, 6) for _ in range(5)]
+    npc_dice = roll_dice(5)
     npc_score = max(
         calculate_score(npc_dice, cat)
         for cat in CATEGORY_NAMES_CN

@@ -8,6 +8,7 @@ import os
 import json
 from datetime import datetime
 from config import DATABASE_PATH, LEGACY_DATABASE_PATHS, SAVE_DIR
+from engine.game_state import migrate_game_state
 
 
 # ============================================================
@@ -94,6 +95,16 @@ def init_db():
             memories_json TEXT NOT NULL DEFAULT '[]',
             saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        -- 权威战斗快照。每次动作后覆盖，服务重启时可恢复。
+        CREATE TABLE IF NOT EXISTS battle_sessions (
+            battle_id TEXT PRIMARY KEY,
+            game_id TEXT,
+            state_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_battle_sessions_game
+            ON battle_sessions(game_id, updated_at);
     """)
     conn.commit()
     conn.close()
@@ -193,6 +204,7 @@ def _extract_keywords(text: str) -> list[str]:
 # ============================================================
 def save_game_state(game_id: str, state: dict):
     """保存完整游戏状态"""
+    state = migrate_game_state(state, game_id)
     conn = get_db()
     conn.execute("""
         INSERT OR REPLACE INTO game_state_json (game_id, state_json, updated_at)
@@ -231,7 +243,7 @@ def load_game_state(game_id: str) -> dict:
     if full_state:
         conn.close()
         try:
-            return json.loads(full_state["state_json"])
+            return migrate_game_state(json.loads(full_state["state_json"]), game_id)
         except json.JSONDecodeError:
             return {}
 
@@ -263,7 +275,7 @@ def load_game_state(game_id: str) -> dict:
         state[f"{prefix}_san"] = npc["san"]
         state[f"{prefix}_trust"] = npc["trust"]
         state[f"{prefix}_alive"] = bool(npc["alive"])
-    return state
+    return migrate_game_state(state, game_id)
 
 
 # ============================================================
@@ -303,7 +315,7 @@ def _coerce_dict(value) -> dict:
 
 def _save_payload_from_row(row: sqlite3.Row) -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "slot_key": row["slot_key"],
         "title": row["title"],
         "source_game_id": row["source_game_id"],
@@ -353,8 +365,9 @@ def _normalize_save_payload(data: dict) -> dict | None:
     if phase not in {"narrating", "action"}:
         phase = "action"
 
+    state = migrate_game_state(state, source_game_id)
     return {
-        "schema_version": int(data.get("schema_version") or 1),
+        "schema_version": int(data.get("schema_version") or state.get("schemaVersion") or 2),
         "slot_key": slot_key,
         "title": str(data.get("title") or "Save"),
         "source_game_id": source_game_id,
@@ -400,14 +413,16 @@ def _save_summary_from_payload(payload: dict) -> dict:
             last_line = text
             break
 
+    player = state.get("player") if isinstance(state.get("player"), dict) else {}
+    story_state = state.get("story") if isinstance(state.get("story"), dict) else {}
     return {
         "slot_key": payload["slot_key"],
         "title": payload["title"],
         "source_game_id": payload["source_game_id"],
-        "player_name": state.get("player_name", "Adventurer"),
+        "player_name": state.get("player_name") or player.get("name") or "Adventurer",
         "char_class": state.get("style_name") or (state.get("player") or {}).get("styleName") or state.get("char_class", "Unknown"),
-        "level": state.get("level", 1),
-        "current_area": state.get("current_area", "Unknown area"),
+        "level": state.get("level") or player.get("level") or 1,
+        "current_area": state.get("current_area") or story_state.get("areaId") or "Unknown area",
         "last_event": state.get("last_event") or last_line[:80],
         "saved_at": payload["saved_at"],
     }
@@ -599,6 +614,7 @@ def save_game_slot(
     memories: list[dict],
 ) -> dict:
     """写入或覆盖一个手动存档槽。"""
+    state = migrate_game_state(state, source_game_id)
     conn = get_db()
     conn.execute("""
         INSERT OR REPLACE INTO game_saves (
@@ -636,7 +652,7 @@ def load_game_save(slot_key: str) -> dict | None:
         return {
             "summary": _save_summary_from_payload(payload),
             "game_id": payload["source_game_id"],
-            "state": payload["state"],
+            "state": migrate_game_state(payload["state"], payload["source_game_id"]),
             "story": payload["story"],
             "suggestions": payload["suggestions"],
             "active_index": int(payload["active_index"] or 0),
@@ -657,7 +673,7 @@ def load_game_save(slot_key: str) -> dict | None:
     return {
         "summary": _save_summary(row),
         "game_id": row["source_game_id"],
-        "state": _json_or_default(row["state_json"], {}),
+        "state": migrate_game_state(_json_or_default(row["state_json"], {}), row["source_game_id"]),
         "story": _json_or_default(row["story_json"], []),
         "suggestions": _json_or_default(row["suggestions_json"], []),
         "active_index": int(row["active_index"] or 0),
@@ -665,3 +681,48 @@ def load_game_save(slot_key: str) -> dict | None:
         "chat_history": _json_or_default(row["chat_history_json"], []),
         "memories": _json_or_default(row["memories_json"], []),
     }
+
+
+def save_battle_state(battle_id: str, game_id: str | None, state: dict):
+    """Persist one authoritative battle snapshot after every transition."""
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO battle_sessions (battle_id, game_id, state_json, updated_at) "
+        "VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+        (battle_id, game_id, json.dumps(state, ensure_ascii=False)),
+    )
+    conn.commit()
+    conn.close()
+    if game_id:
+        game_state = load_game_state(game_id)
+        game_state["battle"] = state
+        game_state.setdefault("session", {})["phase"] = "battle" if state.get("phase") != "BATTLE_END" else "resolution"
+        save_game_state(game_id, game_state)
+
+
+def load_battle_state(battle_id: str) -> dict | None:
+    conn = get_db()
+    row = conn.execute("SELECT state_json FROM battle_sessions WHERE battle_id = ?", (battle_id,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    try:
+        return json.loads(row["state_json"])
+    except json.JSONDecodeError:
+        return None
+
+
+def load_active_battle_for_game(game_id: str) -> dict | None:
+    conn = get_db()
+    row = conn.execute(
+        "SELECT state_json FROM battle_sessions WHERE game_id = ? ORDER BY updated_at DESC LIMIT 1",
+        (game_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    try:
+        state = json.loads(row["state_json"])
+    except json.JSONDecodeError:
+        return None
+    return state if state.get("phase") != "BATTLE_END" else None

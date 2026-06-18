@@ -112,7 +112,11 @@ export function getEncounterConfigByBattleId(battleId?: string | null) {
 }
 
 export function canShowPrepChoice(state: any, config: EncounterFlowConfig): boolean {
-  return !state.flags?.[config.prepDoneFlag] && !state.flags?.[config.battleDoneFlag] && !state[config.battleDoneFlag];
+  const consumedForThisEncounter = state.currentEncounterId === config.encounterId && state.battlePrep?.consumed === true;
+  return !consumedForThisEncounter
+    && !state.flags?.[config.prepDoneFlag]
+    && !state.flags?.[config.battleDoneFlag]
+    && !state[config.battleDoneFlag];
 }
 
 export function isEncounterBattleDone(state: any, config: EncounterFlowConfig): boolean {

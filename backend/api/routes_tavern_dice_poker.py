@@ -143,7 +143,7 @@ def use_skill(game_id: str, req: UseSkillRequest):
         revealed = result.get("revealed_count", 0)
         if revealed > 0:
             # 生成对手骰子
-            opponent_dice = [random.randint(1, 6) for _ in range(revealed)]
+            opponent_dice = roll_dice(revealed)
             state.peek_revealed_dice = opponent_dice
             vals = [str(d) for d in opponent_dice]
             if revealed == 1:

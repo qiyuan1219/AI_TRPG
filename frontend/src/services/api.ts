@@ -8,6 +8,7 @@ import type {
   SaveSlotKey,
   SaveSlotSummary,
 } from '../types/game';
+import type { EventEnvelope } from '../core/events/EventEnvelope';
 
 const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '');
 const BASE = `${API_BASE}/dnd`;
@@ -162,10 +163,18 @@ export async function getState(gameId: string) {
 }
 
 export async function patchGameState(gameId: string, patch: Record<string, any>): Promise<{ game_id: string; state: GameState }> {
+  const patchId = crypto.randomUUID();
   const response = await apiFetch(`${BASE}/game/${gameId}/state/patch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ patch }),
+    body: JSON.stringify({
+      schemaVersion: 1,
+      patchId,
+      source: 'ui',
+      patch,
+      patches: Object.entries(patch).map(([path, value]) => ({ op: 'set', path, value })),
+      createdAt: new Date().toISOString(),
+    }),
   }, '同步状态失败');
 
   if (!response.ok) throw new Error(await readErrorMessage(response, '同步状态失败'));
@@ -452,24 +461,61 @@ export async function fetchShopConsult(item: {
 }
 
 export interface AuthoritativeBattleAction {
-  actorId?: string;
-  skillId?: string;
-  targetIds?: string[];
-  seed?: number;
-  fixed_rolls?: number[];
-  auto_enemy?: boolean;
+  actorId: string;
+  skillId: string;
+  targetIds: string[];
+}
+
+export interface AuthoritativeBattleCharacter {
+  id: string;
+  name: string;
+  team: 'player' | 'enemy';
+  alive: boolean;
+  attributes: Record<string, number>;
+  combatStats: { hp: number; maxHp: number; armor: number; maxArmor: number; defense: number; attackBonus: number; initiativeBonus: number };
+  resources: Record<string, number>;
+  skillIds: string[];
+  statuses: unknown[];
+  cooldowns: Record<string, number>;
+}
+
+export interface AuthoritativeBattleState {
+  battleId: string;
+  gameId?: string | null;
+  encounterId?: string | null;
+  phase: string;
+  round: number;
+  turnIndex: number;
+  characters: AuthoritativeBattleCharacter[];
+  skills: Record<string, Record<string, unknown>>;
+  initiative: Array<{ characterId: string; roll: number; initiativeBonus: number; dexterity: number; total: number }>;
+  actionLog: Array<Record<string, unknown>>;
+  eventLog: Array<Record<string, unknown>>;
+  diceLog: Array<Record<string, unknown>>;
+  rngSeed: number;
+  rngCursor: number;
+  winner?: 'player' | 'enemy';
+}
+
+export interface AuthoritativeBattleEvent extends Record<string, any> {
+  type: string;
+  diceEvent?: import('../core/events/GameEvent').DiceEvent;
 }
 
 export interface AuthoritativeBattleResult {
   battleId: string;
-  battleState: Record<string, any>;
-  currentActor?: Record<string, any> | null;
-  legalActions: Array<Record<string, any>>;
-  events: Array<Record<string, any>>;
+  battleState: AuthoritativeBattleState;
+  updatedBattleState: AuthoritativeBattleState;
+  currentActor?: AuthoritativeBattleCharacter | null;
+  legalActions: Array<{ actorId: string; skillId: string; allowedTargetIds: string[] }>;
+  events: AuthoritativeBattleEvent[];
 }
 
 export async function startAuthoritativeBattle(payload: {
-  characters?: Array<Record<string, any>>;
+  gameId?: string;
+  encounterId?: string;
+  characters?: AuthoritativeBattleCharacter[];
+  skills?: Record<string, Record<string, unknown>>;
   seed?: number;
   fixed_rolls?: number[];
 } = {}): Promise<AuthoritativeBattleResult> {
@@ -544,12 +590,16 @@ export function chatStream(
           if (!line.startsWith('data: ')) continue;
 
           try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === 'narrative') onNarrative(event.content);
-            else if (event.type === 'system') onSystem(event.content);
+            const raw = JSON.parse(line.slice(6));
+            const event = raw && raw.schemaVersion === 1 && 'payload' in raw
+              ? raw as EventEnvelope<unknown>
+              : { ...raw, payload: raw.content };
+            const payload = event.payload;
+            if (event.type === 'narrative') onNarrative(String(payload ?? ''));
+            else if (event.type === 'system') onSystem(String(payload ?? ''));
             else if (event.type === 'suggestions') {
-              const suggestions = Array.isArray(event.content)
-                ? event.content.map((item: any, index: number) => (
+              const suggestions = Array.isArray(payload)
+                ? payload.map((item: any, index: number) => (
                   typeof item === 'string'
                     ? { id: `${index}-${item}`, label: item, text: item }
                     : item
@@ -557,13 +607,13 @@ export function chatStream(
                 : [];
               if (suggestions.length) onSuggestions?.(suggestions);
             }
-            else if (event.type === 'state_update') onStateUpdate?.(event.content);
-            else if (event.type === 'state_snapshot') onStateUpdate?.({ type: 'snapshot', state: event.content });
+            else if (event.type === 'state_update') onStateUpdate?.(payload as Record<string, any>);
+            else if (event.type === 'state_snapshot') onStateUpdate?.({ type: 'snapshot', state: payload });
             else if (event.type === 'done') {
               finished = true;
               onDone();
             }
-            else if (event.type === 'error') onError(toSafeMessage(event.content, SAFE_SERVICE_MESSAGE));
+            else if (event.type === 'error') onError(toSafeMessage(payload, SAFE_SERVICE_MESSAGE));
           } catch {
             // The parser keeps incomplete rows in buffer; malformed complete rows are ignored.
           }

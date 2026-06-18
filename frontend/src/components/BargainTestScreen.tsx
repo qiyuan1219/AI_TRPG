@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { judgeBargain, type BargainJudgeResult } from "../services/api";
 import type { DiceResult } from "../types/game";
 import { Dice3DView, DiceRollOverlay } from "./DiceRollOverlay";
+import { rollDiceEvent } from "../core/dice/createDiceEvent";
+import { randomIndex } from "../core/random/secureRandom";
 
 interface BargainTestScreenProps {
   onBack: () => void;
@@ -60,7 +62,7 @@ const STRATEGY_CN: Record<PhraseStrategy, string> = {
 };
 
 function pickWeighted(available: PhraseStrategy[]): PhraseStrategy {
-  const idx = Math.floor(Math.random() * available.length);
+  const idx = randomIndex(available.length);
   return available[idx];
 }
 
@@ -117,7 +119,7 @@ function generatePhrases(item: BargainItem, currentPrice: number, attempt: numbe
     used.add(strategy);
     const poolTemplates = templates[strategy];
     results.push({
-      text: poolTemplates[Math.floor(Math.random() * poolTemplates.length)],
+      text: poolTemplates[randomIndex(poolTemplates.length)],
       strategy,
     });
   }
@@ -126,7 +128,7 @@ function generatePhrases(item: BargainItem, currentPrice: number, attempt: numbe
 }
 
 function rollD20() {
-  return Math.floor(Math.random() * 20) + 1;
+  return rollDiceEvent('story_check', 'minigame', 20).rolls[0];
 }
 
 function makeDiceResult(roll: number, total: number): DiceResult {

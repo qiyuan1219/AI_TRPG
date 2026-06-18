@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { getIntelById, type IntelDocument } from '../data/intelDocuments';
 import { getItemSummaryByName, resolveItemIconPath } from '../data/itemIconPaths';
 import type { ArchiveDocument, GameState, InvestigationClue } from '../types/game';
+import { getLegacyInventoryDefinition } from '../core/items/ItemCatalog';
 
 type InventoryTab = 'all' | 'consumable' | 'equipment' | 'key_item' | 'archive' | 'clue';
 type InventoryItemType = 'consumable' | 'equipment' | 'key_item' | 'document' | 'clue';
@@ -39,136 +40,6 @@ const TABS: Array<{ id: InventoryTab; label: string }> = [
   { id: 'clue', label: '线索' },
 ];
 
-const ITEM_DEFINITIONS: Record<string, Partial<InventoryEntry>> = {
-  虚构骰子: {
-    id: 'fiction-dice',
-    type: 'consumable',
-    category: 'consumable',
-    icon: 'fiction-dice',
-    rarity: 'rare',
-    summary: '剧情判定后可重投一次 D20，最终采用两次总值中较高的一次。',
-    effectText: '仅限可重投的剧情判定；每次判定最多使用一个重投道具。',
-    stackable: true,
-  },
-  万能骰子: {
-    id: 'omni-dice',
-    type: 'consumable',
-    category: 'consumable',
-    icon: 'omni-dice',
-    rarity: 'rare',
-    summary: '剧情判定后指定一个 1~20 的 D20 点数，并直接采用该结果。',
-    effectText: '仅限可重投的剧情判定；每次判定最多使用一个重投道具。',
-    stackable: true,
-  },
-  治疗药水: {
-    id: 'healing_potion',
-    type: 'consumable',
-    category: 'consumable',
-    icon: 'potion-red',
-    rarity: 'common',
-    effectText: '恢复 1d8 + 2 点生命值。',
-    summary: '普通冒险者常备的红色药剂。',
-    stackable: true,
-  },
-  止血粉: {
-    id: 'coagulation_powder',
-    type: 'consumable',
-    category: 'consumable',
-    icon: 'powder',
-    rarity: 'common',
-    effectText: '用于处理流血、撕裂与浅层创口。',
-    summary: '一小包带有草药气味的止血粉。',
-    stackable: true,
-  },
-  解毒剂: {
-    id: 'antitoxin',
-    type: 'consumable',
-    category: 'consumable',
-    icon: 'vial-green',
-    rarity: 'common',
-    effectText: '缓解常见毒素与孢粉刺激。',
-    summary: '黑市药铺和公会补给箱中常见的解毒药剂。',
-    stackable: true,
-  },
-  净化之心: {
-    id: 'purification_heart',
-    type: 'consumable',
-    category: 'consumable',
-    icon: 'heart-vial',
-    rarity: 'rare',
-    effectText: '可用于压制深层污染，关键节点可能触发额外选择。',
-    summary: '云苓调配的高阶净化药剂。',
-    stackable: false,
-  },
-  长剑: {
-    id: 'longsword',
-    type: 'equipment',
-    category: 'equipment',
-    icon: 'sword',
-    rarity: 'common',
-    equipSlot: 'weapon',
-    summary: '可靠的近战武器。',
-  },
-  冒险者工具包: {
-    id: 'adventurer_kit',
-    type: 'key_item',
-    category: 'key_item',
-    icon: 'kit',
-    rarity: 'common',
-    summary: '绳索、火绒、粉笔、铁钉和基础野外工具。',
-  },
-  抗孢面罩: {
-    id: 'spore_mask',
-    type: 'key_item',
-    category: 'key_item',
-    icon: 'mask',
-    rarity: 'uncommon',
-    summary: '深入孢海时用于过滤孢粉的制式面罩。',
-  },
-  冷光灯: {
-    id: 'cold_lamp',
-    type: 'key_item',
-    category: 'key_item',
-    icon: 'lamp',
-    rarity: 'common',
-    summary: '不会引燃孢粉的冷光照明工具。',
-  },
-  缆梯安全扣: {
-    id: 'elevator_safety_hook',
-    type: 'key_item',
-    category: 'key_item',
-    icon: 'hook',
-    rarity: 'common',
-    summary: '降渊缆梯通行时使用的安全扣具。',
-    useCondition: { sceneIncludes: ['缆梯', '降渊'] },
-  },
-  公会补给箱: {
-    id: 'guild_supply_crate',
-    type: 'key_item',
-    category: 'key_item',
-    icon: 'crate',
-    rarity: 'quest',
-    summary: '公会签发的基础补给，包含远征所需的消耗品。',
-  },
-  钻石: {
-    id: 'diamond',
-    type: 'key_item',
-    category: 'key_item',
-    icon: 'gem',
-    rarity: 'rare',
-    summary: '可作为交易、施法或黑市议价筹码的贵重宝石。',
-  },
-  公会徽记: {
-    id: 'guild_badge',
-    type: 'key_item',
-    category: 'key_item',
-    icon: 'badge',
-    rarity: 'quest',
-    summary: '冒险者公会认证身份的徽记。',
-    useCondition: { sceneIncludes: ['公会'] },
-  },
-};
-
 function stableIdFromName(name: string) {
   return `item_${name.trim().replace(/\s+/g, '_')}`;
 }
@@ -205,7 +76,7 @@ function changeInventoryQuantity(inventoryText: string, targetName: string, delt
 
 function normalizeInventoryItems(inventoryText: string): InventoryEntry[] {
   return parseInventoryText(inventoryText).map(({ name, quantity }) => {
-    const definition = ITEM_DEFINITIONS[name] || {};
+    const definition = (getLegacyInventoryDefinition(name) || {}) as Partial<InventoryEntry>;
     return {
       id: definition.id || stableIdFromName(name),
       name,

@@ -29,6 +29,7 @@ from kp.memory import (
     replace_game_memories,
     save_game_slot,
     save_game_state,
+    save_battle_state,
     save_memory,
     search_memory,
 )
@@ -47,6 +48,10 @@ from engine.investigation_rewards import (
     ensure_investigation_state,
 )
 from engine.state_directives import DirectiveStreamFilter, apply_directive, parse_state_chunk
+from core.events import make_event
+from core.events import PatchOperationModel
+from core.context import update_scene_summary
+from engine.game_state import PatchOperation, apply_state_patch, legacy_patch_operations, migrate_game_state
 from engine.trust_system import canonicalize_trust_state, record_trust_patch_changes, trust_payload
 from logger import get_logger, new_session
 
@@ -66,7 +71,7 @@ def _apply_state_change(chunk: str, state: dict) -> dict:
     """Parse and apply legacy [STATE:tool_name:{...}] directives."""
     directive = parse_state_chunk(chunk)
     if directive:
-        return apply_directive(state, directive)
+        return apply_directive(state, directive, source="ai")
     return {"type": "unknown"}
 
 
@@ -289,6 +294,11 @@ class SaveGameRequest(BaseModel):
 
 class StatePatchRequest(BaseModel):
     patch: dict = Field(default_factory=dict)
+    schemaVersion: int = 1
+    patchId: str | None = None
+    source: str = "ui"
+    correlationId: str | None = None
+    patches: list[PatchOperationModel] = Field(default_factory=list)
 
 
 def _validate_slot_key(slot_key: str):
@@ -611,6 +621,7 @@ async def create_dnd_game(req: CreateDNDRequest):
     normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
+    state = migrate_game_state(state, gid)
     save_game_state(gid, state)
     save_memory(gid, f"游戏开始。{req.player_name}，{state.get('char_class') or req.char_class}，接受委托来到逆穹悬城。")
 
@@ -671,11 +682,18 @@ async def patch_state(game_id: str, req: StatePatchRequest):
     patch = dict(req.patch or {})
     patch.pop("game_id", None)
     patch.pop("id", None)
-    if not patch:
+    operations = [
+        PatchOperation(operation.op, operation.path, operation.value)
+        for operation in req.patches
+    ] or legacy_patch_operations(patch)
+    if not operations:
         return {"game_id": game_id, "state": state}
 
     old_area = state.get("current_area")
-    state.update(patch)
+    next_state, validation = apply_state_patch(state, operations, source="ui")
+    if not validation.valid:
+        raise HTTPException(400, {"message": "状态补丁不合法", "errors": validation.errors})
+    state = next_state
     ensure_investigation_state(state)
     if patch.get("current_area") and patch.get("current_area") != old_area:
         state["actions_in_area"] = int(patch.get("actions_in_area", 0))
@@ -717,6 +735,8 @@ async def save_current_game(game_id: str, req: SaveGameRequest):
         client_state = dict(_sanitize_for_persistence(req.state))
         client_state.pop("game_id", None)
         client_state.pop("id", None)
+        # BattleEngine is authoritative; a stale React snapshot may not overwrite it.
+        client_state.pop("battle", None)
         state.update(client_state)
     normalize_player_style_state(state)
     canonicalize_trust_state(state)
@@ -726,6 +746,8 @@ async def save_current_game(game_id: str, req: SaveGameRequest):
     phase = req.phase if req.phase in {"narrating", "action"} else "action"
     state = _sanitize_for_persistence(state)
     save_game_state(game_id, state)
+    if isinstance(state.get("battle"), dict) and state["battle"].get("battleId"):
+        save_battle_state(state["battle"]["battleId"], game_id, state["battle"])
     story = _sanitize_for_persistence(req.story[-120:])
     suggestions = _sanitize_for_persistence(req.suggestions[:6])
     chat_history = _sanitize_for_persistence(_chat_history.get(game_id, [])[-MAX_HISTORY:])
@@ -756,6 +778,7 @@ async def load_saved_game(slot_key: str):
 
     game_id = save["game_id"]
     state = dict(save["state"])
+    state = migrate_game_state(state, game_id)
     normalize_player_style_state(state)
     canonicalize_trust_state(state)
     ensure_investigation_state(state)
@@ -764,6 +787,8 @@ async def load_saved_game(slot_key: str):
     save["summary"]["current_area"] = state.get("current_area", "未知区域")
     save["summary"]["last_event"] = state.get("last_event", save["summary"].get("last_event", ""))
     save_game_state(game_id, state)
+    if isinstance(state.get("battle"), dict) and state["battle"].get("battleId"):
+        save_battle_state(state["battle"]["battleId"], game_id, state["battle"])
     replace_game_memories(game_id, save["memories"])
     _chat_history[game_id] = save["chat_history"][-MAX_HISTORY:]
 
@@ -890,8 +915,15 @@ async def chat_stream(req: ChatRequest):
     async def gen():
         full = ""
         systems: list[str] = []
+        sequence = 0
         directive_filter = DirectiveStreamFilter()
         player_protocol_filter = PlayerProtocolFilter()
+
+        def emit(event_type: str, payload, source: str = "dm_service") -> str:
+            nonlocal sequence
+            sequence += 1
+            envelope = make_event(event_type, source, payload, sequence, req.game_id)
+            return f"data: {json.dumps(envelope, ensure_ascii=False)}\n\n"
 
         # 鑾峰彇鏃ュ織鍣ㄥ苟绔嬪嵆鍐欏叆鐜╁杈撳叆
         sid = _session_map.get(req.game_id, req.game_id)
@@ -907,62 +939,62 @@ async def chat_stream(req: ChatRequest):
         preroll_event, enhanced_msg = _preroll_if_dc(model_message, state)
         if preroll_event:
             systems.append(preroll_event)
-            yield f"data: {json.dumps({'type':'system','content':preroll_event}, ensure_ascii=False)}\n\n"
+            yield emit("system", preroll_event, "rules")
             parsed_event = _parse_system_event_payload(preroll_event)
             if parsed_event:
                 _, check_payload = parsed_event
                 reward_change = apply_investigation_rewards(state, recorded_message, check_payload)
                 if reward_change:
-                    yield f"data: {json.dumps({'type':'state_update','content':reward_change}, ensure_ascii=False)}\n\n"
+                    yield emit("state_update", reward_change, "rules")
             user_message = enhanced_msg
         else:
             user_message = model_message
             reward_change = apply_investigation_rewards(state, recorded_message, None)
             if reward_change:
-                yield f"data: {json.dumps({'type':'state_update','content':reward_change}, ensure_ascii=False)}\n\n"
+                yield emit("state_update", reward_change, "rules")
 
         try:
             async for chunk in dm_chat_stream(user_message, state, history, ctx + recent):
                 if chunk.startswith("[STATE:"):
                     change = _apply_state_change(chunk, state)
                     systems.append(chunk)
-                    yield f"data: {json.dumps({'type':'state_update','content':change}, ensure_ascii=False)}\n\n"
+                    yield emit("state_update", change, "ai_candidate")
                 elif chunk.startswith("[SYSTEM:"):
                     systems.append(chunk)
-                    yield f"data: {json.dumps({'type':'system','content':chunk}, ensure_ascii=False)}\n\n"
+                    yield emit("system", chunk)
                 else:
                     narrative, directives = directive_filter.feed(chunk)
                     for directive in directives:
-                        change = apply_directive(state, directive)
+                        change = apply_directive(state, directive, source="ai")
                         systems.append(directive.raw)
-                        yield f"data: {json.dumps({'type':'state_update','content':change}, ensure_ascii=False)}\n\n"
+                        yield emit("state_update", change, "ai_candidate")
                     if narrative:
                         visible, hints = player_protocol_filter.feed(narrative)
                         if hints:
-                            yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                            yield emit("suggestions", hints)
                         if visible:
                             full += visible
-                            yield f"data: {json.dumps({'type':'narrative','content':visible}, ensure_ascii=False)}\n\n"
+                            yield emit("narrative", visible)
 
             narrative, directives = directive_filter.flush()
             for directive in directives:
-                change = apply_directive(state, directive)
+                change = apply_directive(state, directive, source="ai")
                 systems.append(directive.raw)
-                yield f"data: {json.dumps({'type':'state_update','content':change}, ensure_ascii=False)}\n\n"
+                yield emit("state_update", change, "ai_candidate")
             if narrative:
                 visible, hints = player_protocol_filter.feed(narrative)
                 if hints:
-                    yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                    yield emit("suggestions", hints)
                 if visible:
                     full += visible
-                    yield f"data: {json.dumps({'type':'narrative','content':visible}, ensure_ascii=False)}\n\n"
+                    yield emit("narrative", visible)
 
             visible, hints = player_protocol_filter.flush()
             if hints:
-                yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                yield emit("suggestions", hints)
             if visible:
                 full += visible
-                yield f"data: {json.dumps({'type':'narrative','content':visible}, ensure_ascii=False)}\n\n"
+                yield emit("narrative", visible)
 
             if not _strip_player_protocol_text(full):
                 fallback_filter = PlayerProtocolFilter()
@@ -972,9 +1004,9 @@ async def chat_stream(req: ChatRequest):
                 hints.extend(tail_hints)
                 full = _strip_player_protocol_text(visible + tail)
                 if hints:
-                    yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                    yield emit("suggestions", hints)
                 if full:
-                    yield f"data: {json.dumps({'type':'narrative','content':full}, ensure_ascii=False)}\n\n"
+                    yield emit("narrative", full)
 
             # DM璇村畬涓€娈?鈫?鍐欏叆鏃ュ織锛堥檮甯︾郴缁熶簨浠讹級
             full = _strip_player_protocol_text(full)
@@ -990,10 +1022,11 @@ async def chat_stream(req: ChatRequest):
             save_memory(req.game_id, f"鐜╁: {recorded_message}")
             if full: save_memory(req.game_id, f"DM: {full[:200]}")
             state["last_event"] = recorded_message[:100]
+            update_scene_summary(state, recorded_message, systems[-1] if systems else "")
             _sanitize_state_in_place(state)
             save_game_state(req.game_id, state)
-            yield f"data: {json.dumps({'type':'state_snapshot','content':state}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type':'done'})}\n\n"
+            yield emit("state_snapshot", state, "rules")
+            yield emit("done", None)
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -1008,9 +1041,9 @@ async def chat_stream(req: ChatRequest):
                 hints.extend(tail_hints)
                 full = _strip_player_protocol_text(visible + tail)
                 if hints:
-                    yield f"data: {json.dumps({'type':'suggestions','content':hints}, ensure_ascii=False)}\n\n"
+                    yield emit("suggestions", hints)
                 if full:
-                    yield f"data: {json.dumps({'type':'narrative','content':full}, ensure_ascii=False)}\n\n"
+                    yield emit("narrative", full)
 
             # 寮傚父鏃朵繚瀛樼姸鎬侊紙闃叉鏈疆鐘舵€佸彉鏇翠涪澶憋級
             try:
@@ -1023,12 +1056,13 @@ async def chat_stream(req: ChatRequest):
                 if full:
                     save_memory(req.game_id, f"DM: {full[:200]}")
                 state["last_event"] = recorded_message[:100]
+                update_scene_summary(state, recorded_message, systems[-1] if systems else "")
                 _sanitize_state_in_place(state)
                 save_game_state(req.game_id, state)
             except Exception as persist_error:
                 log.log_error(f"fallback persist failed: {persist_error}")
-            yield f"data: {json.dumps({'type':'state_snapshot','content':state}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type':'done'})}\n\n"
+            yield emit("state_snapshot", state, "rules")
+            yield emit("done", None)
 
     return StreamingResponse(gen(), media_type="text/event-stream",
         headers={"Cache-Control":"no-cache","Connection":"keep-alive"})

@@ -25,7 +25,7 @@ import {
   isEncounterBattleDone,
   type EncounterFlowConfig,
 } from './data/encounterFlows';
-import { evaluateCondition, applyBattlePrepEffect, finalizeBattlePrepResult, getBattlePrepLog, getRerollItemQuantity, migrateRerollInventory, useFictionDice, useOmniDice, type BattlePrepChoice, type BattlePrepResolveResult, type RerollItemId } from './utils/battlePrep';
+import { BATTLE_PREP_ACTION_LIMIT, createBattlePrepFlowState, evaluateCondition, applyBattlePrepEffect, finalizeBattlePrepResult, getBattlePrepLog, getRerollItemQuantity, lockBattlePrepForNarration, migrateRerollInventory, shouldShowBattlePrepPanel, shouldSuppressBattlePrepSuggestions, useFictionDice, useOmniDice, type BattlePrepChoice, type BattlePrepResolveResult, type RerollItemId } from './utils/battlePrep';
 import { getEndingFeedback } from './data/companionSideQuests';
 import { getItemSummaryByName, resolveItemIconPath } from './data/itemIconPaths';
 import type { StoryTestCheckpoint } from './data/storyTestCheckpoints';
@@ -44,6 +44,9 @@ import type {
 import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrativeSegments, splitNarrative, stripAllMachineProtocolText, stripMachineProtocolText } from './utils/narrative';
 import { buildTrustPatch, COMPANION_ID_BY_EVENT_ID, getCompanionTrust, getTrustTier } from './utils/trust';
 import { SelectionActionCheck } from './utils/selectionAction';
+import './core/actions/battlePrepResolver';
+import { randomIntInclusive as secureRandomIntInclusive } from './core/random/secureRandom';
+import { AiStreamController } from './features/ai/AiStreamController';
 
 
 
@@ -163,7 +166,8 @@ const YUNLING_SHOP_HINTS = [
   '返回公会登记',
 ];
 
-const NODE_CHOICE_LIMIT = 3;
+// 普通剧情调查节点的上限，与战前选择行动无关。
+const STORY_NODE_CHOICE_LIMIT = 3;
 const ACTION_OPTION_LIMIT = 4;
 const GUILD_INTEL_NODE_HINTS = [
   '前往回声酒馆找萨洛打听三名队友',
@@ -325,9 +329,7 @@ function addInventoryQuantity(inventoryText: string, itemName: string, quantity:
 }
 
 function randomIntInclusive(min: number, max: number) {
-  const low = Math.ceil(min);
-  const high = Math.floor(max);
-  return Math.floor(Math.random() * (high - low + 1)) + low;
+  return secureRandomIntInclusive(min, max);
 }
 
 function collectRewardNotices(previous: GameState, next: GameState, nextId: () => number): RewardNotice[] {
@@ -888,7 +890,7 @@ function isOpeningChoiceStage(stage: ActionNodeConfig | null) {
 
 function choiceLimitForStage(state: GameState, stage: ActionNodeConfig | null) {
   if (isOpeningChoiceStage(stage) && isOpeningTutorialBattleNode(state) && !state.tutorial_battle_done && !state.first_choice_resolved) {
-    return 1;
+    return BATTLE_PREP_ACTION_LIMIT;
   }
   // 云苓商店阶段：只能选择一次（买药或回公会登记）
   if (stage && stage.hints.includes('购买药剂') && stage.hints.some((h) => /返回公会登记/.test(h))) {
@@ -898,7 +900,7 @@ function choiceLimitForStage(state: GameState, stage: ActionNodeConfig | null) {
   if (stage && stage.hints.some((h) => /前往蓝伞浅滩/.test(h)) && stage.hints.some((h) => /判断前方风向|确认旧巡逻路线/.test(h))) {
     return 1;
   }
-  return NODE_CHOICE_LIMIT;
+  return STORY_NODE_CHOICE_LIMIT;
 }
 
 function forcedSceneForChoiceStage(stage: ActionNodeConfig | null) {
@@ -977,6 +979,9 @@ function actionChoiceStatusText(state: GameState, visibleSuggestions: ActionSugg
   const hints = visibleSuggestions.map((item) => item.text || item.label).filter(Boolean);
   const stage = getActionChoiceStage(state, hints);
   if (!stage) return '';
+  if (isOpeningChoiceStage(stage) && isOpeningTutorialBattleNode(state)) {
+    return '战前准备：选择一个行动';
+  }
   const used = readChoiceStageUsedChoices(state, stage);
   const count = Number(state[choiceStageCountKey(stage)] ?? used.length);
   const choiceLimit = choiceLimitForStage(state, stage);
@@ -1359,6 +1364,7 @@ function RewardAcquisitionModal({
 
 export default function App() {
   const runtime = dndRuntime;
+  const aiStreamController = useMemo(() => new AiStreamController(runtime), [runtime]);
   const [screen, setScreen] = useState<Screen>('main-menu');
   const [loadError, setLoadError] = useState('');
   const [gameId, setGameId] = useState('');
@@ -1789,6 +1795,8 @@ export default function App() {
       if (encounterConfig && !isEncounterBattleDone(nextState, encounterConfig)) {
         currentEncounterConfigRef.current = encounterConfig;
         if (canShowPrepChoice(nextState, encounterConfig)) {
+          nextState.encounterPhase = 'prepChoice';
+          nextState.battlePrep = createBattlePrepFlowState();
           pendingBattlePrepRef.current = getEncounterPrepActions(encounterConfig);
           battlePrepStateRef.current = nextState;
           battlePrepResultRef.current = null;
@@ -1932,6 +1940,11 @@ export default function App() {
         pendingBattleRef.current = '';
         currentEncounterConfigRef.current = getEncounterConfigById(restoredState.currentEncounterId);
         if (['prepConfirm', 'aiNarration', 'battlePending'].includes(restoredState.encounterPhase) && restoredState.lastPrepResult && currentEncounterConfigRef.current) {
+          const restoredFlow = restoredState.encounterPhase === 'prepConfirm'
+            ? createBattlePrepFlowState('reroll_pending')
+            : { ...lockBattlePrepForNarration(), phase: 'transitioning_to_battle' as const };
+          stateRef.current = { ...restoredState, battlePrep: restoredFlow };
+          setGameState(stateRef.current);
           pendingBattlePrepRef.current = getEncounterPrepActions(currentEncounterConfigRef.current);
           battlePrepResultRef.current = restoredState.lastPrepResult;
           battlePrepStateRef.current = restoredState;
@@ -1939,7 +1952,7 @@ export default function App() {
           setBattlePrepNarration(restoredNarration);
           setBattlePrepNarrationDone(true);
           setBattlePrepNarrating(false);
-          setShowBattlePrepPanel(true);
+          setShowBattlePrepPanel(shouldShowBattlePrepPanel(restoredFlow));
         }
         setOpeningFastForward(false);
         setFastForwardMode(false);
@@ -2342,6 +2355,9 @@ export default function App() {
         currentBattleId: config.battleId,
         nextAfterBattleSceneId: config.afterSceneId,
         encounterPhase: resumeCompletedPrep ? 'battlePending' : 'prepChoice',
+        battlePrep: resumeCompletedPrep
+          ? { active: true, consumed: true, remainingActions: 0, phase: 'transitioning_to_battle' }
+          : createBattlePrepFlowState(),
       };
       currentEncounterConfigRef.current = config;
       pendingBattlePrepRef.current = getEncounterPrepActions(config);
@@ -2355,7 +2371,7 @@ export default function App() {
       setGameState(prepState);
       setSuggestions([]);
       setPhase('narrating');
-      setShowBattlePrepPanel(openPanel);
+      setShowBattlePrepPanel(openPanel && shouldShowBattlePrepPanel(prepState.battlePrep));
       setBpTrigger((n) => n + 1);
       if (gameId) {
         void patchGameState(gameId, {
@@ -2363,6 +2379,7 @@ export default function App() {
           currentBattleId: config.battleId,
           nextAfterBattleSceneId: config.afterSceneId,
           encounterPhase: 'prepChoice',
+          battlePrep: createBattlePrepFlowState(),
         }).catch((error: any) => addEvent(error.message || '战斗遭遇状态同步失败', 'error'));
       }
     },
@@ -3073,7 +3090,7 @@ export default function App() {
       setPendingTutorialBattleSummary([]);
       appendStoryLines([action], 'player', gameState.player_name || '你', true);
 
-      abortRef.current = runtime.streamAction(gameId, resolvedAction, {
+      abortRef.current = aiStreamController.start(gameId, resolvedAction, {
         onNarrative: (chunk) => {
           const parsed = parserRef.current.push(chunk);
           if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
@@ -3084,7 +3101,10 @@ export default function App() {
         },
         onSuggestions: (items) => {
           streamSuggestionsRef.current = items;
-          setSuggestions(constrainActionSuggestions(stateRef.current, items));
+          // 战前行动已锁定：AI 续写期间丢弃模型返回的下一轮选项，避免闪现“第 2/3 次行动”。
+          if (!tutorialBattleIntentRef.current && !shouldSuppressBattlePrepSuggestions(stateRef.current.battlePrep)) {
+            setSuggestions(constrainActionSuggestions(stateRef.current, items));
+          }
         },
         onSystem: (rawEvent) => {
           const parsed = runtime.parseSystemEvent(rawEvent);
@@ -3120,20 +3140,22 @@ export default function App() {
             const setup = buildTutorialBattleSetup(tutorialBattleDiceRef.current, tutorialBattleActionRef.current);
             setPendingTutorialBattleSetup(setup);
             appendStoryLines(setup.dialogueLines, 'system', '系统', true);
-            setGameState((prev) => ({
-              ...prev,
+            const battleReadyState = {
+              ...stateRef.current,
               first_choice_resolved: true,
               tutorial_battle_pending: false,
               current_area: '逆穹悬城·主缆街',
+              encounterPhase: 'battleRunning',
+              battlePrep: { active: false, consumed: true, remainingActions: 0, phase: 'completed' as const },
               last_event: '开局判定完成，进入教学战斗',
-            }));
+            };
+            stateRef.current = battleReadyState;
+            setGameState(battleReadyState);
+            if (gameId) void patchGameState(gameId, battleReadyState).catch(() => {});
             addEvent('开局判定将影响战斗', 'state');
             setSuggestions([]);
             setPhase('narrating');
-            const enterTutorialBattleTimer = window.setTimeout(() => {
-              setScreen('tutorial-battle');
-            }, 3000);
-            eventTimersRef.current.push(enterTutorialBattleTimer);
+            setScreen('tutorial-battle');
           } else if (forcedStageAdvanceScene) {
             playScriptedScene(forcedStageAdvanceScene, { focus: false });
           } else {
@@ -3169,26 +3191,28 @@ export default function App() {
             const fallbackSetup = buildTutorialBattleSetup(null, tutorialBattleActionRef.current);
             setPendingTutorialBattleSetup(fallbackSetup);
             setPendingTutorialBattleSummary(fallbackSetup.dialogueLines);
-            setGameState((prev) => ({
-              ...prev,
+            const fallbackBattleState = {
+              ...stateRef.current,
               first_choice_resolved: true,
               tutorial_battle_pending: false,
               current_area: '逆穹悬城·主缆街',
+              encounterPhase: 'battleRunning',
+              battlePrep: { active: false, consumed: true, remainingActions: 0, phase: 'completed' as const },
               last_event: '主持人兜底后进入教学战斗',
-            }));
+            };
+            stateRef.current = fallbackBattleState;
+            setGameState(fallbackBattleState);
+            if (gameId) void patchGameState(gameId, fallbackBattleState).catch(() => {});
             setSuggestions([]);
             setPhase('narrating');
-            const enterTutorialBattleTimer = window.setTimeout(() => {
-              setScreen('tutorial-battle');
-            }, 3000);
-            eventTimersRef.current.push(enterTutorialBattleTimer);
+            setScreen('tutorial-battle');
           } else {
             setSuggestions(constrainActionSuggestions(stateRef.current));
           }
         },
       }, { visibleMessage: action });
     },
-    [addEvent, appendStoryLines, applyRuntimeStateChange, flushDeferredSystemEvents, gameId, gameState.player_name, pendingTutorialBattleSetup, playScriptedScene, runtime, story, streaming, suggestions],
+    [addEvent, aiStreamController, appendStoryLines, applyRuntimeStateChange, flushDeferredSystemEvents, gameId, gameState.player_name, pendingTutorialBattleSetup, playScriptedScene, runtime, story, streaming, suggestions],
   );
 
   const handleSelectionActionReroll = useCallback((itemId: RerollItemId, chosenD20?: number) => {
@@ -3206,16 +3230,24 @@ export default function App() {
   const handleSelectionActionConfirm = useCallback(() => {
     if (!selectionActionCheck) return;
     const result = selectionActionCheck.finalize();
+    const isTutorialBattlePrep = Boolean(stateRef.current.tutorial_battle_pending && !stateRef.current.first_choice_resolved);
     const nextState = { ...stateRef.current, lastStoryCheckResult: result.storyCheck, lastRerollUsed: Boolean(result.storyCheck?.rerollUsed),
-      lastRerollItemId: result.storyCheck?.reroll?.itemId || null };
+      lastRerollItemId: result.storyCheck?.reroll?.itemId || null,
+      ...(isTutorialBattlePrep ? { encounterPhase: 'aiNarration', battlePrep: lockBattlePrepForNarration() } : {}) };
     stateRef.current = nextState;
     setGameState(nextState);
     selectionActionResumeRef.current = { action: selectionActionCheck.actionText, lockedPrompt: selectionActionCheck.lockedPrompt };
     const action = selectionActionCheck.actionText;
     setSelectionActionCheck(null);
     setBattlePrepDice(null);
+    if (isTutorialBattlePrep) setSuggestions([]);
+    if (gameId && isTutorialBattlePrep) {
+      void patchGameState(gameId, { lastStoryCheckResult: result.storyCheck, lastRerollUsed: Boolean(result.storyCheck?.rerollUsed),
+        lastRerollItemId: result.storyCheck?.reroll?.itemId || null, encounterPhase: 'aiNarration',
+        battlePrep: lockBattlePrepForNarration() }).catch(() => {});
+    }
     window.setTimeout(() => submitAction(action), 0);
-  }, [selectionActionCheck, submitAction]);
+  }, [gameId, selectionActionCheck, submitAction]);
 
   const handleBargainComplete = useCallback(
     (result: BargainCompleteResult) => {
@@ -3596,7 +3628,8 @@ export default function App() {
       // 初投只保存待确认结果，不能提前应用战斗效果。
       const baseState = battlePrepStateRef.current || stateRef.current;
       const nextState = { ...baseState, lastBattlePrepChoice: choice.id, selectedPrepActionId: choice.id,
-        lastPrepResult: result, lastStoryCheckResult: result.storyCheck || null, encounterPhase: 'prepConfirm' };
+        lastPrepResult: result, lastStoryCheckResult: result.storyCheck || null, encounterPhase: 'prepConfirm',
+        battlePrep: { ...createBattlePrepFlowState('reroll_pending'), remainingActions: BATTLE_PREP_ACTION_LIMIT } };
       battlePrepStateRef.current = nextState;
       stateRef.current = nextState;
       setGameState(nextState);
@@ -3611,6 +3644,7 @@ export default function App() {
           nextAfterBattleSceneId: nextState.nextAfterBattleSceneId,
           lastStoryCheckResult: nextState.lastStoryCheckResult,
           encounterPhase: nextState.encounterPhase,
+          battlePrep: nextState.battlePrep,
           last_event: `战前行动初次判定：${choice.label} — 等待确认`,
         }).catch(() => {});
       }
@@ -3631,13 +3665,15 @@ export default function App() {
       const outcome = itemId === 'fiction-dice'
         ? useFictionDice(choice, result, stateRef.current)
         : useOmniDice(choice, result, stateRef.current, chosenD20 ?? 0);
-      const nextState = { ...outcome.state, lastPrepResult: outcome.result, lastStoryCheckResult: outcome.result.storyCheck };
+      const nextState = { ...outcome.state, lastPrepResult: outcome.result, lastStoryCheckResult: outcome.result.storyCheck,
+        battlePrep: createBattlePrepFlowState('reroll_pending') };
       battlePrepResultRef.current = outcome.result;
       battlePrepStateRef.current = nextState;
       stateRef.current = nextState;
       setGameState(nextState);
       if (outcome.result.roll) setBattlePrepDice(storyCheckDiceResult(outcome.result.roll));
-      if (gameId) void patchGameState(gameId, { inventory: nextState.inventory, lastPrepResult: outcome.result, lastStoryCheckResult: outcome.result.storyCheck }).catch(() => {});
+      if (gameId) void patchGameState(gameId, { inventory: nextState.inventory, lastPrepResult: outcome.result,
+        lastStoryCheckResult: outcome.result.storyCheck, battlePrep: nextState.battlePrep }).catch(() => {});
     } catch (error: any) { addEvent(error.message || '重投失败', 'error'); }
   }, [addEvent, gameId]);
 
@@ -3655,6 +3691,7 @@ export default function App() {
     nextState.lastRerollUsed = Boolean(result.storyCheck?.rerollUsed);
     nextState.lastRerollItemId = result.storyCheck?.reroll?.itemId || null;
     nextState.encounterPhase = 'aiNarration';
+    nextState.battlePrep = lockBattlePrepForNarration();
     nextState.lastPrepNarration = '';
     nextState.lastPrepNarrationDone = false;
     battlePrepResultRef.current = result;
@@ -3664,11 +3701,15 @@ export default function App() {
     setBattlePrepNarration('');
     setBattlePrepNarrating(true);
     setBattlePrepNarrationDone(false);
+    // 确认最终骰子的同一个事件循环内立即锁定并隐藏选择面板。
+    setShowBattlePrepPanel(false);
+    setSuggestions([]);
     const log = getBattlePrepLog(choice.id, result.result);
     if (log) addEvent(log, 'state');
     if (gameId) void patchGameState(gameId, { flags: nextState.flags, battleEffects: nextState.battleEffects, lastPrepResult: result,
       lastStoryCheckResult: result.storyCheck || null, lastRerollUsed: nextState.lastRerollUsed, lastRerollItemId: nextState.lastRerollItemId,
-      encounterPhase: nextState.encounterPhase, selectedPrepActionId: choice.id, last_event: `战前行动：${choice.label} — ${result.result}` }).catch(() => {});
+      encounterPhase: nextState.encounterPhase, battlePrep: nextState.battlePrep,
+      selectedPrepActionId: choice.id, last_event: `战前行动：${choice.label} — ${result.result}` }).catch(() => {});
     const check = result.storyCheck;
     void fetchStoryCheckNarration({
       encounter_id: config.encounterId, action_id: choice.id, action_label: choice.label, action_desc: choice.desc,
@@ -3682,20 +3723,25 @@ export default function App() {
       setBattlePrepNarration(completeNarration);
       setBattlePrepNarrating(false);
       setBattlePrepNarrationDone(true);
-      const readyState = { ...stateRef.current, encounterPhase: 'battlePending', lastPrepNarration: completeNarration, lastPrepNarrationDone: true };
+      const readyState = { ...stateRef.current, encounterPhase: 'battlePending', lastPrepNarration: completeNarration,
+        lastPrepNarrationDone: true, battlePrep: { ...lockBattlePrepForNarration(), phase: 'transitioning_to_battle' as const } };
       stateRef.current = readyState;
       battlePrepStateRef.current = readyState;
       setGameState(readyState);
-      if (gameId) void patchGameState(gameId, { encounterPhase: 'battlePending', lastPrepNarration: completeNarration, lastPrepNarrationDone: true }).catch(() => {});
+      if (gameId) void patchGameState(gameId, { encounterPhase: 'battlePending', lastPrepNarration: completeNarration,
+        lastPrepNarrationDone: true, battlePrep: readyState.battlePrep }).catch(() => {});
     }).catch((error: any) => {
       const fallback = result.text;
       setBattlePrepNarration(fallback);
       setBattlePrepNarrating(false);
       setBattlePrepNarrationDone(true);
-      const readyState = { ...stateRef.current, encounterPhase: 'battlePending', lastPrepNarration: fallback, lastPrepNarrationDone: true };
+      const readyState = { ...stateRef.current, encounterPhase: 'battlePending', lastPrepNarration: fallback,
+        lastPrepNarrationDone: true, battlePrep: { ...lockBattlePrepForNarration(), phase: 'transitioning_to_battle' as const } };
       stateRef.current = readyState;
       battlePrepStateRef.current = readyState;
       setGameState(readyState);
+      if (gameId) void patchGameState(gameId, { encounterPhase: 'battlePending', lastPrepNarration: fallback,
+        lastPrepNarrationDone: true, battlePrep: readyState.battlePrep }).catch(() => {});
       addEvent(error.message || 'AI续写失败，已使用兜底文本', 'state');
     });
   }, [addEvent, battlePrepNarrating, battlePrepNarrationDone, gameId]);
@@ -3715,6 +3761,7 @@ export default function App() {
       currentBattleId: config.battleId,
       nextAfterBattleSceneId: config.afterSceneId,
       encounterPhase: 'battleRunning',
+      battlePrep: { active: false, consumed: true, remainingActions: 0, phase: 'completed' },
     };
     stateRef.current = { ...stateRef.current, ...battlePatch };
     setGameState((prev) => ({ ...prev, ...battlePatch }));
@@ -3786,6 +3833,13 @@ export default function App() {
 
     startDeepBattle(config.battleId, undefined, onLose);
   }, [addEvent, appendStoryLines, battlePrepNarrating, battlePrepNarrationDone, gameId, startDeepBattle]);
+
+  useEffect(() => {
+    const prep = gameState.battlePrep;
+    if (prep?.phase !== 'transitioning_to_battle' || prep.consumed !== true) return;
+    if (!battlePrepNarrationDone || battlePrepNarrating || screen !== 'game') return;
+    handleBattlePrepEnterBattle();
+  }, [battlePrepNarrating, battlePrepNarrationDone, gameState.battlePrep, handleBattlePrepEnterBattle, screen]);
 
   // ====== 第一幕结局分流 ======
 
@@ -4045,7 +4099,10 @@ export default function App() {
       player_name: playerName,
       player: {
         ...(stateRef.current.player || {}),
+        id: String(stateRef.current.player?.id || 'player'),
         name: playerName,
+        level: Number(stateRef.current.player?.level ?? 1),
+        gold: Number(stateRef.current.player?.gold ?? stateRef.current.gold ?? 0),
         styleId: style.id,
         styleName: style.name,
         attributes: style.attributes,
@@ -4101,7 +4158,7 @@ export default function App() {
         return;
       }
       // 战前行动：pendingBattlePrepRef 有值时，直接进入 action 阶段，显示战前行动选项
-      if (pendingBattlePrepRef.current) {
+      if (pendingBattlePrepRef.current && shouldShowBattlePrepPanel(stateRef.current.battlePrep)) {
         setShowBattlePrepPanel(true);
         setPhase('narrating');
         void saveCurrentGame(AUTO_SAVE_SLOT, { silent: true, phaseOverride: 'narrating' });
@@ -4305,6 +4362,8 @@ export default function App() {
       <LazyBoundary>
         <ErrorBoundary>
           <BattleTestScreen
+            gameId={gameId}
+            encounterId="tutorial-crawler-battle"
             mode="tutorial"
             openingEffects={pendingTutorialBattleSetup?.openingEffects ?? []}
             onBack={() => {
@@ -4410,6 +4469,8 @@ export default function App() {
       <LazyBoundary>
         <ErrorBoundary>
           <BattleTestScreen
+            gameId={gameId}
+            encounterId={deepBattleId}
             mode="test"
             battleConfigOverride={battleConfig}
             openingEffects={openingEffects}
@@ -4576,7 +4637,7 @@ export default function App() {
 
       {/* 战前行动面板 */}
       <AnimatePresence>
-        {showBattlePrepPanel && pendingBattlePrepRef.current && (
+        {showBattlePrepPanel && pendingBattlePrepRef.current && shouldShowBattlePrepPanel(gameState.battlePrep) && (
           <motion.div
             key="battle-prep"
             initial={{ opacity: 0 }}

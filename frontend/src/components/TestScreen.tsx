@@ -9,6 +9,7 @@ import { SceneBgTestScreen } from "./SceneBgTestScreen";
 import { YachtDiceTestScreen } from "./YachtDiceTestScreen";
 import { STORY_TEST_CHECKPOINTS, type StoryTestCheckpoint } from "../data/storyTestCheckpoints";
 import type { DiceResult } from "../types/game";
+import { rollDiceEvent } from "../core/dice/createDiceEvent";
 
 interface TestScreenProps {
   onBack: () => void;
@@ -77,11 +78,13 @@ export function TestScreen({ onBack, onStoryTest }: TestScreenProps) {
   function rollDie() {
     if (activeDice) return;
 
-    const value = Math.floor(Math.random() * currentDie.sides) + 1;
+    const diceEvent = rollDiceEvent('test', 'test', currentDie.sides);
+    const value = diceEvent.rolls[0];
     const id = Date.now();
     setHistory((prev) => [{ id, die: currentDie.type, value }, ...prev].slice(0, 8));
     setActiveDice({
       type: "dice_test",
+      event: diceEvent,
       data: {
         骰子: `D${currentDie.sides}`,
         掷骰: `D${currentDie.sides}=${value}`,

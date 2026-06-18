@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, type MutableRefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Dice3DView } from "./DiceRollOverlay";
+import { rollDiceEvent } from "../core/dice/createDiceEvent";
+import { randomIntInclusive } from "../core/random/secureRandom";
 
 interface YachtDiceTestScreenProps {
   onBack: () => void;
@@ -65,7 +67,7 @@ const HAND_RULES = [
 
 const OUTCOME_CACHE = new Map<number, number[][]>();
 
-function rollDie(sides: number) { return Math.floor(Math.random() * sides) + 1; }
+function rollDie(sides: number) { return rollDiceEvent('test', 'test', sides).rolls[0]; }
 function rollD6() { return rollDie(6); }
 function rollD20() { return rollDie(20); }
 function rollFiveDice() { return Array.from({ length: DICE_COUNT }, rollD6); }
@@ -141,7 +143,7 @@ function clearTimers(ref: MutableRefObject<number[]>) { ref.current.forEach(t=>c
 
 function revealCountFromTotal(total: number) { if (total>=24) return 5; if (total>=21) return 4; if (total>=18) return 3; return 2; }
 function randomRevealIndexes(count: number) {
-  const idx = [0,1,2,3,4]; for (let i=idx.length-1;i>0;i--){const s=Math.floor(Math.random()*(i+1));[idx[i],idx[s]]=[idx[s],idx[i]];}
+  const idx = [0,1,2,3,4]; for (let i=idx.length-1;i>0;i--){const s=randomIntInclusive(0,i);[idx[i],idx[s]]=[idx[s],idx[i]];}
   return idx.slice(0,count).sort((a,b)=>a-b);
 }
 

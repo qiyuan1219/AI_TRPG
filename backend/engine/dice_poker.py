@@ -5,10 +5,12 @@
 2. 担任氛围组（用D&D风格叙述每次掷骰和得分）
 3. NPC根据结果改变信任值
 """
-import random
 from typing import Optional
 from dataclasses import dataclass, field
 from collections import Counter
+from engine.dice_service import DiceService
+
+_DICE = DiceService()
 
 
 @dataclass
@@ -36,7 +38,7 @@ class DicePokerState:
 
 def roll_dice(n: int = 5) -> list[int]:
     """掷 n 个 D6"""
-    return [random.randint(1, 6) for _ in range(n)]
+    return [_DICE.roll_die(6, "dice poker", "dice_poker", "minigame") for _ in range(n)]
 
 
 def roll_with_kept(state: DicePokerState) -> list[int]:
@@ -44,7 +46,7 @@ def roll_with_kept(state: DicePokerState) -> list[int]:
     result = state.dice[:]
     for i in range(5):
         if i not in state.kept:
-            result[i] = random.randint(1, 6)
+            result[i] = _DICE.roll_die(6, "dice poker reroll", "dice_poker", "minigame")
     return result
 
 

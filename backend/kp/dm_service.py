@@ -4,7 +4,10 @@ import json
 import logging
 from typing import AsyncGenerator
 from openai import AsyncOpenAI, OpenAIError
+from pydantic import ValidationError
 from config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
+from core.ai_schemas import AilinRecruitOutput, BargainOutput, SerlinIntroOutput
+from core.context import build_ai_context, token_budget
 from engine.rules_dnd import (
     skill_check, attack_roll, death_save,
     roll_dice, modifier, PROFICIENCY_BONUS,
@@ -304,9 +307,10 @@ async def dm_chat_stream(
     user_input: str, game_state: dict,
     history: list[dict], recent_memory: list[str] = None,
 ) -> AsyncGenerator[str, None]:
-    sp = build_system_prompt(game_state, recent_memory)
+    context = build_ai_context(game_state, history, recent_memory, "main_chat")
+    sp = build_system_prompt(game_state, context["memories"])
     messages = [{"role": "system", "content": sp}]
-    messages.extend(history[-20:])
+    messages.extend(context["history"])
     messages.append({
         "role": "user",
         "content": (
@@ -323,7 +327,7 @@ async def dm_chat_stream(
 
         stream = await _create_chat_completion(
             model=LLM_MODEL, messages=messages, tools=TOOLS,
-            tool_choice="auto", temperature=0.7, max_tokens=1400, stream=True,
+            tool_choice="auto", temperature=0.7, max_tokens=token_budget("main_chat"), stream=True,
         )
         finish_reason = None
         async for chunk in stream:
@@ -393,7 +397,7 @@ async def dm_chat_stream(
                 model=LLM_MODEL,
                 messages=messages,
                 temperature=0.65,
-                max_tokens=520,
+                max_tokens=token_budget("continuation"),
                 stream=True,
             )
             async for chunk in continuation:
@@ -407,7 +411,7 @@ async def dm_chat_stream(
     final = await _create_chat_completion(
         model=LLM_MODEL,
         messages=messages + [{"role":"user","content":"继续叙事，不要调用函数。"}],
-        temperature=0.7, max_tokens=960, stream=True,
+        temperature=0.7, max_tokens=token_budget("battle_prep"), stream=True,
     )
     final_content = ""
     final_finish_reason = None
@@ -434,7 +438,7 @@ async def dm_chat_stream(
                 },
             ],
             temperature=0.65,
-            max_tokens=520,
+            max_tokens=token_budget("continuation"),
             stream=True,
         )
         async for chunk in continuation:
@@ -449,7 +453,7 @@ async def dm_narrate_stream(prompt: str, state: dict) -> AsyncGenerator[str, Non
     stream = await _create_chat_completion(
         model=LLM_MODEL,
         messages=[{"role":"system","content":sp},{"role":"user","content":prompt}],
-        temperature=0.7, max_tokens=1024, stream=True,
+        temperature=0.7, max_tokens=token_budget("battle_resolution"), stream=True,
     )
     async for chunk in stream:
         d = chunk.choices[0].delta if chunk.choices else None
@@ -540,14 +544,14 @@ reply: string，艾琳的回应
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.55,
-                max_tokens=360,
+                max_tokens=token_budget("compact_judge"),
                 stream=False,
             ),
             timeout=10,
         )
         raw = completion.choices[0].message.content if completion.choices else ""
-        data = json.loads((raw or "").strip())
-    except (OpenAIError, asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError) as error:
+        data = AilinRecruitOutput.model_validate_json((raw or "").strip()).model_dump()
+    except (OpenAIError, asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError, ValidationError) as error:
         logger.warning("ailin recruit judgement fell back: %s", error)
         data = fallback
 
@@ -675,7 +679,7 @@ async def companion_side_event_feedback(
                 {"role": "user", "content": prompt},
             ],
             temperature=0.75,
-            max_tokens=520,
+            max_tokens=token_budget("continuation"),
             stream=False,
         )
         content = completion.choices[0].message.content if completion.choices else ""
@@ -718,7 +722,7 @@ async def companion_side_event_chat(
                 {"role": "user", "content": prompt},
             ],
             temperature=0.8,
-            max_tokens=460,
+            max_tokens=token_budget("answer_judge"),
             stream=False,
         )
         content = completion.choices[0].message.content if completion.choices else ""
@@ -844,12 +848,12 @@ boss_reply 必须是奥兰第一人称台词，60-120个中文字符，无论成
                 {"role": "user", "content": prompt},
             ],
             temperature=0.6,
-            max_tokens=420,
+            max_tokens=token_budget("short_judge"),
             stream=False,
         )
         raw = completion.choices[0].message.content if completion.choices else ""
-        data = json.loads((raw or "").strip())
-    except (OpenAIError, json.JSONDecodeError, TypeError, ValueError) as error:
+        data = BargainOutput.model_validate_json((raw or "").strip()).model_dump()
+    except (OpenAIError, json.JSONDecodeError, TypeError, ValueError, ValidationError) as error:
         logger.warning("bargain judgement fell back: %s", error)
         data = fallback
 
@@ -957,7 +961,7 @@ async def dm_battle_narrate(
                 {"role": "user", "content": user_msg},
             ],
             temperature=1.0,
-            max_tokens=120,
+            max_tokens=token_budget("micro_copy"),
             stream=False,
         )
         text = resp.choices[0].message.content
@@ -1008,7 +1012,7 @@ DC：{payload.get('dc', 0)}，修正：{payload.get('modifier', 0)}
                 model=LLM_MODEL,
                 messages=[{"role": "system", "content": "只输出完整的中文剧情正文，不调用工具。"}, {"role": "user", "content": prompt}],
                 temperature=0.8,
-                max_tokens=320,
+                max_tokens=token_budget("battle_commentary"),
                 stream=False,
             ),
             timeout=20,
@@ -1072,7 +1076,7 @@ async def dm_mini_game_commentary(character: str, event: str, context: dict | No
                 }, ensure_ascii=False)},
             ],
             temperature=0.8,
-            max_tokens=120,
+            max_tokens=token_budget("micro_copy"),
             stream=False,
         )
         return _sanitize_single_line(resp.choices[0].message.content, 90)
@@ -1090,7 +1094,7 @@ async def dm_shop_consult(item: dict) -> str:
                 {"role": "user", "content": json.dumps(item, ensure_ascii=False)},
             ],
             temperature=0.7,
-            max_tokens=120,
+            max_tokens=token_budget("micro_copy"),
             stream=False,
         )
         return _sanitize_single_line(resp.choices[0].message.content, 110)
@@ -1112,32 +1116,12 @@ ADVANTAGE_PROMPT = """你是"D&D 地心之门"的战术分析员。根据当前�
 
 
 async def dm_judge_advantage(unit_name: str, context: str) -> dict:
-    """调用 LLM 判定优势劣势，返回 {advantage, flavor}"""
-    try:
-        resp = await _create_chat_completion(
-            model=LLM_MODEL,
-            messages=[
-                {"role": "system", "content": ADVANTAGE_PROMPT.format(unit_name=unit_name)},
-                {"role": "user", "content": f"战场局势：{context}"},
-            ],
-            temperature=0.5,
-            max_tokens=150,
-            stream=False,
-        )
-        text = resp.choices[0].message.content or ""
-        # 解析 JSON
-        import re
-        json_match = re.search(r"\{[^}]+\}", text)
-        if json_match:
-            import json
-            data = json.loads(json_match.group())
-            return {
-                "advantage": data.get("advantage", "none"),
-                "flavor": data.get("flavor", ""),
-            }
-    except (OpenAIError, json.JSONDecodeError, TypeError, ValueError) as error:
-        logger.warning("advantage judgement fell back: %s", error)
-    return {"advantage": "none", "flavor": ""}
+    """Deprecated compatibility endpoint.
+
+    Advantage/disadvantage is a rules-layer decision. AI is no longer allowed
+    to create this mechanical state, so legacy callers receive a neutral result.
+    """
+    return {"advantage": "none", "flavor": "优势与劣势由规则引擎判定。"}
 
 
 # ============================================================
@@ -1221,14 +1205,14 @@ async def judge_serlin_self_introduction(player_answer: str) -> dict:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.5,
-                max_tokens=300,
+                max_tokens=token_budget("intro_judge"),
                 stream=False,
             ),
             timeout=10,
         )
         raw = completion.choices[0].message.content if completion.choices else ""
-        data = json.loads((raw or "").strip())
-    except (OpenAIError, asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError) as error:
+        data = SerlinIntroOutput.model_validate_json((raw or "").strip()).model_dump()
+    except (OpenAIError, asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError, ValidationError) as error:
         logger.warning("serlin intro judgement fell back: %s", error)
         data = fallback
 
