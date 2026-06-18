@@ -1,17 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { getItemSummaryByName, resolveItemIconPath } from '../../data/itemIconPaths';
-
-export type RewardNoticeKind = 'item' | 'document' | 'clue';
-
-export interface RewardNotice {
-  id: number;
-  kind: RewardNoticeKind;
-  name: string;
-  icon: string;
-  image: string;
-  quantity?: number;
-  summary?: string;
-}
+import type { RewardNotice, RewardNoticeKind } from './storyRewardDiff';
 
 function rewardNoticeLabel(kind: RewardNoticeKind) {
   if (kind === 'document') return '获得档案';

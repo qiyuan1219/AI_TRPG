@@ -6,138 +6,23 @@ import type { DiceResult } from '../types/game';
 import { fetchMiniGameCommentary } from '../services/api';
 import '../styles/orlan-box.css';
 import { rollDiceEvent } from '../core/dice/createDiceEvent';
+import {
+  ORLAN_DIAMOND_MIN_ROLL,
+  ORLAN_DRAW_COST,
+  ORLAN_PITY_LIMIT,
+  resolveOrlanDraw,
+  type OrlanBoxResult,
+  type OrlanDrawRecord as DrawRecord,
+  type OrlanRewardItem as RewardItem,
+} from '../features/minigames/blackMarketDrawFlow';
 
-interface RewardItem {
-  itemId: string;
-  name: string;
-  count: number;
-  type: string;
-  desc: string;
-  icon: string;
-  min?: number;
-  max?: number;
-}
-
-interface DrawRecord {
-  index: number;
-  d20: number;
-  reward: RewardItem;
-  cost: number;
-  isPity: boolean;
-}
-
-export interface OrlanBoxResult {
-  drawCount: number;
-  spent: number;
-  rewards: RewardItem[];
-  finalD20: number;
-  guaranteed: boolean;
-  rewardHistory: DrawRecord[];
-  hasDiamond: boolean;
-  failedNoGoldNoDiamond?: boolean;
-}
+export type { OrlanBoxResult } from '../features/minigames/blackMarketDrawFlow';
 
 interface OrlanBoxGameProps {
   gold: number;
   onBack: () => void;
   onComplete: (result: OrlanBoxResult) => void;
 }
-
-const ORLAN_REWARD_TABLE: RewardItem[] = [
-  {
-    itemId: 'copper_ring',
-    name: '生锈铜戒指',
-    count: 1,
-    type: '旧物',
-    min: 1,
-    max: 2,
-    icon: '/assets/prop/aolan_blindbox/copper_ring.png',
-    desc: '边缘磨得发黑，奥兰坚持说它曾经属于一位勇敢的人。',
-  },
-  {
-    itemId: 'old_talisman_fragments',
-    name: '旧护符碎片',
-    count: 1,
-    type: '材料',
-    min: 3,
-    max: 4,
-    icon: '/assets/prop/aolan_blindbox/old_talisman_fragments.png',
-    desc: '残缺的护符碎片，表面还有几道不完整的祈愿纹。',
-  },
-  {
-    itemId: 'hemostatic_powder',
-    name: '止血粉',
-    count: 1,
-    type: '消耗品',
-    min: 5,
-    max: 6,
-    icon: '/assets/prop/aolan_blindbox/hemostatic_powder.png',
-    desc: '可用于处理普通流血伤口，味道像苦涩的铁锈。',
-  },
-  {
-    itemId: 'weakly_effective_detoxifying_agent',
-    name: '弱效解毒剂',
-    count: 1,
-    type: '消耗品',
-    min: 7,
-    max: 8,
-    icon: '/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png',
-    desc: '能缓解轻微毒素，但对深层污染效果有限。',
-  },
-  {
-    itemId: 'cold_light_stick',
-    name: '冷光棒',
-    count: 1,
-    type: '探索',
-    min: 9,
-    max: 10,
-    icon: '/assets/prop/aolan_blindbox/cold_light_stick.png',
-    desc: '短时间照亮周围环境，不会产生明显热源。',
-  },
-  {
-    itemId: 'sealed_sample_bottle',
-    name: '密封样本瓶',
-    count: 1,
-    type: '探索',
-    min: 11,
-    max: 13,
-    icon: '/assets/prop/aolan_blindbox/sealed_sample_bottle.png',
-    desc: '可用于保存孢子、菌丝或污染残留。',
-  },
-  {
-    itemId: 'small_bottle_therapeutic_solution',
-    name: '小瓶治疗药水',
-    count: 1,
-    type: '消耗品',
-    min: 14,
-    max: 16,
-    icon: '/assets/prop/aolan_blindbox/small_bottle_therapeutic_solution.png',
-    desc: '能恢复少量生命，适合应急。',
-  },
-  {
-    itemId: 'blackmarket_chips',
-    name: '黑市筹码',
-    count: 1,
-    type: '特殊',
-    min: 17,
-    max: 18,
-    icon: '/assets/prop/aolan_blindbox/blackmarket_chips.png',
-    desc: '黑市流通的小筹码，也许以后能派上用场。',
-  },
-];
-
-const DIAMOND_REWARD: RewardItem = {
-  itemId: 'diamond',
-  name: '干净的钻石',
-  count: 1,
-  type: '关键道具',
-  icon: '/assets/prop/aolan_blindbox/diamond.png',
-  desc: '未经附魔、没有追踪印记的天然钻石。凯娅要的就是它。',
-};
-
-const COST_PER_DRAW = 20;
-const PITY_LIMIT = 10;
-const DIAMOND_THRESHOLD = 18;
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
@@ -156,10 +41,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 
 function rollD20() {
   return rollDiceEvent('shop_lottery', 'shop', 20).rolls[0];
-}
-
-function getRewardByD20(d20: number) {
-  return ORLAN_REWARD_TABLE.find((item) => d20 >= (item.min ?? 1) && d20 <= (item.max ?? 20)) ?? ORLAN_REWARD_TABLE[0];
 }
 
 function fallbackOrlanComment(record: DrawRecord) {
@@ -292,28 +173,18 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
   const completedRef = useRef(false);
 
   const currentGold = Math.max(0, gold - totalCost);
-  const canDraw = !hasDiamond && currentGold >= COST_PER_DRAW;
-  const failedNoGoldNoDiamond = !hasDiamond && currentGold < COST_PER_DRAW;
+  const canDraw = !hasDiamond && currentGold >= ORLAN_DRAW_COST;
+  const failedNoGoldNoDiamond = !hasDiamond && currentGold < ORLAN_DRAW_COST;
 
   const doDraw = useCallback(() => {
     if (!canDraw) return;
 
     const d20 = rollD20();
-    const nextDrawCount = drawCount + 1;
-    const isNaturalDiamond = d20 > DIAMOND_THRESHOLD;
-    const isPityDiamond = nextDrawCount >= PITY_LIMIT && !hasDiamond;
-    const isPity = isPityDiamond && !isNaturalDiamond;
-    const reward = isNaturalDiamond || isPityDiamond ? { ...DIAMOND_REWARD } : { ...getRewardByD20(d20) };
-    const record: DrawRecord = {
-      index: nextDrawCount,
-      d20,
-      reward,
-      cost: COST_PER_DRAW,
-      isPity,
-    };
+    const record = resolveOrlanDraw(d20, drawCount, hasDiamond);
+    const { index: nextDrawCount, reward } = record;
 
     setDrawCount(nextDrawCount);
-    setTotalCost((value) => value + COST_PER_DRAW);
+    setTotalCost((value) => value + ORLAN_DRAW_COST);
     setLastD20(d20);
     setLastReward(reward);
     setAllRewards((prev) => [...prev, reward]);
@@ -325,7 +196,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
       data: {
         掷骰: `D20=${d20}`,
         总计: d20,
-        DC: DIAMOND_THRESHOLD + 1,
+        DC: ORLAN_DIAMOND_MIN_ROLL,
         成功: reward.itemId === 'diamond',
         描述: reward.itemId === 'diamond' ? '获得钻石' : `获得${reward.name}`,
         骰子: 'd20',
@@ -437,7 +308,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
         <div className="orlan-box-main">
           <div className="orlan-d20-display">
             <span>{lastD20 ?? 'D20'}</span>
-            <small>{hasDiamond ? '钻石已入手' : `保底 ${drawCount}/${PITY_LIMIT}`}</small>
+            <small>{hasDiamond ? '钻石已入手' : `保底 ${drawCount}/${ORLAN_PITY_LIMIT}`}</small>
           </div>
 
           <div className="orlan-box-status">
@@ -464,7 +335,7 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
             </button>
           ) : (
             <button type="button" className="orlan-primary-button" onClick={doDraw} disabled={!canDraw || Boolean(diceResult) || Boolean(revealedDraw)}>
-              {currentGold < COST_PER_DRAW ? '金币不足' : '抽一次 20G'}
+              {currentGold < ORLAN_DRAW_COST ? '金币不足' : '抽一次 20G'}
             </button>
           )}
         </div>

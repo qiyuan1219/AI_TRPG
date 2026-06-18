@@ -9,7 +9,6 @@ import type { EventFeedItem } from './components/EventFeed';
 import { LoadingScreen } from './components/LoadingScreen';
 import { VisualNovelStage } from './components/VisualNovelStage';
 import type { DrinkingDiceResult } from './components/DrinkingDiceGame';
-import type { OrlanBoxResult } from './components/OrlanBoxGame';
 import PlayerStyleSelector from './components/PlayerStyleSelector';
 import { findRegisteredSpeaker, resolveSpeakerName } from './data/characterRegistry';
 import { resolveDndScene } from './data/dndScenes';
@@ -26,7 +25,6 @@ import {
 } from './data/encounterFlows';
 import { BATTLE_PREP_ACTION_LIMIT, createBattlePrepFlowState, evaluateCondition, applyBattlePrepEffect, finalizeBattlePrepResult, getBattlePrepLog, getRerollItemQuantity, lockBattlePrepForNarration, migrateRerollInventory, shouldShowBattlePrepPanel, shouldSuppressBattlePrepSuggestions, useFictionDice, useOmniDice, type BattlePrepChoice, type BattlePrepResolveResult, type RerollItemId } from './utils/battlePrep';
 import { getEndingFeedback } from './data/companionSideQuests';
-import { getItemSummaryByName, resolveItemIconPath } from './data/itemIconPaths';
 import type { StoryTestCheckpoint } from './data/storyTestCheckpoints';
 import { shopItems } from './data/shopItems';
 import { fetchStoryCheckNarration, judgeAilinRecruitAnswer, judgeSerlinIntro, listSaves, loadGame, patchGameState, saveGame } from './services/api';
@@ -49,7 +47,11 @@ import { AiStreamController } from './features/ai/AiStreamController';
 import { AppModals } from './features/app/AppModals';
 import { AppTopActions } from './features/app/AppTopActions';
 import { SaveLoadBinding } from './features/save/SaveLoadBinding';
-import { StoryRewardNotices, type RewardNotice } from './features/story/StoryRewardNotices';
+import { StoryRewardNotices } from './features/story/StoryRewardNotices';
+import { collectRewardNotices, type RewardNotice } from './features/story/storyRewardDiff';
+import { addInventoryQuantity, buildInventoryStatePatch } from './features/inventory/inventoryStatePatch';
+import { buildApothecaryFarewellInventory, buildApothecaryPurchasePatch, buildBargainPurchasePatch } from './features/shop/shopFlow';
+import { buildYunlingBonusInventory, resolveOrlanCompletion, type OrlanBoxResult } from './features/minigames/blackMarketDrawFlow';
 
 
 
@@ -283,88 +285,8 @@ function rewardEntryId(entry: any) {
   return String(typeof entry === 'string' ? entry : entry?.id || '').trim();
 }
 
-function inventoryCounts(inventoryText: string) {
-  const counts = new Map<string, number>();
-  inventoryText
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .forEach((raw) => {
-      const match = raw.match(/^(.+?)(?:x|×)(\d+)$/i);
-      const name = (match ? match[1] : raw).trim();
-      const quantity = match ? Math.max(1, Number(match[2]) || 1) : 1;
-      counts.set(name, (counts.get(name) ?? 0) + quantity);
-    });
-  return counts;
-}
-
-function formatInventoryCounts(counts: Map<string, number>) {
-  return Array.from(counts.entries())
-    .map(([name, quantity]) => (quantity > 1 ? `${name}x${quantity}` : name))
-    .join(',');
-}
-
-function addInventoryQuantity(inventoryText: string, itemName: string, quantity: number) {
-  const counts = inventoryCounts(inventoryText);
-  counts.set(itemName, (counts.get(itemName) ?? 0) + Math.max(1, quantity));
-  return formatInventoryCounts(counts);
-}
-
 function randomIntInclusive(min: number, max: number) {
   return secureRandomIntInclusive(min, max);
-}
-
-function collectRewardNotices(previous: GameState, next: GameState, nextId: () => number): RewardNotice[] {
-  const notices: RewardNotice[] = [];
-  const prevInventory = inventoryCounts(String(previous.inventory || ''));
-  const nextInventory = inventoryCounts(String(next.inventory || ''));
-
-  nextInventory.forEach((quantity, name) => {
-    const delta = quantity - (prevInventory.get(name) ?? 0);
-    if (delta > 0) {
-      notices.push({
-        id: nextId(),
-        kind: 'item',
-        name,
-        icon: 'item',
-        image: resolveItemIconPath('item', name),
-        quantity: delta,
-        summary: getItemSummaryByName(name),
-      });
-    }
-  });
-
-  const prevDocuments = new Set((Array.isArray(previous.documents) ? previous.documents : []).map(rewardEntryId).filter(Boolean));
-  (Array.isArray(next.documents) ? next.documents : []).forEach((raw: any) => {
-    const id = rewardEntryId(raw);
-    if (!id || prevDocuments.has(id)) return;
-    notices.push({
-      id: nextId(),
-      kind: 'document',
-      name: String(raw?.name || id),
-      icon: String(raw?.icon || 'document'),
-      image: resolveItemIconPath(String(raw?.icon || 'document'), String(raw?.name || id)),
-      summary: String(raw?.summary || raw?.source || ''),
-    });
-  });
-
-  const prevClues = new Set((Array.isArray(previous.clues) ? previous.clues : []).map(rewardEntryId).filter(Boolean));
-  (Array.isArray(next.clues) ? next.clues : []).forEach((raw: any) => {
-    const id = rewardEntryId(raw);
-    if (!id || prevClues.has(id)) return;
-    const name = String(raw?.name || id);
-    const icon = String(raw?.icon || 'clue');
-    notices.push({
-      id: nextId(),
-      kind: 'clue',
-      name,
-      icon,
-      image: resolveItemIconPath(icon, name),
-      summary: String(raw?.description || raw?.source || ''),
-    });
-  });
-
-  return notices.slice(0, 5);
 }
 
 function hasClue(state: GameState, clueId: string) {
@@ -1630,10 +1552,7 @@ export default function App() {
 
   const patchStateFromPanel = useCallback(
     (patch: Partial<GameState>, message?: string) => {
-      const statePatch: Partial<GameState> = {
-        ...patch,
-        ...(message && !patch.last_event ? { last_event: message } : {}),
-      };
+      const statePatch = buildInventoryStatePatch(patch, message);
       const nextState = { ...stateRef.current, ...statePatch };
       stateRef.current = nextState;
       setGameState(nextState);
@@ -3188,20 +3107,7 @@ export default function App() {
       setShowBargainGame(false);
 
       const current = stateRef.current;
-      const currentGold = Number(current.gold ?? 200);
-      const inventoryText = String(current.inventory || '长剑,冒险者工具包');
-      const nextInventory = inventoryText.includes(result.itemName)
-        ? inventoryText
-        : `${inventoryText},${result.itemName}`;
-      const nextGold = Math.max(0, currentGold - result.finalPrice);
-      const purchasePatch: GameState = {
-        gold: nextGold,
-        inventory: nextInventory,
-        blackmarket_done: true,
-        blackmarket_purchase_item: result.itemName,
-        blackmarket_purchase_price: result.finalPrice,
-        last_event: `完成黑市采购：${result.itemName}，成交价${result.finalPrice}金`,
-      };
+      const purchasePatch = buildBargainPurchasePatch(current, result);
 
       addEvent(`获得 ${result.itemName}`, 'state');
       addEvent(`金币 -${result.finalPrice}`, 'state');
@@ -3293,54 +3199,18 @@ export default function App() {
     (result: OrlanBoxResult) => {
       setShowLuckyBoxGame(false);
       const current = stateRef.current;
-      const currentGold = Number(current.gold ?? 200);
-      const hasDiamond = Boolean(result.hasDiamond || result.rewards.some((reward) => reward.itemId === 'diamond'));
+      const outcome = resolveOrlanCompletion(current, result);
+      const { patch, failedNoGoldNoDiamond, nextInventory } = outcome;
+      outcome.eventMessages.forEach((message) => addEvent(message, 'state'));
 
-      // 从 rewards 构建背包物品列表
-      const inventoryText = String(current.inventory || '长剑,冒险者工具包');
-      let nextInventory = inventoryText;
-      for (const reward of result.rewards) {
-        nextInventory = nextInventory ? `${nextInventory},${reward.name}` : reward.name;
-      }
-
-      // 事件消息
-      for (const reward of result.rewards) {
-        addEvent(`获得 ${reward.name}`, 'state');
-      }
-      if (result.spent) addEvent(`金币 -${result.spent}`, 'state');
-
-      const basePatch: GameState = {
-        gold: Math.max(0, currentGold - result.spent),
-        inventory: nextInventory,
-        lucky_box_done: true,
-        lucky_box_attempts: result.drawCount,
-        lucky_box_spent: result.spent,
-        lucky_box_final_roll: result.finalD20,
-        lucky_box_guaranteed: result.guaranteed,
-      };
-
-      if (result.failedNoGoldNoDiamond && !hasDiamond) {
-        const currentTrust = getCompanionTrust(current, 'kaiya');
-        const trustPatch = buildTrustPatch(current, { kaiya: currentTrust - 40 });
-        const patch: GameState = {
-          ...basePatch,
-          ...trustPatch,
-          orlanBoxFailedNoGoldNoDiamond: true,
-          lucky_box_failed_no_gold_no_diamond: true,
-          gotDiamondForKaiya: false,
-          kaiya_diamond_paid: false,
-          kaiya_joined_with_debt: true,
-          last_event: `奥兰幸运盲盒失败，金币耗尽且没有获得钻石；凯娅负债入队，信任-40`,
-        };
-
-        addEvent('凯娅信任 -40', 'state');
+      if (failedNoGoldNoDiamond) {
         const debtScene = getScriptedScene('kaiya-recruited-with-debt');
         if (debtScene) {
           playScriptedScene(debtScene, { extraStatePatch: patch });
           if (current.tavern_yunling_unlocked) {
             const yunlingScene = getScriptedScene('yunling-black-market');
             if (yunlingScene) {
-              const yunlingInventory = `${nextInventory},治疗药水x3`;
+              const yunlingInventory = buildYunlingBonusInventory(nextInventory);
               playScriptedScene(yunlingScene, {
                 focus: false,
                 extraStatePatch: {
@@ -3362,20 +3232,13 @@ export default function App() {
         return;
       }
 
-      const patch: GameState = {
-        ...basePatch,
-        gotDiamondForKaiya: hasDiamond,
-        kaiya_diamond_paid: hasDiamond,
-        last_event: `奥兰幸运盲盒抽到钻石，共${result.drawCount}次，花费${result.spent}金`,
-      };
-
       const scene = getScriptedScene('kaiya-recruited');
       if (scene) {
         playScriptedScene(scene, { extraStatePatch: patch });
         if (current.tavern_yunling_unlocked) {
           const yunlingScene = getScriptedScene('yunling-black-market');
           if (yunlingScene) {
-            const yunlingInventory = `${nextInventory},治疗药水x3`;
+            const yunlingInventory = buildYunlingBonusInventory(nextInventory);
             playScriptedScene(yunlingScene, {
               focus: false,
               extraStatePatch: {
@@ -3401,33 +3264,8 @@ export default function App() {
   const handleApothecaryPurchase = useCallback(
     (itemId: string, name: string, price: number, stat?: string) => {
       const current = stateRef.current;
-      const currentGold = Number(current.gold ?? 200);
-      if ((stat || itemId === 'purification_heart') && (current[`yunling_${itemId}_bought`] || (itemId === 'purification_heart' && current.purification_heart_owned))) {
-        return;
-      }
-
-      const inventoryText = String(current.inventory || '长剑,冒险者工具包');
-      const nextInventory =
-        itemId === 'purification_heart' && inventoryText.includes(name)
-          ? inventoryText
-          : `${inventoryText},${name}`;
-
-      const patch: GameState = {
-        gold: Math.max(0, currentGold - price),
-        inventory: nextInventory,
-        [`yunling_${itemId}_bought`]: true,
-        last_event: `在云苓处购买${name}`,
-      };
-
-      if (stat) {
-        patch[stat] = Number(current[stat] ?? 10) + 2;
-      } else if (itemId === 'healing_potion') {
-        const maxHp = Number(current.max_hp ?? current.current_hp ?? 20);
-        const curHp = Number(current.current_hp ?? 20);
-        patch.current_hp = Math.min(maxHp, curHp + 5);
-      } else if (itemId === 'purification_heart') {
-        patch.purification_heart_owned = true;
-      }
+      const patch = buildApothecaryPurchasePatch(current, { itemId, name, price, stat });
+      if (!patch) return;
 
       setGameState((prev) => ({ ...prev, ...patch }));
       addEvent(`金币 -${price}`, 'state');
@@ -3445,10 +3283,10 @@ export default function App() {
   // 云苓药铺：离开 → 播放云苓告别固定剧情 → 自动进入公会登记
   const handleApothecaryExit = useCallback(() => {
     setShowApothecaryShopUI(false);
-    const farewell = getScriptedScene('yunling-farewell');
-    if (farewell) {
-      const currentInv = String(stateRef.current.inventory || '');
-      const nextInv = addInventoryQuantity(currentInv, '云苓的护身符', 1);
+      const farewell = getScriptedScene('yunling-farewell');
+      if (farewell) {
+        const currentInv = String(stateRef.current.inventory || '');
+        const nextInv = buildApothecaryFarewellInventory(currentInv);
       playScriptedScene(farewell, {
         extraStatePatch: { inventory: nextInv, yunling_farewell_done: true },
         focus: false,
