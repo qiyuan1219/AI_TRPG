@@ -10,7 +10,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { VisualNovelStage } from './components/VisualNovelStage';
 import type { DrinkingDiceResult } from './components/DrinkingDiceGame';
 import PlayerStyleSelector from './components/PlayerStyleSelector';
-import { findRegisteredSpeaker, resolveSpeakerName } from './data/characterRegistry';
+import { resolveSpeakerName } from './data/characterRegistry';
 import { resolveDndScene } from './data/dndScenes';
 import { getAc, getInitiativeModifier, getMaxHp, getPlayerStyleById, migrateClassToStyleState } from './data/dndClasses';
 import { getScriptedScene, matchScriptedScene, type ScriptedScene } from './data/scriptedScenes';
@@ -52,6 +52,8 @@ import { collectRewardNotices, type RewardNotice } from './features/story/storyR
 import { addInventoryQuantity, buildInventoryStatePatch } from './features/inventory/inventoryStatePatch';
 import { buildApothecaryFarewellInventory, buildApothecaryPurchasePatch, buildBargainPurchasePatch } from './features/shop/shopFlow';
 import { buildYunlingBonusInventory, resolveOrlanCompletion, type OrlanBoxResult } from './features/minigames/blackMarketDrawFlow';
+import { buildSaveSnapshot, normalizePersistedGameState } from './features/save/saveSnapshot';
+import { prepareSaveRestore } from './features/save/saveRestore';
 
 
 
@@ -820,22 +822,6 @@ function withStageLimitDirective(action: string, nextAction: string) {
   return `${action}\n[DIRECTIVE:stage_limit:{"rule":"${PHASE_LIMIT_DIRECTIVE}","nextAction":"${nextAction}"}]`;
 }
 
-function sanitizeStoryForSave(lines: StoryLine[]) {
-  return lines
-    .map((line) => ({ ...line, text: stripMachineProtocolText(line.text) }))
-    .filter((line) => line.text.trim());
-}
-
-function sanitizeSuggestionsForSave(items: ActionSuggestion[]) {
-  return items
-    .map((item) => ({
-      ...item,
-      label: stripMachineProtocolText(item.label),
-      text: stripMachineProtocolText(item.text),
-    }))
-    .filter((item) => item.label.trim() && item.text.trim());
-}
-
 function filterNodeSuggestions(state: GameState, hints: string[]) {
   const node = getActionChoiceStage(state, hints);
   if (!node) return hints;
@@ -1007,62 +993,6 @@ function fallbackSuggestions(state: GameState): ActionSuggestion[] {
     return makeSuggestions(['让瑟琳分析黑石脉冲规律【智力DC14】', '记录莱因断片证言【医疗DC12】', '确认队伍Boss战前状态']);
   }
   return makeSuggestions(['前往冒险者公会登记', '在逆穹悬城探索打听情报【感知DC12】', '与瑟琳讨论远征计划【魅力DC12】']);
-}
-
-function normalizeStoryLines(lines: StoryLine[]): StoryLine[] {
-  let nextId = 1;
-  let lastDialogueSpeaker = '';
-  const normalized: StoryLine[] = [];
-
-  (Array.isArray(lines) ? lines : [])
-    .filter((line) => line && typeof line.text === 'string' && line.text.trim())
-    .forEach((line) => {
-      const rawId = Number(line.id);
-      const id = Number.isFinite(rawId) && rawId > 0 ? rawId : nextId;
-      nextId = Math.max(nextId, id + 1);
-      const role = line.role === 'player' || line.role === 'system' ? line.role : 'kp';
-      const text = stripAllMachineProtocolText(line.text);
-      if (!text) return;
-      const previousLine = normalized[normalized.length - 1];
-      const previousText = previousLine?.text.trim() ?? '';
-      const isDialogue = /^[""「]/.test(text.trim());
-      let speaker = resolveSpeakerName(line.speaker || '主持人') || '主持人';
-
-      if (role === 'kp' && isDialogue) {
-        const previousNamedSpeaker = findRegisteredSpeaker(previousText, true);
-        const pronounContinuesPrevious = Boolean(lastDialogueSpeaker && /^(他们|她们|它们|他|她|它)/.test(previousText));
-        const contextSpeaker = previousNamedSpeaker || (pronounContinuesPrevious ? lastDialogueSpeaker : '');
-        if (contextSpeaker && (speaker === '主持人')) {
-          speaker = contextSpeaker;
-        }
-      }
-
-      if (role === 'kp' && isDialogue && speaker !== '主持人') {
-        lastDialogueSpeaker = speaker;
-      }
-
-      normalized.push({
-        id,
-        role,
-        speaker,
-        text,
-        portrait: typeof line.portrait === 'string' ? line.portrait : undefined,
-        bgImage: typeof line.bgImage === 'string' ? line.bgImage : undefined,
-        bgm: typeof line.bgm === 'string' ? line.bgm : undefined,
-        scriptedSceneId: typeof line.scriptedSceneId === 'string' ? line.scriptedSceneId : undefined,
-      });
-    });
-
-  return normalized;
-}
-
-function findInheritedBgImage(story: StoryLine[], activeIndex: number) {
-  const end = Math.min(Math.max(activeIndex, 0), Math.max(story.length - 1, 0));
-  for (let index = end; index >= 0; index -= 1) {
-    const bgImage = story[index]?.bgImage;
-    if (typeof bgImage === 'string' && bgImage.trim()) return bgImage;
-  }
-  return null;
 }
 
 import { OpeningActionTutorial, OPENING_ACTION_TUTORIAL } from './components/OpeningActionTutorial';
@@ -1691,26 +1621,22 @@ export default function App() {
       }
 
       try {
-        const latestState = migrateRerollInventory(synchronizeMainStoryState(migrateClassToStyleState(stateRef.current)));
+        const latestState = normalizePersistedGameState(stateRef.current, synchronizeMainStoryState);
         if (latestState !== stateRef.current) {
           stateRef.current = latestState;
           setGameState(latestState);
         }
-        const saveTitlePrefix = slotKey === AUTO_SAVE_SLOT ? '自动' : '';
-        const saveTitle = options.customTitle
-          ? `${saveTitlePrefix}${saveTitlePrefix ? ' · ' : ''}${options.customTitle}`
-          : `${saveTitlePrefix}${saveTitlePrefix ? ' · ' : ''}${latestState.player_name || '冒险者'} · ${getSaveTitleArea(latestState)}`;
-        const sanitizedStory = sanitizeStoryForSave(story);
-        const sanitizedSuggestions = sanitizeSuggestionsForSave(constrainActionSuggestions(latestState, suggestions));
-        const result = await saveGame(gameId, {
-          slot_key: slotKey,
-          title: saveTitle,
+        const snapshot = buildSaveSnapshot({
+          slotKey,
+          customTitle: options.customTitle,
           state: latestState,
-          story: sanitizedStory,
-          suggestions: sanitizedSuggestions,
-          active_index: Math.min(activeIndex, Math.max(sanitizedStory.length - 1, 0)),
+          story,
+          suggestions: constrainActionSuggestions(latestState, suggestions),
+          activeIndex,
           phase: options.phaseOverride ?? phase,
+          saveArea: getSaveTitleArea(latestState),
         });
+        const result = await saveGame(gameId, snapshot);
 
         upsertSaveSummary(result.save);
         if (!silent) {
@@ -1757,15 +1683,15 @@ export default function App() {
         abortRef.current?.abort();
         parserRef.current = createNarrativeStreamParser();
         const result = await loadGame(slotKey);
-        const restoredState = migrateRerollInventory(synchronizeMainStoryState(migrateClassToStyleState(result.state)));
-        const restoredStory = normalizeStoryLines(result.story);
-        const maxLineId = restoredStory.reduce((max, line) => Math.max(max, line.id), 0);
-        const restoredActiveIndex = restoredStory.length ? Math.min(Math.max(result.active_index, 0), restoredStory.length - 1) : 0;
-        const restoredLine = restoredStory[restoredActiveIndex];
-        const restoredBgImage = findInheritedBgImage(restoredStory, restoredActiveIndex);
+        const restored = prepareSaveRestore(result, synchronizeMainStoryState);
+        const restoredState = restored.state;
+        const restoredStory = restored.story;
+        const restoredActiveIndex = restored.activeIndex;
+        const restoredLine = restored.activeLine;
+        const restoredBgImage = restored.inheritedBgImage;
         const restoredBgmTrack = resolveBgmTrack('game', restoredLine, restoredState);
 
-        lineId.current = maxLineId + 1;
+        lineId.current = restored.nextLineId;
         eventId.current = 1;
         kpSpeakerRef.current = '';
         setGameId(result.game_id);
@@ -1775,15 +1701,15 @@ export default function App() {
         setRewardNotices([]);
         setStory(restoredStory);
         setActiveIndex(restoredActiveIndex);
-        setPhase(result.phase === 'narrating' ? 'narrating' : 'action');
+        setPhase(restored.phase);
         setStreaming(false);
         setSuggestions(constrainActionSuggestions(restoredState, result.suggestions));
         setShowStyleSelection(false);
         setShowBattlePrepPanel(false);
         setBattlePrepDice(null);
         setSelectionActionCheck(null);
-        setSelectedOpeningStyleId(String(restoredState.selectedStyleId || restoredState.selected_style_id || 'balanced'));
-        setOpeningPlayerName(String(restoredState.player_name || '').replace(/^冒险者$/, ''));
+        setSelectedOpeningStyleId(restored.selectedStyleId);
+        setOpeningPlayerName(restored.playerNameInput);
         setFullyVisibleLineId(null);
         setPendingTutorialBattleSetup(null);
         setPendingTutorialBattleSummary([]);
