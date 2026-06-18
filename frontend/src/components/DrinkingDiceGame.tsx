@@ -8,7 +8,7 @@ import { fetchMiniGameCommentary } from '../services/api';
 const INITIAL_ALCOHOL = 10;
 const INITIAL_AC = 5;
 const AC_STEP = 2;
-const MAX_AC = 18;
+const MAX_AC = 16;
 
 function rollDie(sides: number) {
   return Math.floor(Math.random() * sides) + 1;
@@ -144,7 +144,7 @@ const DRINKING_TUTORIAL: TutorialStep[] = [
     title: 'AC递增',
     badge: '越来越烈',
     placement: 'center',
-    body: '第一回合 AC5。每回合结束后，如果酒还没喝完，AC +2，最高到 AC17。\n\n越拖到后面，酒劲越冲，体质豁免越难通过。',
+    body: '第一回合 AC5。每回合结束后，如果酒还没喝完，AC +2，最高到 AC16。\n\n越拖到后面，酒劲越冲，体质豁免越难通过。',
   },
   {
     title: '喝酒与自然20',

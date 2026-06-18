@@ -254,7 +254,7 @@ const TAVERN_DICE_TUTORIAL: TutorialStep[] = [
   },
 ];
 
-export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDicePokerProps) {
+export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps) {
   const [phase, setPhase] = useState<Phase>('prep');
   const [round, setRound] = useState(1);
   const [stake, setStake] = useState(BASE_STAKE);
@@ -453,10 +453,14 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
     resetRoundState(round + 1, doubleStake ? stake * 2 : BASE_STAKE);
   }
 
-  function cashOutAfterWin() {
+  function continueAfterWin(doubleStake: boolean) {
     const payout = stake * 2;
     setEarnings((value) => value + payout);
-    finishGame(wins, { extraEarnings: payout });
+    if (round >= ROUND_LIMIT) {
+      finishGame(wins, { extraEarnings: payout });
+      return;
+    }
+    resetRoundState(round + 1, doubleStake ? stake * 2 : BASE_STAKE);
   }
 
   function plead() {
@@ -574,11 +578,6 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
             <span>回声酒馆 · 快艇骰子</span>
             <small>第 {round}/3 局 · 已胜 {wins} 局 · 当前下注 {stake}G</small>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button type="button" className="tavern-dice-close" onClick={onClose} aria-label="关闭快艇骰子">
-              x
-            </button>
-          </div>
         </header>
 
         <div className="tavern-dice-board">
@@ -617,11 +616,11 @@ export function TavernDicePoker({ gold = 200, onClose, onComplete }: TavernDiceP
             {phase === 'round_result' && lastRecord && (
               lastRecord.result === 'win' ? (
                 <>
-                  <button type="button" className="tavern-tool-btn primary" onClick={cashOutAfterWin}>
-                    收走赌注结束
+                  <button type="button" className="tavern-tool-btn primary" onClick={() => continueAfterWin(false)}>
+                    {round >= ROUND_LIMIT ? '查看结算' : '进入下一局'}
                   </button>
                   {round < ROUND_LIMIT && (
-                    <button type="button" className="tavern-tool-btn" onClick={() => continueAfterRound(true)}>
+                    <button type="button" className="tavern-tool-btn" onClick={() => continueAfterWin(true)}>
                       翻倍下一局
                     </button>
                   )}
