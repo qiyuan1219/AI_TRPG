@@ -24,6 +24,7 @@ export const DEFAULT_BATTLE_PREP_ACTION: BattlePrepChoice = {
   id: 'keep-formation',
   label: '保持队形，准备迎战',
   type: 'battlePrep',
+  canUseRerollItems: true,
   desc: '在敌人靠近前稳住阵型。',
   check: { skill: 'observe', dc: 12, label: '观察 DC 12', attribute: 'wis' },
   successText: '你的判断及时生效，队伍在混乱爆发前争取到了一点优势。',
@@ -37,6 +38,7 @@ export const TUTORIAL_BATTLE_PREP_ACTIONS: BattlePrepChoice[] = [
     id: 'observe-soft-belly',
     label: '观察裂隙爬兽的软肋',
     type: 'battlePrep',
+    canUseRerollItems: true,
     desc: '根据瑟琳的提醒，寻找裂隙爬兽腹侧没有硬壳保护的位置。',
     check: { skill: 'observe', dc: 12, label: '观察 DC 12', attribute: 'wis' },
     successText: '你看准了裂隙爬兽跃起时暴露出的腹侧软肋。',
@@ -48,6 +50,7 @@ export const TUTORIAL_BATTLE_PREP_ACTIONS: BattlePrepChoice[] = [
     id: 'hold-position',
     label: '稳住脚步，不退向护栏',
     type: 'battlePrep',
+    canUseRerollItems: true,
     desc: '听从瑟琳提醒，避免在慌乱中退到危险边缘。',
     check: { skill: 'endurance', dc: 11, label: '耐受 DC 11', attribute: 'con' },
     successText: '你稳住呼吸和重心，没有被裂隙爬兽的冲势逼到护栏边。',
@@ -115,4 +118,3 @@ export function canShowPrepChoice(state: any, config: EncounterFlowConfig): bool
 export function isEncounterBattleDone(state: any, config: EncounterFlowConfig): boolean {
   return Boolean(state.flags?.[config.battleDoneFlag] || state[config.battleDoneFlag]);
 }
-

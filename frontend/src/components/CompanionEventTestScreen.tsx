@@ -80,7 +80,7 @@ const BLOCK_ECHO_FOREST_BATTLE_CONFIG: BattleConfig = {
       skills: [
         { id: 'adv-cleave', name: '稳步斩击', resource: '战斗技能', source: '职业技能', formula: 'STR+熟练 vs AC；1d8+3', effect: '压制污染藤蔓', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 13, label: '稳步斩击' }, tags: ['攻击'] },
         { id: 'adv-guard', name: '盾牌压制', resource: '战斗技能', source: '职业技能', formula: 'STR运动 DC13；1d4+3', effect: '挡住拟声孢群', cooldown: '每回合1次', rule: '技能检定', roll: { kind: 'ability', ability: 'str', dc: 13, label: '盾牌压制' }, tags: ['检定'] },
-        { id: 'adv-breath', name: '回气', resource: '战斗技能', source: '职业技能', formula: '恢复1d10+3', effect: '稳定呼吸，抵抗孢粉', cooldown: '每战斗1次', rule: '治疗骰', roll: { kind: 'healing', dieType: 'd10', diceCount: 1, bonus: 3, label: '回气' }, tags: ['治疗'] },
+        { id: 'adv-breath', name: '回气', resource: '战斗技能', source: '职业技能', formula: '恢复1d8+3', effect: '稳定呼吸，抵抗孢粉', cooldown: '每战斗1次', rule: '治疗骰', roll: { kind: 'healing', dieType: 'd8', diceCount: 1, bonus: 3, label: '回气' }, tags: ['治疗'] },
       ],
       nonCombatSkills: [],
     },

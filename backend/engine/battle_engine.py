@@ -53,6 +53,21 @@ SKILLS: dict[str, dict] = {
         "cooldown": 0,
         "effects": [],
     },
+    "selin_starburst": {
+        "id": "selin_starburst",
+        "name": "星轨震荡",
+        "targetType": "all_enemies",
+        "requiresHitRoll": True,
+        "hitBonus": 1,
+        "damageDice": "2d4",
+        "damageBonusAttribute": None,
+        "damageType": "arcane",
+        "primaryTargetBonus": 2,
+        "armorPierce": 0,
+        "cost": {},
+        "cooldown": 0,
+        "effects": [],
+    },
     "brock_pan": {
         "id": "brock_pan",
         "name": "铁锅猛击",
@@ -164,7 +179,7 @@ DEFAULT_CHARACTERS: list[dict] = [
         "attributes": {"strength": -1, "dexterity": 2, "constitution": 1, "intelligence": 3, "wisdom": 2, "charisma": 0},
         "combatStats": {"hp": 24, "maxHp": 24, "armor": 1, "maxArmor": 1, "defense": 14, "attackBonus": 4, "initiativeBonus": 2},
         "resources": {},
-        "skillIds": ["selin_bolt"],
+        "skillIds": ["selin_bolt", "selin_starburst"],
         "statuses": [],
         "cooldowns": {},
     },
@@ -318,6 +333,9 @@ class BattleEngine:
         group_target = skill.get("targetType") in {"all_enemies", "all_allies"}
         if group_target:
             targets = legal_targets
+            requested_primary_id = next(iter(action.get("targetIds", [])), None)
+            if requested_primary_id in legal_target_ids:
+                targets = sorted(targets, key=lambda candidate: candidate["id"] != requested_primary_id)
         else:
             targets = [self.get_character(target_id) for target_id in action.get("targetIds", [])]
             if not targets or any(target is None for target in targets):
@@ -341,8 +359,13 @@ class BattleEngine:
             critical = roll == 20
             events.append({"type": "attack_roll", "actorId": actor["id"], "targetId": target["id"], "dice": "1d20", "rawRoll": roll, "modifier": actor["combatStats"].get("attackBonus", 0) + skill.get("hitBonus", 0), "total": total, "targetDefense": defense, "result": "critical" if critical else "hit" if hit else "miss"})
             if hit:
+                shared_damage_roll = None
+                if len(targets) > 1:
+                    damage_formula = _double_dice(skill.get("damageDice", "1d4")) if critical else skill.get("damageDice", "1d4")
+                    shared_damage_roll = dice.roll_formula(damage_formula, f"{actor['name']} {skill['name']} damage")
                 for resolved_target in targets:
-                    self._apply_damage(actor, resolved_target, skill, dice, critical, events)
+                    primary_bonus = skill.get("primaryTargetBonus", 0) if resolved_target["id"] == target["id"] else 0
+                    self._apply_damage(actor, resolved_target, skill, dice, critical, events, primary_bonus, shared_damage_roll)
         elif skill.get("damageDice"):
             for resolved_target in targets:
                 self._apply_damage(actor, resolved_target, skill, dice, False, events)
@@ -461,13 +484,13 @@ class BattleEngine:
             return 0
         return int(actor.get("attributes", {}).get(key, 0))
 
-    def _apply_damage(self, actor: dict, target: dict, skill: dict, dice: DiceService, critical: bool, events: list[dict]):
+    def _apply_damage(self, actor: dict, target: dict, skill: dict, dice: DiceService, critical: bool, events: list[dict], flat_bonus: int = 0, damage_roll: dict | None = None):
         damage_formula = skill.get("damageDice", "1d4")
         if critical:
             damage_formula = _double_dice(damage_formula)
-        roll = dice.roll_formula(damage_formula, f"{actor['name']} {skill['name']} damage")
+        roll = damage_roll or dice.roll_formula(damage_formula, f"{actor['name']} {skill['name']} damage")
         attr_bonus = self._attr_bonus(actor, skill.get("damageBonusAttribute"))
-        raw_damage = max(0, roll["total"] + attr_bonus)
+        raw_damage = max(0, roll["total"] + attr_bonus + flat_bonus)
         pierce = min(raw_damage, int(skill.get("armorPierce", 0)))
         armor_damage = min(target["combatStats"].get("armor", 0), raw_damage - pierce)
         hp_damage = raw_damage - armor_damage
@@ -475,7 +498,7 @@ class BattleEngine:
         target["combatStats"]["hp"] = max(0, target["combatStats"]["hp"] - hp_damage)
         if target["combatStats"]["hp"] <= 0:
             target["alive"] = False
-        events.append({"type": "damage", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "attributeBonus": attr_bonus, "rawDamage": raw_damage, "armorPierce": pierce, "armorDamage": armor_damage, "hpDamage": hp_damage, "targetArmor": target["combatStats"]["armor"], "targetHp": target["combatStats"]["hp"], "targetAlive": target["alive"], "critical": critical})
+        events.append({"type": "damage", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "attributeBonus": attr_bonus, "flatBonus": flat_bonus, "rawDamage": raw_damage, "armorPierce": pierce, "armorDamage": armor_damage, "hpDamage": hp_damage, "targetArmor": target["combatStats"]["armor"], "targetHp": target["combatStats"]["hp"], "targetAlive": target["alive"], "critical": critical})
 
     def _apply_healing(self, actor: dict, target: dict, skill: dict, dice: DiceService, events: list[dict]):
         if not target.get("alive", True):

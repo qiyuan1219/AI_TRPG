@@ -58,7 +58,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       statuses: ['前排'],
       traits: ['HP34/AC16'],
       skills: [
-        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d10+300钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 13, label: '铁锅重砸' }, tags: ['攻击'] },
+        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d8+300钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 13, label: '铁锅重砸' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },
@@ -190,7 +190,7 @@ export const BONE_MARSH_BATTLE_CONFIG: BattleConfig = {
       statuses: ['前排'],
       traits: ['HP30/AC16'],
       skills: [
-        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d10+3钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 14, label: '铁锅重砸' }, tags: ['攻击'] },
+        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d8+3钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 14, label: '铁锅重砸' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },
@@ -323,7 +323,7 @@ export const BLACKSTONE_GATEKEEPER_BOSS_CONFIG: BattleConfig = {
       statuses: ['前排'],
       traits: ['HP28/AC16'],
       skills: [
-        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d10+3钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 17, label: '铁锅重砸' }, tags: ['攻击'] },
+        { id: 'brock-smash', name: '铁锅重砸', resource: '战斗技能', source: '队友技能', formula: 'STR+熟练 vs AC；1d8+3钝击', effect: '正面砸击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 17, label: '铁锅重砸' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },

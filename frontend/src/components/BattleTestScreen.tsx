@@ -69,6 +69,7 @@ export interface BattleSkill {
   rule: string;
   roll: SkillRollSpec;
   tags: string[];
+  primaryTargetBonus?: number;
   trigger?: string;
   locked?: boolean;
 }
@@ -302,12 +303,12 @@ const BATTLE_UNITS: BattleUnit[] = [
         name: "回气",
         resource: "附赠动作",
         source: "职业技能",
-        formula: "恢复 1d10 + 战士等级",
+        formula: "恢复 1d8 + 战士等级",
         effect: "立即恢复生命值，用于测试治疗骰和附赠动作占用。",
         cooldown: "每次短休 1 次",
         rule: "HP 与恢复",
-        roll: { kind: "healing", dieType: "d10", diceCount: 1, bonus: 3, label: "回气恢复量" },
-        tags: ["治疗", "D10", "短休"],
+        roll: { kind: "healing", dieType: "d8", diceCount: 1, bonus: 3, label: "回气恢复量" },
+        tags: ["治疗", "D8", "短休"],
       },
       {
         id: "F4",
@@ -901,11 +902,11 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
         name: "回气",
         resource: "战斗技能",
         source: "职业技能",
-        formula: "恢复 1d10+3 HP",
+        formula: "恢复 1d8+3 HP",
         effect: "教学重点：治疗不攻击敌人，而是选择我方目标并恢复生命值。冒险者受伤后再用最划算。",
         cooldown: "每战斗 1 次",
         rule: "治疗骰",
-        roll: { kind: "healing", dieType: "d10", diceCount: 1, bonus: 3, label: "回气恢复量" },
+        roll: { kind: "healing", dieType: "d8", diceCount: 1, bonus: 3, label: "回气恢复量" },
         tags: ["治疗", "HP", "保命"],
       },
     ],
@@ -944,15 +945,16 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
       },
       {
         id: "SE2",
-        name: "时隙牵引",
+        name: "星轨震荡",
         resource: "战斗技能",
         source: "队友技能",
-        formula: "目标 DEX 豁免 DC13；1d6+3 力场",
-        effect: "教学重点：有些技能不是你掷攻击，而是目标掷豁免。目标失败吃完整效果，成功通常只有半效。",
+        formula: "INT + 熟练 vs AC；2d4 奥术",
+        effect: "命中后对敌方全体造成 2d4 奥术伤害，主目标额外受到 2 点伤害。",
         cooldown: "每回合 1 次",
-        rule: "豁免判定",
-        roll: { kind: "save", dc: 13, targetSaveBonus: 2, label: "目标 DEX 豁免" },
-        tags: ["豁免", "减速", "控制"],
+        rule: "范围法术攻击",
+        roll: { kind: "attack", ability: "int", targetAc: 12, label: "星轨震荡命中判定" },
+        tags: ["法术攻击", "范围", "全体", "奥术"],
+        primaryTargetBonus: 2,
       },
       {
         id: "SE3",
@@ -1149,7 +1151,7 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     skills: [
       { id: "T1", name: "稳步斩击", resource: "战斗技能", source: "职业技能", formula: "STR+熟练 vs AC；1d8+3", effect: "基础攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "str", targetAc: 12, label: "稳步斩击" }, tags: ["攻击"] },
       { id: "T2", name: "盾牌压制", resource: "战斗技能", source: "职业技能", formula: "STR运动 DC12；1d4+3", effect: "技能检定", cooldown: "每回合1次", rule: "技能检定", roll: { kind: "ability", ability: "str", dc: 12, label: "盾牌压制" }, tags: ["检定"] },
-      { id: "T3", name: "回气", resource: "战斗技能", source: "职业技能", formula: "恢复1d10+3", effect: "治疗自身", cooldown: "每战斗1次", rule: "治疗骰", roll: { kind: "healing", dieType: "d10", diceCount: 1, bonus: 3, label: "回气" }, tags: ["治疗"] },
+      { id: "T3", name: "回气", resource: "战斗技能", source: "职业技能", formula: "恢复1d8+3", effect: "治疗自身", cooldown: "每战斗1次", rule: "治疗骰", roll: { kind: "healing", dieType: "d8", diceCount: 1, bonus: 3, label: "回气" }, tags: ["治疗"] },
     ], nonCombatSkills: [],
   },
   {
@@ -1159,7 +1161,7 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     resourceProfile: ["法术攻击", "豁免", "治疗"], statuses: ["后排"], traits: ["HP24/AC14"],
     skills: [
       { id: "S1", name: "银钟光束", resource: "战斗技能", source: "队友技能", formula: "INT+熟练 vs AC；1d8+3光耀", effect: "法术攻击", cooldown: "每回合1次", rule: "法术攻击", roll: { kind: "attack", ability: "int", targetAc: 12, label: "银钟光束" }, tags: ["法术"] },
-      { id: "S2", name: "时隙牵引", resource: "战斗技能", source: "队友技能", formula: "目标DEX豁免DC13；1d6+3力场", effect: "目标豁免", cooldown: "每回合1次", rule: "豁免判定", roll: { kind: "save", dc: 13, targetSaveBonus: 2, label: "时隙牵引" }, tags: ["豁免"] },
+      { id: "S2", name: "星轨震荡", resource: "战斗技能", source: "队友技能", formula: "INT+熟练 vs AC；2d4奥术", effect: "命中后对敌方全体造成2d4奥术伤害，主目标额外受到2点伤害。", cooldown: "每回合1次", rule: "范围法术攻击", roll: { kind: "attack", ability: "int", targetAc: 12, label: "星轨震荡命中判定" }, tags: ["法术攻击", "范围", "全体", "奥术"], primaryTargetBonus: 2 },
       { id: "S3", name: "逆钟愈合", resource: "战斗技能", source: "队友技能", formula: "恢复1d8+3", effect: "治疗队友", cooldown: "每战斗2次", rule: "治疗骰", roll: { kind: "healing", dieType: "d8", diceCount: 1, bonus: 3, label: "逆钟愈合" }, tags: ["治疗"] },
     ], nonCombatSkills: [],
   },
@@ -2054,7 +2056,8 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
   }
 
   if (dice.type === "dice_test" && skill.roll.kind === "attack") {
-    const finalAmount = tunedAmount;
+    const primaryTargetBonus = skill.primaryTargetBonus ?? 0;
+    const finalAmount = tunedAmount !== undefined ? tunedAmount + primaryTargetBonus : undefined;
     const damageFormula = formatDamageFormulaForPlayer(skill.formula);
     const narration = buildKpNarration({ actor, target, skill, dice, amount: finalAmount, outcome: "hit" });
     return {
@@ -2067,7 +2070,9 @@ function buildBattleEffect(actor: BattleUnit, target: BattleUnit, skill: BattleS
       resultLine: diceLine(dice),
       amount: finalAmount,
       success: Boolean(finalAmount),
-      detail: `命中后投掷伤害骰 ${damageFormula}，造成 ${finalAmount ?? 0} 点伤害。${displayEffect}`,
+      detail: primaryTargetBonus > 0
+        ? `命中后投掷伤害骰 ${damageFormula}，骰点合计 ${tunedAmount ?? 0}；敌方全体受到 ${tunedAmount ?? 0} 点伤害，主目标 ${target.name} 额外受到 ${primaryTargetBonus} 点伤害（共 ${finalAmount ?? 0} 点）。${displayEffect}`
+        : `命中后投掷伤害骰 ${damageFormula}，造成 ${finalAmount ?? 0} 点伤害。${displayEffect}`,
       narration,
     };
   }
@@ -2677,9 +2682,9 @@ export function BattleTestScreen({
   const settlementTimerRef = useRef<number | null>(null);
 
   function inferOutcome(title: string): string {
+    if (title.includes("未命中")) return "miss";
     if (title.includes("命中")) return "hit";
     if (title.includes("擦伤")) return "graze";
-    if (title.includes("未命中")) return "miss";
     if (title.includes("半效")) return "save-half";
     if (title.includes("豁免失败")) return "save-full";
     if (title.includes("豁免成功")) return "save-half";
@@ -2737,15 +2742,20 @@ export function BattleTestScreen({
 
   function executeSettlement(settlement: PendingSettlement) {
     const { unit, target, skill, effect } = settlement;
-    const impactedTargets = getResolvedDamageTargets(unit, target, skill);
+    const attackMissed = skill.roll.kind === "attack" && effect.success === false;
+    const impactedTargets = attackMissed ? [target] : getResolvedDamageTargets(unit, target, skill);
     const targetLabel = impactedTargets.length > 1 ? impactedTargets.map((item) => item.name).join("、") : target.name;
     applyHpEffect(unit, target, skill, effect);
     // 群体伤害：本地兜底描述我方全体或敌方全体
     const aoeLabel = impactedTargets.length > 1
       ? (unit.faction === "enemy" ? "我方全体" : "敌方全体")
       : target.name;
-    const localNarration = impactedTargets.length > 1
-      ? `${unit.name}释放${skill.name}，${aoeLabel}受到 ${effect.amount} 点伤害。`
+    const localNarration = attackMissed
+      ? effect.narration
+      : impactedTargets.length > 1
+      ? skill.primaryTargetBonus
+        ? `${unit.name}释放${skill.name}，${aoeLabel}受到 ${(effect.amount ?? 0) - skill.primaryTargetBonus} 点伤害，主目标${target.name}额外受到 ${skill.primaryTargetBonus} 点伤害。`
+        : `${unit.name}释放${skill.name}，${aoeLabel}受到 ${effect.amount} 点伤害。`
       : effect.narration;
     const placeholderEffect = { ...effect, narration: "KP记录中…" };
     kpReportEffectIdRef.current = placeholderEffect.id;
@@ -2877,7 +2887,11 @@ export function BattleTestScreen({
       setUnitHp((current) => {
         const next = { ...current };
         damageTargets.forEach((damageTarget) => {
-          next[damageTarget.id] = Math.max(0, (current[damageTarget.id] ?? damageTarget.hp) - effect.amount!);
+          const primaryTargetBonus = skill.primaryTargetBonus ?? 0;
+          const targetDamage = damageTarget.id === target.id
+            ? effect.amount!
+            : Math.max(0, effect.amount! - primaryTargetBonus);
+          next[damageTarget.id] = Math.max(0, (current[damageTarget.id] ?? damageTarget.hp) - targetDamage);
         });
         return next;
       });

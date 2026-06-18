@@ -40,6 +40,26 @@ const TABS: Array<{ id: InventoryTab; label: string }> = [
 ];
 
 const ITEM_DEFINITIONS: Record<string, Partial<InventoryEntry>> = {
+  虚构骰子: {
+    id: 'fiction-dice',
+    type: 'consumable',
+    category: 'consumable',
+    icon: 'fiction-dice',
+    rarity: 'rare',
+    summary: '剧情判定后可重投一次 D20，最终采用两次总值中较高的一次。',
+    effectText: '仅限可重投的剧情判定；每次判定最多使用一个重投道具。',
+    stackable: true,
+  },
+  万能骰子: {
+    id: 'omni-dice',
+    type: 'consumable',
+    category: 'consumable',
+    icon: 'omni-dice',
+    rarity: 'rare',
+    summary: '剧情判定后指定一个 1~20 的 D20 点数，并直接采用该结果。',
+    effectText: '仅限可重投的剧情判定；每次判定最多使用一个重投道具。',
+    stackable: true,
+  },
   治疗药水: {
     id: 'healing_potion',
     type: 'consumable',

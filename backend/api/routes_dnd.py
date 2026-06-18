@@ -17,6 +17,7 @@ from kp.dm_service import (
     dm_judge_advantage,
     judge_ailin_recruit_answer,
     judge_serlin_self_introduction,
+    dm_story_check_narrate,
 )
 from kp.memory import (
     get_game_memories,
@@ -242,6 +243,23 @@ class AilinRecruitAnswerRequest(BaseModel):
 
 class SerlinIntroRequest(BaseModel):
     player_answer: str
+
+
+class StoryCheckNarrateRequest(BaseModel):
+    encounter_id: str = ""
+    action_id: str
+    action_label: str
+    action_desc: str = ""
+    skill_name: str = ""
+    dc: int = 0
+    modifier: int = 0
+    initial_roll: dict = Field(default_factory=dict)
+    reroll: dict | None = None
+    final_roll: dict = Field(default_factory=dict)
+    final_success: bool
+    reroll_used: bool = False
+    reroll_item_id: str | None = None
+    current_area: str = ""
 
 
 class MiniGameCommentaryRequest(BaseModel):
@@ -554,7 +572,7 @@ async def create_dnd_game(req: CreateDNDRequest):
         "atk_bonus": derived["atk_bonus"],
         "proficiency_bonus": PROFICIENCY_BONUS.get(req.level, 2),
         "gold": 400,
-        "inventory": "长剑,冒险者工具包,治疗药水x2",
+        "inventory": "长剑,冒险者工具包,治疗药水x2,虚构骰子x3,万能骰子x3",
         "player": {
             "styleId": selected_style_id,
             "styleName": style_name,
@@ -816,6 +834,11 @@ async def judge_serlin_intro(req: SerlinIntroRequest):
     if not player_answer:
         raise HTTPException(400, "介绍不能为空")
     return await judge_serlin_self_introduction(player_answer=player_answer)
+
+
+@router_dnd.post("/story-check/narrate")
+async def story_check_narrate(req: StoryCheckNarrateRequest):
+    return {"narration": await dm_story_check_narrate(req.model_dump())}
 
 
 @router_dnd.post("/mini-game/commentary")

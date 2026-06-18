@@ -967,6 +967,62 @@ async def dm_battle_narrate(
         return ""
 
 
+def _fallback_story_check_narration(payload: dict) -> str:
+    success = bool(payload.get("final_success"))
+    source = str(payload.get("reroll_item_id") or "")
+    if source == "fiction-dice":
+        return ("虚构骰子在掌心微微发热，命运像被重新掷出一次。"
+                + ("新的结果替你抓住了局势中的破绽，队伍随即占据有利位置。" if success else "但第二次机会仍没能扭转险势，队伍只得谨慎收紧阵形。"))
+    if source == "omni-dice":
+        return ("万能骰子的骰面被奇异力量固定，局势沿着你选定的结果落下。"
+                + ("你的行动及时奏效，队伍得以带着这份优势迎接敌人。" if success else "你接受了这个结果，队伍也为随之而来的压力做好准备。"))
+    return ("你的判断及时生效，混乱在爆发前被你抓住了一瞬。队伍已经准备好迎接敌人。" if success
+            else "你的行动慢了一步，危险迅速逼近。队伍收紧阵形，准备承受接下来的冲击。")
+
+
+async def dm_story_check_narrate(payload: dict) -> str:
+    """Generate a complete, side-effect-free bridge from a finalized story check to battle."""
+    fallback = _fallback_story_check_narration(payload)
+    prompt = f"""你是《地心之门》的主持人。根据已经锁定的战前剧情判定，续写一段进入战斗前的承接叙事。
+
+行动：{payload.get('action_label', '')}
+行动描述：{payload.get('action_desc', '')}
+技能：{payload.get('skill_name', '')}
+DC：{payload.get('dc', 0)}，修正：{payload.get('modifier', 0)}
+初次投骰：{payload.get('initial_roll', {})}
+重投：{payload.get('reroll')}
+最终投骰：{payload.get('final_roll', {})}
+最终成败：{'成功' if payload.get('final_success') else '失败'}
+重投道具：{payload.get('reroll_item_id') or '未使用'}
+当前区域：{payload.get('current_area', '')}
+
+要求：
+- 只依据最终投骰决定成败，绝不能改写判定结果或数值。
+- 使用虚构骰子时体现命运被重新掷出；使用万能骰子时体现骰面被奇异力量固定。
+- 写 2 至 4 句完整中文，形成战斗前承接，但不要宣布战斗已经开始。
+- 不输出选项、系统指令、状态修改、Markdown 或“进入战斗”按钮文字。
+- 必须完整收束，不能以半句话结尾。"""
+    try:
+        completion = await asyncio.wait_for(
+            _create_chat_completion(
+                model=LLM_MODEL,
+                messages=[{"role": "system", "content": "只输出完整的中文剧情正文，不调用工具。"}, {"role": "user", "content": prompt}],
+                temperature=0.8,
+                max_tokens=320,
+                stream=False,
+            ),
+            timeout=20,
+        )
+        text = (completion.choices[0].message.content if completion.choices else "") or ""
+        cleaned = text.strip().replace("```", "")
+        if not cleaned or cleaned[-1] not in "。！？」”":
+            return fallback
+        return cleaned[:600]
+    except (OpenAIError, asyncio.TimeoutError, TypeError, ValueError) as error:
+        logger.warning("story check narration fell back: %s", error)
+        return fallback
+
+
 MINI_GAME_COMMENTARY_PROMPT = """你是《地心之门》小游戏中的即时角色反馈生成器。
 
 角色口吻：

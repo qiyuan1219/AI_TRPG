@@ -10,6 +10,8 @@ interface PlayerStyleSelectorProps {
   confirmLabel?: string;
   title?: string;
   subtitle?: string;
+  playerName?: string;
+  onPlayerNameChange?: (name: string) => void;
 }
 
 const ATTRS: Array<{ key: keyof CharacterPreset['attributes']; name: string }> = [
@@ -125,6 +127,8 @@ export default function PlayerStyleSelector({
   confirmLabel = '确认流派',
   title = '选择冒险者流派',
   subtitle = '流派只影响初始六维、生命、防护和先攻；行动技能会在游戏中自然判定。',
+  playerName = '',
+  onPlayerNameChange,
 }: PlayerStyleSelectorProps) {
   const currentStyle = getPlayerStyleById(selectedStyleId);
 
@@ -134,6 +138,19 @@ export default function PlayerStyleSelector({
         <p className="eyebrow">冒险者登记</p>
         <h2>{title}</h2>
         <p>{subtitle}</p>
+        {onPlayerNameChange && (
+          <label className="adventurer-name-field">
+            <span>冒险者姓名</span>
+            <input
+              type="text"
+              value={playerName}
+              maxLength={20}
+              autoComplete="off"
+              placeholder="写下你的名字"
+              onChange={(event) => onPlayerNameChange(event.target.value)}
+            />
+          </label>
+        )}
       </div>
 
       <section className="creator-grid style-selector-grid">
@@ -194,7 +211,7 @@ export default function PlayerStyleSelector({
           </div>
 
           {onConfirm && (
-            <button type="button" onClick={onConfirm} className="start-button">
+            <button type="button" onClick={onConfirm} disabled={Boolean(onPlayerNameChange && !playerName.trim())} className="start-button">
               {confirmLabel}
             </button>
           )}

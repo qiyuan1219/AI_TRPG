@@ -251,6 +251,32 @@ export async function judgeSerlinIntro(playerAnswer: string): Promise<SerlinIntr
   return response.json();
 }
 
+export interface StoryCheckNarratePayload {
+  encounter_id: string;
+  action_id: string;
+  action_label: string;
+  action_desc: string;
+  skill_name: string;
+  dc: number;
+  modifier: number;
+  initial_roll: object;
+  reroll?: object | null;
+  final_roll: object;
+  final_success: boolean;
+  reroll_used: boolean;
+  reroll_item_id?: string | null;
+  current_area: string;
+}
+
+export async function fetchStoryCheckNarration(payload: StoryCheckNarratePayload): Promise<string> {
+  const response = await apiFetch(`${BASE}/story-check/narrate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+  }, '战前续写生成失败');
+  if (!response.ok) throw new Error(await readErrorMessage(response, '战前续写生成失败'));
+  const data = await response.json();
+  return String(data.narration || '').trim();
+}
+
 export async function startCompanionSideEvent(
   eventId = 'block_echo_forest',
   initialTrust = 55,

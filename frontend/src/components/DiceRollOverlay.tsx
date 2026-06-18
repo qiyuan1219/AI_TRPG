@@ -21,6 +21,19 @@ export interface DiceRollOverlayProps {
   diceKind?: string;        // "命中判定" / "伤害掷骰" / "治疗掷骰" / "检定" 等
   charSkill?: string;        // "艾琳 · 白枝护盾"
   showD20Calc?: boolean;    // 命中骰时显示 D20+加值=总计 vs AC
+  rerollDecision?: {
+    fictionQuantity: number;
+    omniQuantity: number;
+    rerollUsed: boolean;
+    onConfirm: () => void;
+    onUseFiction: () => void;
+    onUseOmni: (chosenD20: number) => void;
+  };
+  comparisonRolls?: {
+    initial: number;
+    reroll: number;
+    selected: 'initial' | 'reroll';
+  };
 }
 
 export interface Dice3DViewProps {
@@ -286,13 +299,15 @@ function makePipTex(num: number): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
-export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = false, attackMissed = false, targetAc = 0, diceKind, charSkill, showD20Calc }: DiceRollOverlayProps) {
+export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = false, attackMissed = false, targetAc = 0, diceKind, charSkill, showD20Calc, rerollDecision, comparisonRolls }: DiceRollOverlayProps) {
   const [show, setShow] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [effectRevealed, setEffectRevealed] = useState(false);
   const [skillFx, setSkillFx] = useState<SkillEffectConfig | null>(null);
   const [closed, setClosed] = useState(false);
+  const [showOmniPicker, setShowOmniPicker] = useState(false);
+  const [chosenD20, setChosenD20] = useState(20);
   const timerRef = useRef<number[]>([]);
   const closeTimerRef = useRef<number | null>(null);
   const skillEffectRef = useRef<SkillEffectConfig | null>(null);
@@ -313,6 +328,7 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
     setEffectRevealed(false);
     setSkillFx(null);
     setClosed(false);
+    setShowOmniPicker(false);
     if (closeTimerRef.current) { window.clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
 
     // 音效：开始滚动
@@ -367,7 +383,7 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
   }, [closed]); // eslint-disable-line
 
   function closeOverlay() {
-    if (!effectRevealed || closed) return;
+    if (!effectRevealed || closed || rerollDecision) return;
     setClosed(true);
     onClose?.();
   }
@@ -399,7 +415,25 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
           </div>
         )}
 
-        {result?.damageDice && !attackMode ? (
+        {comparisonRolls ? (
+          <div className="dice-multi-row dice-reroll-comparison">
+            {([
+              { key: 'initial', label: '初次判定', roll: comparisonRolls.initial },
+              { key: 'reroll', label: '重投结果', roll: comparisonRolls.reroll },
+            ] as const).map((entry) => {
+              const picked = comparisonRolls.selected === entry.key;
+              return <div className="dice-multi-item" key={entry.key}>
+                <span className="dice-comparison-label">{entry.label}</span>
+                <Dice3DView dieType="d20" roll={entry.roll} rolling={entry.key === 'reroll' && rolling}
+                  revealed={entry.key === 'initial' || revealed} size={170} showResultBadge={false} />
+                <motion.span className={`dice-multi-num ${picked ? 'dice-adv-picked' : 'dice-adv-unused'}`}
+                  initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                  {entry.roll}{picked ? ' ✓ 最终采用' : ''}
+                </motion.span>
+              </div>;
+            })}
+          </div>
+        ) : result?.damageDice && !attackMode ? (
           /* 非攻击模式：D20 + 伤害骰组合显示 */
           <div className="dice-multi-row">
             <div className="dice-multi-item">
@@ -681,8 +715,29 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
         )}
       </motion.div>
 
+      {effectRevealed && rerollDecision && (
+        <div className="dice-reroll-actions" onClick={(event) => event.stopPropagation()}>
+          <button type="button" className="dice-reroll-confirm" onClick={rerollDecision.onConfirm}>确定</button>
+          {!rerollDecision.rerollUsed && <>
+            <button type="button" disabled={rerollDecision.fictionQuantity <= 0} onClick={rerollDecision.onUseFiction}>
+              {rerollDecision.fictionQuantity > 0 ? `使用虚构骰子（剩余 ${rerollDecision.fictionQuantity}）` : '虚构骰子不足'}
+            </button>
+            <button type="button" disabled={rerollDecision.omniQuantity <= 0} onClick={() => setShowOmniPicker((value) => !value)}>
+              {rerollDecision.omniQuantity > 0 ? `使用万能骰子（剩余 ${rerollDecision.omniQuantity}）` : '万能骰子不足'}
+            </button>
+          </>}
+          {showOmniPicker && !rerollDecision.rerollUsed && (
+            <div className="dice-omni-picker">
+              <span>指定 D20 点数</span>
+              <input type="number" min={1} max={20} value={chosenD20} onChange={(event) => setChosenD20(Number(event.target.value))} />
+              <button type="button" onClick={() => rerollDecision.onUseOmni(chosenD20)}>采用</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 点击继续提示 */}
-      {effectRevealed && (
+      {effectRevealed && !rerollDecision && (
         <motion.div
           className="dice-continue-hint"
           initial={{ opacity: 0, y: 10 }}

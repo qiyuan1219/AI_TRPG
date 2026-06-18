@@ -30,6 +30,7 @@ export interface BattlePrepChoice {
   successEffect: BattlePrepEffect;
   greatSuccessEffect?: BattlePrepEffect;
   failEffect?: BattlePrepEffect;
+  canUseRerollItems?: boolean;
 }
 
 export interface BattlePrepEffect {
@@ -51,6 +52,73 @@ export interface BattlePrepResolveResult {
   text: string;
   effect: BattlePrepEffect | null;
   roll?: BattlePrepRoll;
+  storyCheck?: StoryCheckResult;
+  finalized?: boolean;
+}
+
+export type RerollItemId = 'fiction-dice' | 'omni-dice';
+
+export interface StoryCheckResult {
+  checkId: string;
+  actionId: string;
+  attribute: AbilityKey;
+  skillName: string;
+  dc: number;
+  modifier: number;
+  initialRoll: StoryRoll;
+  reroll?: StoryRoll & { itemId: RerollItemId };
+  finalRoll: StoryRoll & { source: 'initial' | RerollItemId };
+  rerollUsed: boolean;
+  finalized: boolean;
+}
+
+interface StoryRoll {
+  d20: number;
+  total: number;
+  success: boolean;
+}
+
+const REROLL_ITEM_NAMES: Record<RerollItemId, string> = {
+  'fiction-dice': '虚构骰子',
+  'omni-dice': '万能骰子',
+};
+
+function parseInventory(inventory: string): Map<string, number> {
+  const result = new Map<string, number>();
+  String(inventory || '').split(',').map((item) => item.trim()).filter(Boolean).forEach((raw) => {
+    const match = raw.match(/^(.+?)(?:x|×)(\d+)$/i);
+    const name = (match ? match[1] : raw).trim();
+    const quantity = match ? Number(match[2]) : 1;
+    result.set(name, (result.get(name) || 0) + quantity);
+  });
+  return result;
+}
+
+function formatInventory(items: Map<string, number>): string {
+  return Array.from(items.entries()).filter(([, quantity]) => quantity > 0)
+    .map(([name, quantity]) => quantity > 1 ? `${name}x${quantity}` : name).join(',');
+}
+
+export function migrateRerollInventory(state: any): any {
+  const items = parseInventory(state?.inventory || '');
+  let changed = false;
+  Object.values(REROLL_ITEM_NAMES).forEach((name) => {
+    if (!items.has(name)) { items.set(name, 3); changed = true; }
+  });
+  return changed ? { ...state, inventory: formatInventory(items) } : state;
+}
+
+export function getRerollItemQuantity(state: any, itemId: RerollItemId): number {
+  return parseInventory(state?.inventory || '').get(REROLL_ITEM_NAMES[itemId]) || 0;
+}
+
+function consumeRerollItem(state: any, itemId: RerollItemId): any {
+  const items = parseInventory(state?.inventory || '');
+  const name = REROLL_ITEM_NAMES[itemId];
+  const quantity = items.get(name) || 0;
+  if (quantity <= 0) throw new Error(`${name}不足`);
+  items.set(name, quantity - 1);
+  return { ...state, inventory: formatInventory(items) };
 }
 
 // ============================================================
@@ -218,13 +286,28 @@ export function resolveBattlePrepChoice(
 
   // 4) 骰子判定
   const roll = rollBattlePrepCheck(choice.check, state);
+  const success = roll.total >= choice.check.dc;
+  const storyRoll = { d20: roll.d20, total: roll.total, success };
+  const storyCheck: StoryCheckResult = {
+    checkId: `${choice.id}-${Date.now()}`,
+    actionId: choice.id,
+    attribute: resolveSkillAbility(roll.skill, choice.check.attribute),
+    skillName: roll.skill,
+    dc: roll.dc,
+    modifier: roll.modifier,
+    initialRoll: storyRoll,
+    finalRoll: { ...storyRoll, source: 'initial' },
+    rerollUsed: false,
+    finalized: false,
+  };
 
-  if (roll.total >= choice.check.dc) {
+  if (success) {
     return {
       result: 'success',
       text: choice.successText,
       effect: choice.successEffect,
       roll,
+      storyCheck,
     };
   }
 
@@ -233,7 +316,59 @@ export function resolveBattlePrepChoice(
     text: choice.failText || choice.successText,
     effect: choice.failEffect || null,
     roll,
+    storyCheck,
   };
+}
+
+function resultFromFinalRoll(choice: BattlePrepChoice, base: BattlePrepResolveResult, storyCheck: StoryCheckResult): BattlePrepResolveResult {
+  const success = storyCheck.finalRoll.success;
+  return {
+    ...base,
+    result: success ? 'success' : 'failed',
+    text: success ? choice.successText : (choice.failText || choice.successText),
+    effect: success ? choice.successEffect : (choice.failEffect || null),
+    roll: {
+      d20: storyCheck.finalRoll.d20,
+      modifier: storyCheck.modifier,
+      total: storyCheck.finalRoll.total,
+      dc: storyCheck.dc,
+      skill: storyCheck.skillName,
+    },
+    storyCheck,
+  };
+}
+
+export function useFictionDice(choice: BattlePrepChoice, base: BattlePrepResolveResult, state: any) {
+  const check = base.storyCheck;
+  if (!check || check.finalized) throw new Error('当前判定不能重投');
+  if (check.rerollUsed) throw new Error('本次判定已经使用过重投道具');
+  const nextState = consumeRerollItem(state, 'fiction-dice');
+  const d20 = rollD20();
+  const total = d20 + check.modifier;
+  const reroll = { itemId: 'fiction-dice' as const, d20, total, success: total >= check.dc };
+  const useReroll = total >= check.initialRoll.total;
+  const finalRoll = useReroll
+    ? { d20, total, success: reroll.success, source: 'fiction-dice' as const }
+    : { ...check.initialRoll, source: 'initial' as const };
+  const storyCheck = { ...check, reroll, finalRoll, rerollUsed: true };
+  return { state: nextState, result: resultFromFinalRoll(choice, base, storyCheck) };
+}
+
+export function useOmniDice(choice: BattlePrepChoice, base: BattlePrepResolveResult, state: any, chosenD20: number) {
+  const check = base.storyCheck;
+  if (!check || check.finalized) throw new Error('当前判定不能重投');
+  if (check.rerollUsed) throw new Error('本次判定已经使用过重投道具');
+  if (!Number.isInteger(chosenD20) || chosenD20 < 1 || chosenD20 > 20) throw new Error('万能骰子的指定点数必须在 1 到 20 之间');
+  const nextState = consumeRerollItem(state, 'omni-dice');
+  const total = chosenD20 + check.modifier;
+  const reroll = { itemId: 'omni-dice' as const, d20: chosenD20, total, success: total >= check.dc };
+  const storyCheck = { ...check, reroll, finalRoll: { ...reroll, source: 'omni-dice' as const }, rerollUsed: true };
+  return { state: nextState, result: resultFromFinalRoll(choice, base, storyCheck) };
+}
+
+export function finalizeBattlePrepResult(choice: BattlePrepChoice, base: BattlePrepResolveResult): BattlePrepResolveResult {
+  if (!base.storyCheck) return { ...base, finalized: true };
+  return { ...resultFromFinalRoll(choice, base, { ...base.storyCheck, finalized: true }), finalized: true };
 }
 
 // ============================================================

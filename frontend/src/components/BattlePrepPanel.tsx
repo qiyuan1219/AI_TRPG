@@ -1,17 +1,23 @@
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { BattlePrepChoice, BattlePrepResolveResult, BattlePrepResultType } from '../utils/battlePrep';
-import { evaluateCondition, resolveBattlePrepChoice } from '../utils/battlePrep';
+import { evaluateCondition, getRerollItemQuantity, resolveBattlePrepChoice } from '../utils/battlePrep';
 import type { DiceResult } from '../types/game';
 
 interface BattlePrepPanelProps {
   choices: BattlePrepChoice[];
   gameState: any;
   onResolve: (choice: BattlePrepChoice, result: BattlePrepResolveResult) => void;
+  onReroll: (itemId: 'fiction-dice' | 'omni-dice', chosenD20?: number) => void;
+  onConfirm: () => void;
   onEnterBattle: () => void;
   resolvedResult: BattlePrepResolveResult | null;
   resolvedChoice: BattlePrepChoice | null;
   diceResult: DiceResult | null;
+  narration?: string;
+  narrationLoading?: boolean;
+  canContinue?: boolean;
+  continueLabel?: string;
 }
 
 function getChoiceStatus(choice: BattlePrepChoice, state: any): {
@@ -59,13 +65,21 @@ const BattlePrepPanel: React.FC<BattlePrepPanelProps> = ({
   choices,
   gameState,
   onResolve,
+  onReroll,
+  onConfirm,
   onEnterBattle,
   resolvedResult,
   resolvedChoice,
   diceResult,
+  narration = '',
+  narrationLoading = false,
+  canContinue = true,
+  continueLabel = '进入战斗',
 }) => {
   const [selected, setSelected] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const [showOmniPicker, setShowOmniPicker] = React.useState(false);
+  const [chosenD20, setChosenD20] = React.useState(20);
 
   const handleSelect = (choice: BattlePrepChoice) => {
     if (selected || submitting) return;
@@ -84,6 +98,10 @@ const BattlePrepPanel: React.FC<BattlePrepPanelProps> = ({
     () => new Map(choices.map((c) => [c.id, getChoiceStatus(c, gameState)])),
     [choices, gameState],
   );
+  const check = resolvedResult?.storyCheck;
+  const fictionQuantity = getRerollItemQuantity(gameState, 'fiction-dice');
+  const omniQuantity = getRerollItemQuantity(gameState, 'omni-dice');
+  const canReroll = Boolean(check && !check.rerollUsed && !check.finalized && resolvedChoice?.canUseRerollItems === true);
 
   return (
     <AnimatePresence mode="wait">
@@ -180,19 +198,34 @@ const BattlePrepPanel: React.FC<BattlePrepPanelProps> = ({
             </p>
           </div>
 
+          {check && (
+            <div className="bg-slate-900/70 border border-slate-600/50 rounded-xl p-4 mb-4 space-y-2 text-sm">
+              <p className="text-slate-300">初次判定：D20 {check.initialRoll.d20} + {check.modifier} = {check.initialRoll.total} / DC {check.dc}，{check.initialRoll.success ? '成功' : '失败'}</p>
+              {check.reroll && <p className="text-amber-300">{check.reroll.itemId === 'fiction-dice' ? '虚构骰子' : '万能骰子'}：D20 {check.reroll.d20} + {check.modifier} = {check.reroll.total}，{check.reroll.success ? '成功' : '失败'}</p>}
+              <p className="font-semibold text-white">最终采用：{check.finalRoll.total}，判定{check.finalRoll.success ? '成功' : '失败'}</p>
+            </div>
+          )}
+
           <div className="bg-slate-800/70 border border-slate-600/50 rounded-xl p-5 mb-6">
             {resolvedChoice && (
               <p className="text-xs text-amber-300 mb-3">
                 {resolvedChoice.label}
               </p>
             )}
-            <p className="text-xs uppercase tracking-[0.18em] text-gray-500 mb-2">
-              AI 续写
-            </p>
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500 mb-2">判定结果</p>
             <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
               {resolvedResult.text}
             </p>
           </div>
+
+          {resolvedResult.finalized && (
+            <div className="bg-slate-900/80 border border-amber-500/30 rounded-xl p-5 mb-6">
+              <p className="text-xs uppercase tracking-[0.18em] text-amber-400/70 mb-2">AI 续写</p>
+              <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                {narrationLoading ? '主持人正在根据最终判定续写，请稍候……' : narration}
+              </p>
+            </div>
+          )}
 
           {/* Dice overlay */}
           {diceResult && (
@@ -205,16 +238,44 @@ const BattlePrepPanel: React.FC<BattlePrepPanelProps> = ({
             </div>
           )}
 
-          <div className="text-center">
+          {!resolvedResult.finalized ? <div className="flex flex-wrap justify-center gap-3">
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              onClick={onEnterBattle}
+              onClick={onConfirm}
               className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-amber-900/30 transition-colors"
             >
-              进入战斗
+              确定
             </motion.button>
-          </div>
+            {canReroll && <>
+              <button type="button" disabled={fictionQuantity <= 0} onClick={() => onReroll('fiction-dice')}
+                className="px-5 py-3 rounded-xl bg-indigo-700 disabled:bg-slate-700 disabled:text-slate-500 text-white">
+                {fictionQuantity > 0 ? `使用虚构骰子（剩余 ${fictionQuantity}）` : '虚构骰子不足'}
+              </button>
+              <button type="button" disabled={omniQuantity <= 0} onClick={() => setShowOmniPicker(true)}
+                className="px-5 py-3 rounded-xl bg-violet-700 disabled:bg-slate-700 disabled:text-slate-500 text-white">
+                {omniQuantity > 0 ? `使用万能骰子（剩余 ${omniQuantity}）` : '万能骰子不足'}
+              </button>
+            </>}
+          </div> : <div className="text-center">
+            <motion.button whileHover={canContinue ? { scale: 1.03 } : undefined} whileTap={canContinue ? { scale: 0.97 } : undefined}
+              disabled={!canContinue} onClick={onEnterBattle}
+              className="px-8 py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-400 text-white rounded-xl font-bold text-lg">
+              {narrationLoading ? '等待 AI 续写完成…' : continueLabel}
+            </motion.button>
+          </div>}
+
+          {showOmniPicker && (
+            <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75" onClick={() => setShowOmniPicker(false)}>
+              <div className="w-[min(92vw,28rem)] rounded-2xl border border-violet-500/50 bg-slate-900 p-6" onClick={(event) => event.stopPropagation()}>
+                <h3 className="text-xl font-bold text-violet-300 mb-2">使用万能骰子</h3>
+                <p className="text-sm text-slate-400 mb-4">请选择本次剧情判定的 D20 点数（1~20）。确认后消耗 1 个万能骰子。</p>
+                <div className="flex gap-2 mb-4">{[1, 5, 10, 15, 20].map((value) => <button key={value} className="flex-1 rounded bg-slate-700 py-2" onClick={() => setChosenD20(value)}>{value}</button>)}</div>
+                <input className="w-full rounded bg-slate-800 border border-slate-600 p-3 mb-4" type="number" min={1} max={20} value={chosenD20} onChange={(e) => setChosenD20(Number(e.target.value))} />
+                <div className="flex justify-end gap-3"><button onClick={() => setShowOmniPicker(false)}>取消</button><button className="rounded bg-violet-600 px-4 py-2" onClick={() => { onReroll('omni-dice', chosenD20); setShowOmniPicker(false); }}>确认点数</button></div>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

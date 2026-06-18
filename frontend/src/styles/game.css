@@ -300,11 +300,34 @@
   color: var(--gold-soft);
 }
 
-.style-selector-copy p:last-child {
+.style-selector-copy > p:last-of-type {
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
 }
+
+.adventurer-name-field {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 360px);
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--gold-soft);
+  font-weight: 800;
+}
+
+.adventurer-name-field input {
+  width: 100%;
+  border: 1px solid rgba(231, 211, 161, 0.28);
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #f5ecd8;
+  outline: none;
+}
+
+.adventurer-name-field input:focus { border-color: rgba(95, 183, 167, 0.8); box-shadow: 0 0 0 2px rgba(95, 183, 167, 0.14); }
+.start-button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .class-option {
   display: flex;
@@ -510,6 +533,7 @@
 
 /* 紧凑版 ── 小屏 */
 @media (max-width: 768px) {
+  .adventurer-name-field { grid-template-columns: 1fr; gap: 6px; }
   .creator-grid {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -615,9 +639,10 @@
   right: 20px;
   z-index: 6;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
+  width: 180px;
   max-width: calc(100% - 40px);
 }
 
@@ -627,13 +652,14 @@
 .game-title-btn,
 .game-inventory-entry .inventory-open-button,
 .game-character-btn {
-  min-height: 36px;
-  padding: 0 14px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
   border: 1px solid rgba(214, 168, 90, 0.4);
-  border-radius: 6px;
+  border-radius: 8px;
   background: rgba(42, 33, 27, 0.72);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 1rem;
   white-space: nowrap;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(10px);
@@ -641,6 +667,9 @@
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
 }
 
 .game-log-btn:hover,
@@ -653,16 +682,14 @@
   background: rgba(214, 168, 90, 0.2);
 }
 
-.game-title-btn:hover {
-  background: rgba(156, 63, 87, 0.24);
+.game-inventory-entry {
+  position: static;
+  width: 100%;
 }
 
-.game-inventory-entry {
-  position: absolute;
-  top: 96px;
-  right: 20px;
-  z-index: 7;
-  width: auto;
+.game-inventory-entry .inventory-panel-entry {
+  display: block;
+  width: 100%;
 }
 
 /* 背包/角色按钮位置与环境已由上方统一按钮样式接管 */
@@ -736,10 +763,7 @@
 }
 
 .game-character-btn {
-  position: absolute;
-  top: 154px;
-  right: 20px;
-  z-index: 6;
+  position: static;
 }
 
 .character-modal-backdrop {

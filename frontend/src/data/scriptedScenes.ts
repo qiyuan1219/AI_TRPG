@@ -17,7 +17,7 @@ export interface ScriptedScene {
   triggers: string[];
   lines: ScriptedLine[];
   hints: string[];
-  battlePrep?: Array<{ id: string; label: string; type: 'battlePrep'; desc: string; autoSuccessWhen?: string; greatSuccessWhen?: string; alwaysSuccess?: boolean; check?: { skill: string; altSkill?: string; dc: number; label: string }; successText: string; greatSuccessText?: string; failText?: string; successEffect: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> }; greatSuccessEffect?: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> }; failEffect?: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> } }>;
+  battlePrep?: Array<{ id: string; label: string; type: 'battlePrep'; desc: string; canUseRerollItems?: boolean; autoSuccessWhen?: string; greatSuccessWhen?: string; alwaysSuccess?: boolean; check?: { skill: string; altSkill?: string; dc: number; label: string }; successText: string; greatSuccessText?: string; failText?: string; successEffect: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> }; greatSuccessEffect?: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> }; failEffect?: { flags?: Record<string, boolean>; battleEffects?: Record<string, any> } }>;
   setArea?: string;
   bgImage?: string;
   bgm?: string;
@@ -181,7 +181,7 @@ const OPENING_SUSPENSE: ScriptedScene = {
     { speaker: '主持人', text: '瑟琳的银杖向前一指，寒白色法光照亮了裂隙爬兽腹侧一片没有硬壳覆盖的软甲。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
     { speaker: '瑟琳', text: '「看清楚它的动作。腹侧软肋是弱点，等它跃起时攻击。」' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
     { speaker: '主持人', text: '裂隙爬兽已经逼近。周围的行人四散逃离，巡街守卫被孢尘阻隔在另一侧，而你正站在它冲锋路线的正前方。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
-    { speaker: '主持人', text: '这是你抵达逆穹城后的第一场战斗。' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
+    { speaker: '主持人', text: '这是你抵达逆穹城后的第一场战斗。按照你平时战斗的思路来吧' ,bgImage: '/assets/scenes/02tutorial-battle-trigger.webp'},
   ],
   hints: [
     '正面迎击裂隙爬兽【力量DC10】',
@@ -208,19 +208,31 @@ const TUTORIAL_BATTLE_AFTER: ScriptedScene = {
   lastEvent: '击退补给吊箱中的裂隙爬兽，守卫引导前往冒险者公会',
   lines: [
     { speaker: '主持人', text: '最后一只裂隙爬兽被银白色光芒逼退，撞在吊箱边缘，蜷缩着失去了攻击性。' },
+    { speaker: '主持人', text: '它没有继续扑咬，反而本能地缩向吊箱阴影深处，像是那道光比刀刃更让它恐惧。' },
     { speaker: '瑟琳', text: '「没有重伤。很好，你的反应速度比大部分第一次进悬城的人快。」' },
+    { speaker: '瑟琳', text: '「不过你也看到了，它们对银白光的反应很异常。普通野兽不会这样退缩。」' },
     { speaker: '守卫', text: '「这是从孢海据点回收的空箱。最近三个月，类似事件发生了四次。」' },
-    { speaker: '守卫', text: '「感谢你们出手。如果让它们冲进吊桥区，今天的通行记录上就要多几行红字了。」' },
-    { speaker: '主持人', text: '守卫把一只应急补给袋递给你。' },
-    { speaker: '瑟琳', text: '「四次不是偶然。它们不是主动潜进来的——箱壁内侧有拖痕，像是被什么东西赶上去的。」' },
-    { speaker: '主持人', text: '主缆街短暂安静下来，远处城市缆索发出低沉震响。' },
+    { speaker: '守卫', text: '「可问题是，补给吊箱入城前都会检查封条。按记录，这只箱子不该被打开过。」' },
+    { speaker: '主持人', text: '守卫蹲下查看吊箱边缘。箱门的铜封条还挂在锁扣上，但封蜡内侧有一道不太明显的黑蓝色刮痕。' },
+    { speaker: '主持人', text: '那痕迹不像是从外面撬开的，倒像是有什么东西曾经贴着箱壁，被硬生生拖进了里面。' },
+    { speaker: '守卫', text: '「感谢你们出手。如果让它们冲进吊桥区，今天的通行记录上就要多几行红字了。这里有一些补给物资，请收下吧。」' },
+    { speaker: '主持人', text: '守卫把一只应急补给袋递给你，又警惕地看了一眼吊箱封条。' },
+    { speaker: '瑟琳', text: '「不是偶然。它们不是主动潜进来的——箱壁内侧有拖痕，像是被什么东西赶上去的。」' },
+    { speaker: '瑟琳', text: '「而且它们怕的未必是光本身。刚才我的术式里混了逆钟学派的净化银辉，可能刺激到了它们体内的裂隙孢核。」' },
+    { speaker: '主持人', text: '主缆街短暂安静下来，远处城市缆索发出低沉震响。吊箱残骸旁，封条、拖痕和魔物畏光的反应都显得格外刺眼。' },
     { speaker: '守卫', text: '「冒险者公会在倒挂塔楼区，顺着主缆走到底。你们的委托应该需要先登记。」' },
-    { speaker: '瑟琳', text: '「先过去吧。米娜应该已经在等你了。」' },
+    { speaker: '守卫', text: '「当然，如果你们想在离开前多看一眼吊箱封条，我不会拦着。只是别碰里面残留的孢粉。」' },
+    { speaker: '瑟琳', text: '「先过去也可以。米娜应该已经在等你了。」' },
+    { speaker: '瑟琳', text: '「但如果你想问那些魔物为什么怕光，现在问我也来得及。这个现象，可能和孢海深处的异常有关。」' },
   ],
   hints: [
-    '前往冒险者公会登记',
+    '放弃调查，直接前往冒险者公会登记',
+    '查看吊箱封条【智力DC10】',
+    '询问瑟琳这些魔物为什么怕光【智力DC8】',
   ],
 };
+
+
 
 // ============================================================
 // 教学战斗后 → 抵达冒险者公会
@@ -742,7 +754,7 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
     expedition_registered: true,
     blackmarket_done: true,
     currentNodeId: 'guild-final-registration',
-    inventory: '长剑,冒险者工具包,抗孢面罩,冷光灯,止血粉,解毒剂,缆梯安全扣,公会补给箱',
+    inventory: '长剑,冒险者工具包,抗孢面罩,冷光灯,止血粉,解毒剂,缆梯安全扣,公会补给箱,虚构骰子x3,万能骰子x3',
   },
   events: ['五人远征队登记完成', '公会物资已领取'],
   lastEvent: '在冒险者公会登记五人小队，并领取前往无光孢海的正式物资',
@@ -1140,6 +1152,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
       id: 'blue-shoal-prep-ignore-voices',
       label: '保持沉默，识破拟声诱导',
       type: 'battlePrep',
+      canUseRerollItems: true,
       desc: '根据先前收集到的情报，判断这些求救声是否是拟声菌团的诱导。',
       autoSuccessWhen: 'flags.clue_voice_mimic || flags.wounded_guard_stabilized',
       greatSuccessWhen: 'flags.clue_voice_mimic && flags.wounded_guard_stabilized',
@@ -1182,6 +1195,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
       id: 'blue-shoal-prep-find-core',
       label: '用符文灯寻找拟声菌团核心',
       type: 'battlePrep',
+      canUseRerollItems: true,
       desc: '照向拟声菌团腹腔，尝试在开战前找出它们真正的核心。',
       autoSuccessWhen: 'flags.clue_voice_mimic',
       check: { skill: 'observe', altSkill: 'arcana', dc: 15, label: '观察 / 奥秘 DC 15' },
@@ -1206,6 +1220,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
       id: 'blue-shoal-prep-avoid-bulges',
       label: '听从布洛克指挥，避开菌毯鼓包',
       type: 'battlePrep',
+      canUseRerollItems: true,
       desc: '根据菌毯鼓起的位置，提前避开孢化兽破土突袭。',
       check: { skill: 'survival', altSkill: 'perception', dc: 13, label: '生存 / 感知 DC 13' },
       successText: '布洛克用斧柄敲了敲几处鼓起的菌毯，立刻示意众人后撤。下一秒，孢化兽从你们原本站立的位置破土而出，却扑了个空。',
@@ -1230,6 +1245,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
       id: 'blue-shoal-prep-mask',
       label: '整理抗孢面罩，压低呼吸',
       type: 'battlePrep',
+      canUseRerollItems: true,
       desc: '重新压紧抗孢面罩，减少孢尘对队伍的影响。',
       alwaysSuccess: true,
       successText: '你们重新压紧抗孢面罩，放慢呼吸。甜腻的孢尘气味被隔在面罩之外，脑中的昏沉感稍稍退去。',
