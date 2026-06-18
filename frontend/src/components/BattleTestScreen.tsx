@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Dice3DView, DiceRollOverlay, type DieType } from "./DiceRollOverlay";
 import type { DiceResult } from "../types/game";
@@ -7,7 +7,9 @@ import { authoritativeAmountByTarget, authoritativeDice, authoritativeEffect, au
 import { dispatchGameAction } from "../core/actions/registry";
 import "../core/actions/battleResolver";
 import { rollDiceEvent } from "../core/dice/createDiceEvent";
+import { BattleActionBar } from "../features/battle/BattleActionBar";
 import { battleController } from "../features/battle/BattleController";
+import { BattleLogPanel } from "../features/battle/BattleLogPanel";
 import { BattleTutorialIntro as BattleTutorialIntroView } from "../features/battle/BattleTutorialIntro";
 import { createBattleViewModel } from "../features/battle/BattleViewModel";
 
@@ -3202,12 +3204,7 @@ export function BattleTestScreen({
       </section>
 
       {/* 左侧：战斗记录 — 我方角色下方 */}
-      <aside className="battle-log-panel" aria-label="战斗记录">
-        <span>战斗记录</span>
-        {battleLog.map((line) => (
-          <p key={line}>{line}</p>
-        ))}
-      </aside>
+      <BattleLogPanel logs={battleLog} />
 
       {/* 底部：AI KP 回合结算 — 视觉小说对话框风格 */}
       <AnimatePresence>
@@ -3259,7 +3256,7 @@ export function BattleTestScreen({
 
       <AnimatePresence>
         {actionUnit && !enemyTurn && actionUnit.id === activeUnit?.id && (
-          <ActionPanel
+          <BattleActionBar
             key={actionUnit.id}
             unit={actionUnit}
             usedResources={usedResources[actionUnit.id] ?? {}}
@@ -3275,6 +3272,11 @@ export function BattleTestScreen({
             onCancelTarget={() => setTargetSelection(null)}
             advantage={advantage}
             tacticalAdvice={tacticalAdvice}
+            isResourceSpent={(resource, resourceState) => resourceIsSpent(resource as BattleResource, resourceState as Partial<Record<BattleResource, boolean>>)}
+            formatSkillFormula={(skill) => boldifyDiceNotation(formatSkillFormulaForPlayer(skill))}
+            getSkillTargetHint={(skill) => skillTargetHint(skill)}
+            getAvatarClassName={(model) => `battle-avatar-mark ${AVATAR_MAP[model] ? 'battle-avatar-img' : `battle-avatar-${model}`}`}
+            getAvatarStyle={(model) => AVATAR_MAP[model] ? { backgroundImage: `url(${AVATAR_MAP[model]})` } : undefined}
           />
         )}
       </AnimatePresence>
@@ -3872,124 +3874,5 @@ function SkillCard({ skill, compact = true }: { skill: BattleSkill; compact?: bo
         ))}
       </div>
     </article>
-  );
-}
-
-function ActionPanel({
-  unit,
-  usedResources,
-  pendingSkill,
-  pendingTargets,
-  onInspect,
-  onClose,
-  onEndTurn,
-  onChooseSkill,
-  onSelectTarget,
-  onCancelTarget,
-  advantage,
-  tacticalAdvice,
-}: {
-  unit: BattleUnit;
-  usedResources: Partial<Record<BattleResource, boolean>>;
-  pendingSkill?: BattleSkill;
-  pendingTargets: BattleUnit[];
-  onInspect: () => void;
-  onClose: () => void;
-  onEndTurn: () => void;
-  onChooseSkill: (skill: BattleSkill) => void;
-  onSelectTarget: (target: BattleUnit) => void;
-  onCancelTarget: () => void;
-  advantage?: { type: "advantage" | "disadvantage"; reason: string } | null;
-  tacticalAdvice?: { headline: string; reason: string; intent: string; confidence: number } | null;
-}) {
-  return (
-    <motion.section
-      className="battle-action-sheet"
-      role="dialog"
-      aria-label={`${unit.name} 行动`}
-      initial={{ opacity: 0, y: 28 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 28 }}
-    >
-      <header>
-        <div>
-          <span>{unit.name} 的回合</span>
-          {advantage && (
-            <strong className={`battle-adv-badge ${advantage.type === "advantage" ? "is-adv" : "is-dis"}`}>
-              {advantage.type === "advantage" ? "⚔️ 优势" : "⚠️ 劣势"}：{advantage.reason}
-            </strong>
-          )}
-          {tacticalAdvice && (
-            <small style={{ color: 'var(--teal)', fontWeight: 600 }}>
-              瑟琳的建议：{tacticalAdvice.reason}
-            </small>
-          )}
-          {!tacticalAdvice && <small>先选技能，再指定释放对象，随后进入骰子判定与效果结算。</small>}
-        </div>
-        <div className="battle-action-buttons">
-          <button type="button" className="ghost-button" onClick={onInspect}>
-            详情
-          </button>
-          <button type="button" className="ghost-button" onClick={onClose}>
-            收起
-          </button>
-          <button type="button" className="start-button" onClick={onEndTurn}>
-            结束回合
-          </button>
-        </div>
-      </header>
-
-      <div className="battle-action-content">
-        <section className="battle-action-skill-list" aria-label="可用技能">
-          {unit.skills.map((skill) => {
-            const spent = resourceIsSpent(skill.resource, usedResources);
-            const disabled = spent || skill.locked;
-
-            return (
-              <button
-                key={skill.id}
-                type="button"
-                className={`${disabled ? "is-disabled" : ""} ${pendingSkill?.id === skill.id ? "is-selected" : ""}`}
-                disabled={disabled}
-                onClick={() => onChooseSkill(skill)}
-              >
-                <span>技能</span>
-                <b>{skill.name}</b>
-                <small>{boldifyDiceNotation(formatSkillFormulaForPlayer(skill))}</small>
-                <em>{skillTargetHint(skill)}</em>
-              </button>
-            );
-          })}
-        </section>
-
-        {pendingSkill && (
-          <section className="battle-target-picker" aria-label="指定释放对象">
-            <header>
-              <div>
-                <b>指定释放对象</b>
-                <span>
-                  {pendingSkill.name} · {skillTargetHint(pendingSkill)}
-                </span>
-              </div>
-              <button type="button" className="ghost-button" onClick={onCancelTarget}>
-                取消
-              </button>
-            </header>
-            <div>
-              {pendingTargets.map((target) => (
-                <button key={target.id} type="button" onClick={() => onSelectTarget(target)}>
-                  <span className={`battle-avatar-mark ${AVATAR_MAP[target.model] ? 'battle-avatar-img' : `battle-avatar-${target.model}`}`} style={AVATAR_MAP[target.model] ? { backgroundImage: `url(${AVATAR_MAP[target.model]})` } : undefined} />
-                  <b>{target.name}</b>
-                  <small>
-                    HP {target.hp}/{target.maxHp} · AC {target.ac}
-                  </small>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-      </div>
-    </motion.section>
   );
 }
