@@ -9,7 +9,12 @@ import "../core/actions/battleResolver";
 import { rollDiceEvent } from "../core/dice/createDiceEvent";
 import { BattleActionBar } from "../features/battle/BattleActionBar";
 import { battleController } from "../features/battle/BattleController";
+import { BattleEffectPanel } from "../features/battle/BattleEffectPanel";
+import { BattleField } from "../features/battle/BattleField";
 import { BattleLogPanel } from "../features/battle/BattleLogPanel";
+import { BattleResultPanel } from "../features/battle/BattleResultPanel";
+import { BattleUnitDetailModal } from "../features/battle/BattleUnitDetailModal";
+import { RosterPanel } from "../features/battle/RosterPanel";
 import { BattleTutorialIntro as BattleTutorialIntroView } from "../features/battle/BattleTutorialIntro";
 import { createBattleViewModel } from "../features/battle/BattleViewModel";
 
@@ -1347,7 +1352,6 @@ function boldifyDiceNotation(text: string): React.ReactNode[] {
     /^\d+d\d+$/i.test(part) ? <b key={i}>{part}</b> : part
   );
 }
-
 const DAMAGE_TYPE_WORDS_RE = /\s*(挥砍|钝击|穿刺|毒素|火焰|冷冻|寒冷|力场|立场|光耀|暗影|黯蚀|奥术|雷电|闪电|酸蚀|心灵|坏死|辐射)\s*/g;
 const DAMAGE_TYPE_TAG_RE = /^(挥砍|钝击|穿刺|毒素|火焰|冷冻|寒冷|力场|立场|光耀|暗影|黯蚀|奥术|雷电|闪电|酸蚀|心灵|坏死|辐射)$/;
 
@@ -3150,58 +3154,59 @@ export function BattleTestScreen({
       {/* 战术建议已集成到战斗行动面板中 */}
 
       {(battleWon || battleLost) && (
-        <section className={`battle-end-banner ${battleWon ? "is-win" : "is-lose"}`} aria-label="战斗结果">
-          <b>{battleWon ? config.winTitle : config.loseTitle}</b>
-          <span>
-            {battleWon
-              ? config.winText
-              : config.loseText}
-          </span>
-          {(battleWon || battleLost) && config.completeLabel && onComplete && (
-            <button type="button" className="start-button" onClick={() => onComplete({ outcome: battleWon ? "win" : "lose" })}>
-              {config.completeLabel}
-            </button>
-          )}
-        </section>
+        <BattleResultPanel
+          outcome={battleWon ? "win" : "lose"}
+          winTitle={config.winTitle}
+          loseTitle={config.loseTitle}
+          winText={config.winText}
+          loseText={config.loseText}
+          completeLabel={config.completeLabel}
+          onContinue={onComplete}
+        />
       )}
 
-      <RosterPanel title="我方" units={allies} activeUnitId={activeUnit?.id} onSelect={setSelectedUnitId} />
-      <RosterPanel title="敌方" units={enemies} activeUnitId={activeUnit?.id} onSelect={setSelectedUnitId} align="right" />
+      <RosterPanel
+        title="我方"
+        units={allies}
+        activeUnitId={activeUnit?.id}
+        onSelect={setSelectedUnitId}
+        getHpPercent={getHpPercent}
+        getAvatarClassName={(model) => `battle-avatar-mark ${AVATAR_MAP[model] ? 'battle-avatar-img' : `battle-avatar-${model}`}`}
+        getAvatarStyle={(model) => AVATAR_MAP[model] ? { backgroundImage: `url(${AVATAR_MAP[model]})` } : undefined}
+      />
+      <RosterPanel
+        title="敌方"
+        units={enemies}
+        activeUnitId={activeUnit?.id}
+        onSelect={setSelectedUnitId}
+        align="right"
+        getHpPercent={getHpPercent}
+        getAvatarClassName={(model) => `battle-avatar-mark ${AVATAR_MAP[model] ? 'battle-avatar-img' : `battle-avatar-${model}`}`}
+        getAvatarStyle={(model) => AVATAR_MAP[model] ? { backgroundImage: `url(${AVATAR_MAP[model]})` } : undefined}
+      />
 
-      <section className="battle-field" aria-label="战斗场景">
-        <div className="battle-side battle-side-ally">
-          {allies.map((unit) => (
-            <BattleModel
-              key={unit.id}
-              unit={unit}
-              active={unit.id === activeUnit?.id && phase === "battle"}
-              targetable={pendingTargetIds.has(unit.id)}
-              casting={battleAnimation?.actorId === unit.id}
-              impacted={isAnimationTarget(unit)}
-              animationKey={battleAnimation?.id}
-              effectKind={isAnimationTarget(unit) ? battleAnimation?.effectKind : undefined}
-              feedback={isAnimationTarget(unit) ? battleAnimation?.feedbackByTargetId?.[unit.id] ?? battleAnimation?.feedback : undefined}
-              onClick={() => handleModelClick(unit)}
-            />
-          ))}
-        </div>
-        <div className="battle-side battle-side-enemy">
-          {enemies.map((unit) => (
-            <BattleModel
-              key={unit.id}
-              unit={unit}
-              active={unit.id === activeUnit?.id && phase === "battle"}
-              targetable={pendingTargetIds.has(unit.id)}
-              casting={battleAnimation?.actorId === unit.id}
-              impacted={isAnimationTarget(unit)}
-              animationKey={battleAnimation?.id}
-              effectKind={isAnimationTarget(unit) ? battleAnimation?.effectKind : undefined}
-              feedback={isAnimationTarget(unit) ? battleAnimation?.feedbackByTargetId?.[unit.id] ?? battleAnimation?.feedback : undefined}
-              onClick={() => handleModelClick(unit)}
-            />
-          ))}
-        </div>
-      </section>
+      <BattleField
+        allies={allies}
+        enemies={enemies}
+        getActorState={(unit) => {
+          const impacted = isAnimationTarget(unit);
+          return {
+            active: unit.id === activeUnit?.id && phase === "battle",
+            targetable: pendingTargetIds.has(unit.id),
+            casting: battleAnimation?.actorId === unit.id,
+            impacted,
+            animationKey: battleAnimation?.id,
+            effectKind: impacted ? battleAnimation?.effectKind : undefined,
+            feedback: impacted ? battleAnimation?.feedbackByTargetId?.[unit.id] ?? battleAnimation?.feedback : undefined,
+          };
+        }}
+        onSelectUnit={(unitId) => {
+          const unit = unitMap.get(unitId);
+          if (unit) handleModelClick(unit);
+        }}
+        getHpPercent={getHpPercent}
+        getSpriteSheetUrl={(model) => SPRITE_SHEET_MAP[model]}
+      />
 
       {/* 左侧：战斗记录 — 我方角色下方 */}
       <BattleLogPanel logs={battleLog} />
@@ -3209,26 +3214,18 @@ export function BattleTestScreen({
       {/* 底部：AI KP 回合结算 — 视觉小说对话框风格 */}
       <AnimatePresence>
         {lastEffect && (
-          <motion.section
+          <BattleEffectPanel
             key={lastEffect.id}
-            className={`battle-effect-panel ${lastEffect.success === false ? "is-fail" : "is-win"}`}
-            aria-label="AI KP 回合结算"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-          >
-            <BattleEffectPanel
-              effect={lastEffect}
-              nextTurnLabel={
-                kpReportPending ? "KP战场报告生成中…"
-                : enemyTurn && !enemyTurnDone ? "等待敌方行动结束"
-                : enemyTurn && enemyTurnDone ? "敌方行动完毕，下一行动 →"
-                : "下一行动 →"
-              }
-              nextTurnDisabled={kpReportPending || phase !== "battle" || (enemyTurn && !enemyTurnDone) || battleWon || battleLost || Boolean(activeDice)}
-              onNextTurn={nextTurn}
-            />
-          </motion.section>
+            effect={lastEffect}
+            nextTurnLabel={
+              kpReportPending ? "KP战场报告生成中…"
+              : enemyTurn && !enemyTurnDone ? "等待敌方行动结束"
+              : enemyTurn && enemyTurnDone ? "敌方行动完毕，下一行动 →"
+              : "下一行动 →"
+            }
+            nextTurnDisabled={kpReportPending || phase !== "battle" || (enemyTurn && !enemyTurnDone) || battleWon || battleLost || Boolean(activeDice)}
+            onNextTurn={nextTurn}
+          />
         )}
       </AnimatePresence>
 
@@ -3245,11 +3242,22 @@ export function BattleTestScreen({
 
       <AnimatePresence>
         {selectedUnit && (
-          <UnitDetailModal
+          <BattleUnitDetailModal
             key={selectedUnit.id}
             unit={selectedUnit}
             initiative={initiative.find((entry) => entry.unitId === selectedUnit.id)}
+            abilityLabels={ABILITY_LABELS.map(([key, label]) => ({ key, label }))}
             onClose={() => setSelectedUnitId(null)}
+            getHpPercent={getHpPercent}
+            getAvatarClassName={(model) => `battle-avatar-mark ${AVATAR_MAP[model] ? 'battle-avatar-img' : `battle-avatar-${model}`}`}
+            getAvatarStyle={(model) => AVATAR_MAP[model] ? { backgroundImage: `url(${AVATAR_MAP[model]})` } : undefined}
+            formatModifier={formatModifier}
+            abilityModifier={abilityModifier}
+            formatCombatText={formatCombatTextForPlayer}
+            renderSkillFormula={(skill) => boldifyDiceNotation(formatSkillFormulaForPlayer(skill))}
+            renderSkillEffect={(skill) => boldifyDiceNotation(formatSkillEffectForPlayer(skill))}
+            skillNeedsRoll={skillNeedsRoll}
+            visibleSkillTags={visibleSkillTags}
           />
         )}
       </AnimatePresence>
@@ -3577,302 +3585,5 @@ function InitiativeRollOverlay({
         </footer>
       </motion.div>
     </motion.section>
-  );
-}
-
-function RosterPanel({
-  title,
-  units,
-  activeUnitId,
-  align = "left",
-  onSelect,
-}: {
-  title: string;
-  units: BattleUnit[];
-  activeUnitId?: string;
-  align?: "left" | "right";
-  onSelect: (unitId: string) => void;
-}) {
-  return (
-    <aside className={`battle-roster battle-roster-${align}`}>
-      <span className="battle-roster-title">{title}</span>
-      {units.map((unit) => (
-        <button
-          key={unit.id}
-          type="button"
-          className={`battle-roster-unit ${unit.id === activeUnitId ? "is-active" : ""} ${unit.hp <= 0 ? "is-defeated" : ""}`}
-          onClick={() => onSelect(unit.id)}
-        >
-                <span className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
-                <span className="battle-roster-copy">
-            <span className="roster-name-hp">
-              <b>{unit.name}</b>
-              <span className="battle-mini-hp">
-                <i style={{ width: `${getHpPercent(unit)}%` }} />
-              </span>
-            </span>
-            <small>
-              HP {unit.hp}/{unit.maxHp} · AC {unit.ac}
-            </small>
-          </span>
-        </button>
-      ))}
-    </aside>
-  );
-}
-
-function BattleModel({
-  unit,
-  active,
-  targetable,
-  casting,
-  impacted,
-  animationKey,
-  effectKind = "slash",
-  feedback,
-  onClick,
-}: {
-  unit: BattleUnit;
-  active: boolean;
-  targetable: boolean;
-  casting: boolean;
-  impacted: boolean;
-  animationKey?: number;
-  effectKind?: BattleFxKind;
-  feedback?: BattleAnimationCue["feedback"];
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`battle-combatant ${active ? "is-active" : ""} ${targetable ? "is-targetable" : ""} ${casting ? "is-casting" : ""} ${impacted ? "is-impacted" : ""} ${feedback?.tone === "miss" ? "is-missed" : ""} ${unit.hp <= 0 ? "is-defeated" : ""} ${unit.faction === "enemy" ? "is-enemy" : "is-ally"}`}
-      onClick={onClick}
-      aria-label={unit.name}
-    >
-      <span className={`battle-sprite battle-sprite-${unit.model}`}>
-        {SPRITE_SHEET_MAP[unit.model] ? (
-          <span
-            className="sprite-sheet"
-            style={{
-              backgroundImage: `url(${SPRITE_SHEET_MAP[unit.model]})`,
-            }}
-          />
-        ) : (
-          <>
-            <span className="sprite-aura" />
-            <span className="sprite-head" />
-            <span className="sprite-body" />
-            <span className="sprite-weapon" />
-          </>
-        )}
-      </span>
-      {impacted && (
-        <span
-          key={`impact-${animationKey ?? unit.id}`}
-          className={`battle-impact-effect battle-impact-${effectKind}`}
-          aria-hidden="true"
-        >
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-        </span>
-      )}
-      {feedback && (
-        <span
-          key={`feedback-${animationKey ?? unit.id}`}
-          className={`battle-floating-feedback is-${feedback.tone}`}
-          aria-hidden="true"
-        >
-          {feedback.text}
-        </span>
-      )}
-      <span className="battle-combatant-info">
-        <span className="battle-combatant-name">{unit.name}</span>
-        <span className="battle-combatant-hp">
-          <i style={{ width: `${getHpPercent(unit)}%` }} />
-        </span>
-      </span>
-    </button>
-  );
-}
-
-function BattleEffectPanel({ effect, nextTurnLabel, nextTurnDisabled, onNextTurn }: {
-  effect: BattleEffect;
-  nextTurnLabel: string;
-  nextTurnDisabled: boolean;
-  onNextTurn: () => void;
-}) {
-  return (
-    <div className="vn-dialogue-box">
-      <span className="vn-speaker-tag">
-        {effect.actorName} · {effect.skillName}
-      </span>
-        <p className="vn-result-line">
-          <b>{effect.resultLine}</b>
-          {typeof effect.amount === "number" && (
-            <em className="vn-amount">{effect.amount}</em>
-          )}
-        </p>
-        <blockquote className="vn-narration">{effect.narration}</blockquote>
-        <small className="vn-formula">{effect.formula}</small>
-        <button
-          type="button"
-          className="vn-next-turn-btn"
-          disabled={nextTurnDisabled}
-          onClick={(e) => { e.stopPropagation(); onNextTurn(); }}
-        >
-          {nextTurnLabel}
-        </button>
-      </div>
-  );
-}
-
-function UnitDetailModal({
-  unit,
-  initiative,
-  onClose,
-}: {
-  unit: BattleUnit;
-  initiative?: InitiativeEntry;
-  onClose: () => void;
-}) {
-  return (
-    <motion.div
-      className="battle-modal-backdrop"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.section
-        className="battle-unit-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${unit.name} 详情`}
-        initial={{ opacity: 0, scale: 0.94, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.94, y: 16 }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="battle-modal-header">
-          <div className={`battle-avatar-mark ${AVATAR_MAP[unit.model] ? 'battle-avatar-img' : `battle-avatar-${unit.model}`}`} style={AVATAR_MAP[unit.model] ? { backgroundImage: `url(${AVATAR_MAP[unit.model]})` } : undefined} />
-          <div>
-            <span>{unit.name}</span>
-            <small>{unit.role}</small>
-          </div>
-          <button type="button" aria-label="关闭" onClick={onClose}>
-            ×
-          </button>
-        </header>
-
-        <div className="battle-detail-grid">
-          <section className="battle-detail-block">
-            <h2>状态</h2>
-            <div className="battle-stat-row">
-              <span>HP</span>
-              <b>
-                {unit.hp}/{unit.maxHp}
-              </b>
-            </div>
-            <div className="battle-wide-hp">
-              <i style={{ width: `${getHpPercent(unit)}%` }} />
-            </div>
-            <div className="battle-stat-row">
-              <span>AC</span>
-              <b>{unit.ac}</b>
-            </div>
-            <div className="battle-stat-row">
-              <span>熟练</span>
-              <b>{formatModifier(unit.proficiency)}</b>
-            </div>
-            {initiative && (
-              <div className="battle-stat-row">
-                <span>先攻</span>
-                <b>{initiative.total}</b>
-              </div>
-            )}
-            {unit.weaponMastery && (
-              <div className="battle-stat-note">
-                <b>精通/资源</b>
-                <span>{formatCombatTextForPlayer(unit.weaponMastery)}</span>
-              </div>
-            )}
-            <div className="battle-status-list">
-              {unit.statuses.map((status) => (
-                <span key={status}>{formatCombatTextForPlayer(status)}</span>
-              ))}
-            </div>
-          </section>
-
-          <section className="battle-detail-block battle-abilities">
-            <h2>六维数值</h2>
-            {ABILITY_LABELS.map(([key, label]) => {
-              const value = unit.abilities[key];
-              return (
-                <div key={key} className="battle-ability-tile">
-                  <span>{label}</span>
-                  <b>{value}</b>
-                  <small>{formatModifier(abilityModifier(value))}</small>
-                </div>
-              );
-            })}
-          </section>
-
-          <section className="battle-detail-block battle-traits">
-            <h2>规则画像</h2>
-            {unit.traits.map((trait) => (
-              <span key={trait}>{formatCombatTextForPlayer(trait)}</span>
-            ))}
-            {unit.resourceProfile.map((profile) => (
-              <span key={profile}>{formatCombatTextForPlayer(profile)}</span>
-            ))}
-          </section>
-
-          <section className="battle-detail-block battle-skills">
-            <h2>战斗技能</h2>
-            {unit.skills.map((skill) => (
-              <SkillCard key={skill.id} skill={skill} compact={false} />
-            ))}
-          </section>
-
-          {unit.nonCombatSkills.length > 0 && (
-            <section className="battle-detail-block battle-noncombat-skills">
-              <h2>非战斗技能</h2>
-              {unit.nonCombatSkills.map((skill) => (
-                <article key={skill.name}>
-                  <b>{skill.name}</b>
-                  <small>{skill.check}</small>
-                  <p>{skill.effect}</p>
-                </article>
-              ))}
-            </section>
-          )}
-        </div>
-      </motion.section>
-    </motion.div>
-  );
-}
-
-function SkillCard({ skill, compact = true }: { skill: BattleSkill; compact?: boolean }) {
-  return (
-    <article className={`battle-skill-card ${skill.locked ? "is-locked" : ""} ${compact ? "is-compact" : ""}`}>
-      <div className="battle-skill-card-head">
-        <span>{skill.resource}</span>
-        <b>{skill.name}</b>
-        <em>{skill.cooldown}</em>
-      </div>
-      <small>{boldifyDiceNotation(formatSkillFormulaForPlayer(skill))}</small>
-      {!compact && <p>{boldifyDiceNotation(formatSkillEffectForPlayer(skill))}</p>}
-      <div className="battle-skill-meta">
-        <i>{skillNeedsRoll(skill) ? "需掷骰" : "无掷骰"}</i>
-        <i>{skill.rule}</i>
-        {skill.trigger && <i>{skill.trigger}</i>}
-        {visibleSkillTags(skill).map((tag) => (
-          <i key={tag}>{tag}</i>
-        ))}
-      </div>
-    </article>
   );
 }
