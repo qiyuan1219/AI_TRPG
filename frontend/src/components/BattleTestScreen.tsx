@@ -8,6 +8,7 @@ import { dispatchGameAction } from "../core/actions/registry";
 import "../core/actions/battleResolver";
 import { rollDiceEvent } from "../core/dice/createDiceEvent";
 import { battleController } from "../features/battle/BattleController";
+import { BattleTutorialIntro as BattleTutorialIntroView } from "../features/battle/BattleTutorialIntro";
 import { createBattleViewModel } from "../features/battle/BattleViewModel";
 
 const BATTLE_BGM_TRACK = "/assets/bgm/bgm_05_battle_general.mp3";
@@ -3377,7 +3378,7 @@ export function BattleTestScreen({
 
       <AnimatePresence>
         {showTutorialIntro && config.tutorialIntro && (
-          <BattleTutorialIntro
+          <BattleTutorialIntroView
             intro={config.tutorialIntro}
             step={tutorialIntroStep}
             onPrevious={() => setTutorialIntroStep((step) => Math.max(0, step - 1))}
