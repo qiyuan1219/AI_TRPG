@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Dice3DView, DiceRollOverlay, type DieType } from "./DiceRollOverlay";
+import { Dice3DView, type DieType } from "./DiceRollOverlay";
 import type { DiceResult } from "../types/game";
 import { fetchBattleNarration, type AuthoritativeBattleResult } from "../services/api";
 import { authoritativeAmountByTarget, authoritativeDice, authoritativeEffect, authoritativeHp, authoritativeInitiative, toAuthoritativeBattlePayload } from "../core/battle/authoritativeAdapter";
@@ -9,6 +9,7 @@ import "../core/actions/battleResolver";
 import { rollDiceEvent } from "../core/dice/createDiceEvent";
 import { BattleActionBar } from "../features/battle/BattleActionBar";
 import { battleController } from "../features/battle/BattleController";
+import { BattleDiceBinding } from "../features/battle/BattleDiceBinding";
 import { BattleEffectPanel } from "../features/battle/BattleEffectPanel";
 import { BattleField } from "../features/battle/BattleField";
 import { BattleLogPanel } from "../features/battle/BattleLogPanel";
@@ -3069,6 +3070,16 @@ export function BattleTestScreen({
     return () => window.clearTimeout(timer);
   }, [activeUnit, battleLost, battleWon, phase]);
 
+  const pendingDiceAttack = pendingAttackRef.current
+    ? {
+        unitName: pendingAttackRef.current.unit.name,
+        targetName: pendingAttackRef.current.target.name,
+        targetAc: pendingAttackRef.current.target.ac,
+        skillName: pendingAttackRef.current.skill.name,
+        hit: pendingAttackRef.current.hit,
+      }
+    : null;
+
   return (
     <main className="battle-test-screen">
       <div className="battle-background" style={{ backgroundImage: `url(${config.backgroundUrl || BACKGROUND_URL})` }} />
@@ -3289,29 +3300,10 @@ export function BattleTestScreen({
         )}
       </AnimatePresence>
 
-      <DiceRollOverlay
-        dice={activeDice}
-        dieType="d20"
-        attackMode={attackPhase === "d20" || attackPhase === "save"}
-        attackMissed={attackPhase === "d20" && pendingAttackRef.current?.hit === false}
-        targetAc={pendingAttackRef.current?.target.ac ?? 0}
-        diceKind={
-          attackPhase === "d20" ? "命中判定" :
-          attackPhase === "save" ? "豁免掷骰" :
-          attackPhase === "damage" ? "伤害掷骰" :
-          activeDice?.type === "skill_check" ?
-            (activeDice.data["成功"] !== undefined && activeDice.data["DC"] ? "豁免掷骰" : "检定掷骰") :
-          activeDice?.data["骰子"]?.includes("D") && Number(activeDice.data["总计"]) > 0 ?
-            (activeDice.data["属性"]?.includes("治疗") || activeDice.data["属性"]?.includes("恢复") ? "治疗掷骰" :
-              activeDice.data["属性"]?.includes("伤害") ? "伤害掷骰" : "投骰结果") :
-          "投骰结果"
-        }
-        charSkill={
-          pendingAttackRef.current
-            ? `${pendingAttackRef.current.unit.name} · ${pendingAttackRef.current.skill.name}`
-            : activeDice?.data["武器"] || activeDice?.data["属性"] || ""
-        }
-        showD20Calc={attackPhase === "d20" || attackPhase === "save"}
+      <BattleDiceBinding
+        activeDice={activeDice}
+        attackPhase={attackPhase}
+        pendingAttack={pendingDiceAttack}
         onClose={() => {
           // 攻击技能两阶段流程
           if ((attackPhase === "d20" || attackPhase === "save") && pendingAttackRef.current) {
