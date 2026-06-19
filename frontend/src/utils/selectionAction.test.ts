@@ -22,4 +22,20 @@ describe('SelectionActionCheck', () => {
     expect(check.lockedPrompt).toContain('禁止再次投骰');
     expect(check.lockedPrompt).toContain('最终成功');
   });
+
+  it('可复用教学判定 UI 执行配置好的战前行动', () => {
+    setDiceFaceProviderForTests(() => 14);
+    const choice = {
+      id: 'blue-shoal-test', label: '识破拟声【观察DC14】', type: 'battlePrep' as const,
+      desc: '识破拟声', canUseRerollItems: true,
+      check: { skill: 'observe', dc: 14, label: '观察 DC 14', attribute: 'wis' as const },
+      successText: '识破成功', failText: '识破失败',
+      successEffect: { battleEffects: { allyMentalResistBonus: 2 } },
+      failEffect: {},
+    };
+    const check = SelectionActionCheck.fromChoice(choice.label, choice, { wis: 10 });
+    expect(check.choice.id).toBe('blue-shoal-test');
+    expect(check.result.storyCheck?.dc).toBe(14);
+    expect(check.finalize().effect?.battleEffects?.allyMentalResistBonus).toBe(2);
+  });
 });

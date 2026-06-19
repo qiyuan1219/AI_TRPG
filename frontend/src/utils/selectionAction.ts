@@ -36,6 +36,11 @@ export class SelectionActionCheck {
     return new SelectionActionCheck(actionText, choice, resolveBattlePrepChoice(choice, state));
   }
 
+  /** 复用教学战的判定 UI，但保留遭遇配置中的原始效果。 */
+  static fromChoice(actionText: string, choice: BattlePrepChoice, state: GameState): SelectionActionCheck {
+    return new SelectionActionCheck(actionText, choice, resolveBattlePrepChoice(choice, state));
+  }
+
   reroll(itemId: RerollItemId, state: GameState, chosenD20?: number): GameState {
     const outcome = itemId === 'fiction-dice'
       ? useFictionDice(this.choice, this.result, state)

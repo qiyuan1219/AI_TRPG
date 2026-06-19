@@ -635,8 +635,9 @@
 
 .game-top-actions {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 88px;
+  left: 20px;
+  right: auto;
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -653,6 +654,7 @@
 .game-inventory-entry .inventory-open-button,
 .game-character-btn {
   width: 100%;
+  height: 52px;
   min-height: 52px;
   padding: 0 16px;
   border: 1px solid rgba(214, 168, 90, 0.4);
@@ -690,6 +692,22 @@
 .game-inventory-entry .inventory-panel-entry {
   display: block;
   width: 100%;
+}
+
+/* InventoryPanel has its own generic button layout later in this stylesheet.
+   Keep its entry identical to the other buttons when used in this action rail. */
+.game-top-actions .game-inventory-entry .inventory-open-button {
+  display: flex;
+  grid-template-columns: none;
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 16px;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold-soft);
 }
 
 /* 背包/角色按钮位置与环境已由上方统一按钮样式接管 */
@@ -1412,20 +1430,28 @@
 }
 
 .rarity-common {
-  border-color: rgba(231, 211, 161, 0.16);
+  border-color: rgba(231, 211, 161, 0.38);
 }
 
 .rarity-uncommon {
-  border-color: rgba(95, 183, 167, 0.42);
+  border-color: rgba(95, 183, 167, 0.72);
 }
 
 .rarity-rare {
-  border-color: rgba(159, 128, 218, 0.52);
+  border-color: rgba(159, 128, 218, 0.82);
 }
 
 .rarity-key,
 .rarity-quest {
-  border-color: rgba(214, 168, 90, 0.72);
+  border-color: rgba(214, 168, 90, 0.9);
+}
+
+.inventory-slot.rarity-common,
+.inventory-slot.rarity-uncommon,
+.inventory-slot.rarity-rare,
+.inventory-slot.rarity-key,
+.inventory-slot.rarity-quest {
+  border-width: 2px;
 }
 
 .inventory-empty {

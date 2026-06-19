@@ -361,7 +361,7 @@ export const BLACKSTONE_GATEKEEPER_BOSS_CONFIG: BattleConfig = {
     { title: '黑石脉冲', text: '每两回合全队脉冲，瑟琳银杖会受影响，法术不稳定。' },
     { title: '核心暴露', text: 'HP降至25%以下核心暴露，战斗暂停，需在破坏和稳定核心之间选择。' },
   ],
-  backgroundUrl: '/assets/battle/battle03.png',
+  backgroundUrl: '/assets/scenes/14dark-gate-forecourt-battle.webp',
   eyebrow: 'Boss 战 · 第一幕关底',
   title: '黑石门卫',
   subtitle: '黑暗之门前庭的古老守卫',

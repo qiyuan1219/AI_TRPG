@@ -33,6 +33,10 @@ export const ITEM_ICON_PATHS: Record<string, string> = {
   'spore-mask': '/assets/icons/items/spore-mask.png',
   'cable-clip': '/assets/icons/items/cable-clip.png',
   'supply-crate': '/assets/icons/items/supply-crate.png',
+  'fortress-emblem': '/assets/icons/items/item-fortress-emblem.png',
+  'lain-dogtag': '/assets/icons/items/item-lain-dogtag.png',
+  'black-obelisk-shard': '/assets/icons/items/item-black-obelisk-shard.png',
+  'silver-staff-charm': '/assets/icons/items/item-silver-staff-charm.png',
   item: DEFAULT_ITEM_ICON,
   default: DEFAULT_ITEM_ICON,
 
@@ -93,6 +97,10 @@ const ITEM_NAME_ICON_TOKENS: Record<string, string> = {
   抗孢面罩: 'spore-mask',
   缆梯安全扣: 'cable-clip',
   公会补给箱: 'supply-crate',
+  远征要塞徽记: 'fortress-emblem',
+  莱因的身份牌: 'lain-dogtag',
+  黑色方尖碑碎片: 'black-obelisk-shard',
+  银杖护符: 'silver-staff-charm',
 };
 
 const ITEM_NAME_SUMMARIES: Record<string, string> = {
@@ -125,6 +133,10 @@ const ITEM_NAME_SUMMARIES: Record<string, string> = {
   抗孢面罩: '过滤孢粉和有毒粉尘的防护面罩，孢海探索的必需品。',
   缆梯安全扣: '固定在降渊缆梯主缆上的安全锁扣，防止意外坠落。',
   公会补给箱: '冒险者公会配发的远征标准补给，内含急救品和应急物资。',
+  远征要塞徽记: '蓝伞浅滩遗留的旧要塞徽记，背面刻着通往黑石根区的路线。',
+  莱因的身份牌: '受损的远征队身份牌，仍能辨认出莱因的姓名。',
+  黑色方尖碑碎片: '从黑石根区入口取下的封印碎片，会随着脉冲发出微光。',
+  银杖护符: '瑟琳从裂开的银杖上取下的小护符，只交给她真正信任的同伴。',
 };
 
 export function resolveItemIconPath(iconOrPath?: string, itemName?: string) {

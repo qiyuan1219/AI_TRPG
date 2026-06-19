@@ -1150,15 +1150,12 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
   battlePrep: [
     {
       id: 'blue-shoal-prep-ignore-voices',
-      label: '保持沉默，识破拟声诱导',
+      label: '保持沉默，识破拟声诱导【观察/奥秘DC14】',
       type: 'battlePrep',
       canUseRerollItems: true,
       desc: '根据先前收集到的情报，判断这些求救声是否是拟声菌团的诱导。',
-      autoSuccessWhen: 'flags.clue_voice_mimic || flags.wounded_guard_stabilized',
-      greatSuccessWhen: 'flags.clue_voice_mimic && flags.wounded_guard_stabilized',
       check: { skill: 'observe', altSkill: 'arcana', dc: 14, label: '观察 / 奥秘 DC 14' },
       successText: '你们没有回应那些求救声。结合先前的线索，你们迅速判断出声音并非来自活人，而是拟声菌团在试探队伍反应。',
-      greatSuccessText: '巡逻记录与伤员证词在此刻完全对上了。你们不仅识破了拟声诱导，还借声音变化判断出了菌团核心的大致位置。',
       failText: '你们虽然没有立刻回应，但那声音越来越像熟悉的人。短暂的迟疑让队伍阵型出现了一瞬间松动。',
       successEffect: {
         flags: { blue_shoal_prep_ignore_voices_success: true },
@@ -1166,16 +1163,6 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
           disableEnemySkillFirstRound: ['voice_disruption'],
           allyMentalResistBonus: 2,
           allyMentalResistRounds: 1,
-        },
-      },
-      greatSuccessEffect: {
-        flags: { blue_shoal_prep_ignore_voices_great_success: true },
-        battleEffects: {
-          disableEnemySkillFirstRound: ['voice_disruption'],
-          allyMentalResistBonus: 2,
-          allyMentalResistRounds: 2,
-          targetEnemyType: 'fungal_mimic',
-          attackBonusFirstRound: 2,
         },
       },
       failEffect: {
@@ -1193,11 +1180,10 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
     },
     {
       id: 'blue-shoal-prep-find-core',
-      label: '用符文灯寻找拟声菌团核心',
+      label: '用符文灯寻找拟声菌团核心【观察/奥秘DC15】',
       type: 'battlePrep',
       canUseRerollItems: true,
       desc: '照向拟声菌团腹腔，尝试在开战前找出它们真正的核心。',
-      autoSuccessWhen: 'flags.clue_voice_mimic',
       check: { skill: 'observe', altSkill: 'arcana', dc: 15, label: '观察 / 奥秘 DC 15' },
       successText: '符文灯的冷光刺入菌团腹腔，你们看见几枚暗蓝色核心正在湿软菌块中缓慢收缩。那些断续的求救声短暂失真，变成了刺耳杂音。',
       failText: '符文灯扫过菌团身体，却只照出一层层湿软菌块。下一刻，菌团突然模仿出你们的声音，干扰了队伍判断。',
@@ -1218,7 +1204,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
     },
     {
       id: 'blue-shoal-prep-avoid-bulges',
-      label: '听从布洛克指挥，避开菌毯鼓包',
+      label: '听从布洛克指挥，避开菌毯鼓包【生存/感知DC13】',
       type: 'battlePrep',
       canUseRerollItems: true,
       desc: '根据菌毯鼓起的位置，提前避开孢化兽破土突袭。',
@@ -1243,11 +1229,11 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
     },
     {
       id: 'blue-shoal-prep-mask',
-      label: '整理抗孢面罩，压低呼吸',
+      label: '整理抗孢面罩，压低呼吸【体质DC10】',
       type: 'battlePrep',
       canUseRerollItems: true,
       desc: '重新压紧抗孢面罩，减少孢尘对队伍的影响。',
-      alwaysSuccess: true,
+      check: { skill: 'endurance', dc: 10, label: '体质 DC 10' },
       successText: '你们重新压紧抗孢面罩，放慢呼吸。甜腻的孢尘气味被隔在面罩之外，脑中的昏沉感稍稍退去。',
       successEffect: {
         flags: { blue_shoal_prep_mask_success: true },
@@ -1452,6 +1438,114 @@ const BLACKSTONE_CORE_CHOICE: ScriptedScene = {
   ],
 };
 
+// ============================================================
+// 压缩第一幕收束路线（旧支线数据保留，但不再自动触发）
+// ============================================================
+const ACT1_BLUE_SHOAL_AFTERMATH_COMPRESSED: ScriptedScene = {
+  id: 'act1-blue-shoal-aftermath-compressed', manualOnly: true,
+  triggers: ['蓝伞浅滩战后余波'], setArea: '无光孢海·蓝伞浅滩',
+  bgImage: '/assets/scenes/10blue-shoal-after-battle.webp', bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { compressedAct1EndingStarted: true, blueShoalAftermathSeen: true, currentNodeId: 'act1-blue-shoal-aftermath-compressed' },
+  lastEvent: '蓝伞浅滩的战斗结束，队伍发现通往黑石根区的远征标记',
+  lines: [
+    { speaker: '主持人', text: '最后一只孢化地底兽倒在蓝伞菌的冷光下。浅滩重新安静，只剩水滴从破损的护甲上滑落。' },
+    { speaker: '布洛克', text: '「这不是普通的巡逻队徽记。是旧远征要塞的。」' },
+    { speaker: '凯娅', text: '「路标指向黑石根区。旧路还没有完全塌。」' },
+    { speaker: '瑟琳', text: '「我们走那条路。再绕远，就会错过黑石脉冲的间隔。」' },
+  ],
+  hints: ['沿远征标记前往黑石根区'],
+};
+
+const ACT1_BLACK_ROOT_ENTRANCE: ScriptedScene = {
+  id: 'act1-black-root-entrance', manualOnly: true, triggers: ['进入黑石根区'],
+  setArea: '无光孢海·黑石根区入口', bgImage: '/assets/scenes/11black-root-entrance.webp',
+  bgm: '/assets/bgm/bgm_04b_fungal_sea_explore.mp3',
+  statePatch: { blackRootEntranceSeen: true, currentNodeId: 'act1-black-root-entrance' },
+  lastEvent: '抵达黑石根区入口，发现幸存者的血迹',
+  lines: [
+    { speaker: '主持人', text: '菌丝在这里变得像烧焦的树根，深深嵌进岩层。一枚破损的方尖碑碎片卡在旧路标旁。' },
+    { speaker: '艾琳', text: '「有新鲜血迹。不是我们的。」' },
+    { speaker: '凯娅', text: '「往前。拖行痕迹还没被孢尘盖住。」' },
+  ], hints: ['追踪血迹寻找幸存者'],
+};
+
+const ACT1_LAIN_SURVIVOR: ScriptedScene = {
+  id: 'act1-lain-survivor-event', manualOnly: true, triggers: ['发现莱因'],
+  setArea: '无光孢海·黑石根区废营', bgImage: '/assets/scenes/12lain-survivor-site.webp',
+  statePatch: { lainEncountered: true, currentNodeId: 'act1-lain-survivor-event' },
+  lastEvent: '在黑石根区发现重伤的远征队员莱因',
+  lines: [
+    { speaker: '主持人', text: '一名披着旧远征斗篷的男人靠在断墙下。他的呼吸很浅，手里死死攅着半枚身份牌。' },
+    { speaker: '莱因', text: '「门……还在吃人的时间。别让它……看见你们。」' },
+    { speaker: '艾琳', text: '「他还活着，但精神污染很严重。」' },
+    { speaker: '瑟琳', text: '「选择权在你。只是这一次，选择会被记住。」' },
+  ],
+  hints: ['救治莱因并带他同行', '先追问莱因发生了什么', '检查莱因的伤势与身份牌', '取走身份牌线索后离开', '无视莱因，继续前进'],
+};
+
+const ACT1_SERIN_CRACK: ScriptedScene = {
+  id: 'act1-black-root-rest-serin-crack', manualOnly: true, triggers: ['黑石根区休整'],
+  setArea: '无光孢海·黑石根区休整点', bgImage: '/assets/scenes/13black-root-rest-point.webp',
+  statePatch: { currentNodeId: 'act1-black-root-rest-serin-crack' },
+  lastEvent: '黑暗之门前休整，瑟琳的银杖出现裂痕',
+  lines: [
+    { speaker: '主持人', text: '休整时，你看见瑟琳正用手指按住银杖上一道新的裂纹。裂纹里的冷光与黑石脉冲同步闪动。' },
+    { speaker: '瑟琳', text: '「只是法术负荷。我还能继续。」' },
+    { speaker: '艾琳', text: '「你说得太快了。」' },
+  ],
+  hints: ['安慰瑟琳，要求她先休息', '克制地追问银杖裂痕', '只问这会如何影响任务', '强迫瑟琳说出真相', '要求瑟琳强行继续施法'],
+};
+
+const ACT1_BOSS_CORE_CHOICE: ScriptedScene = {
+  ...BLACKSTONE_CORE_CHOICE,
+  id: 'act1-boss-core-choice',
+  bgImage: '/assets/scenes/14dark-gate-forecourt-battle.webp',
+  statePatch: { ...BLACKSTONE_CORE_CHOICE.statePatch, blackstoneGatekeeperDefeated: true, currentNodeId: 'act1-boss-core-choice' },
+};
+
+const ACT1_ENDINGS: ScriptedScene[] = [
+  ['guardian-remains', '守门者仍在', '核心稳定下来，封印未破。莱因在艾琳的搀扶下重新站稳，你们带着一名幸存者走向开启的门。'],
+  ['wounded-through-gate', '带伤者穿门', '核心碎裂，封锁随之崩塌。莱因咳出一口黑血，但你们没有丢下他，一同穿过破碎的石门。'],
+  ['cold-expedition', '冷静的远征', '核心稳定，封锁保留。队伍没有停下等待任何人，只带着沉默与任务穿过黑石门。'],
+  ['gate-split-open', '裂门而下', '核心粉碎，封锁解除。黑石门在你们面前轰然洞开，没有幸存者，也没有回头的理由。'],
+].map(([id, title, text]) => ({
+  id: `act1-ending-${id}`, manualOnly: true, triggers: [title], setArea: '黑暗之门',
+  bgImage: `/assets/scenes/ending-${id}.webp`, statePatch: { currentNodeId: `act1-ending-${id}`, act1EndingId: id },
+  lastEvent: `第一幕结局：${title}`, lines: [{ speaker: '主持人', text }], hints: ['穿过黑暗之门'],
+}));
+
+const ACT1_OCEAN_REVEAL: ScriptedScene = {
+  id: 'act1-ending-ocean-reveal', manualOnly: true, triggers: ['穿过黑暗之门'],
+  setArea: '地下海洋·黑暗之门彼端', bgImage: '/assets/scenes/15underground-ocean-reveal.webp',
+  statePatch: { undergroundOceanRevealed: true, currentNodeId: 'act1-ending-ocean-reveal' },
+  lastEvent: '黑暗之门后的地下海洋显现',
+  lines: [
+    { speaker: '主持人', text: '门后不是地底堡垒，也不是更深的岩层。' },
+    { speaker: '主持人', text: '一片没有天空的地下海洋在你们脚下展开。远处的微光像灯塔一样在黑潮上明灭。' },
+    { speaker: '瑟琳', text: '「第一道门打开了。真正的远征，现在才开始。」' },
+  ], hints: ['结束第一幕'],
+};
+
+const ACT1_GAME_COMPLETE: ScriptedScene = {
+  id: 'act1-game-complete', manualOnly: true, triggers: ['结束第一幕'], setArea: '第一幕·完',
+  bgImage: '/assets/scenes/15underground-ocean-reveal.webp',
+  statePatch: { act1GameCompleted: true, currentNodeId: 'act1-game-complete' },
+  lastEvent: '第一幕结束', lines: [{ speaker: '主持人', text: '第一幕《地心之门》结束。你的选择已被记录。' }], hints: ['[第一幕结束]'],
+};
+
+const ACT1_BAD_ENDING: ScriptedScene = {
+  id: 'act1-bad-ending-time-reset', manualOnly: true, triggers: ['逆时归零'], setArea: '逆时归零',
+  bgImage: '/assets/scenes/14dark-gate-forecourt-battle.webp',
+  statePatch: { act1EndingId: 'time-reset', act1GameCompleted: true, currentNodeId: 'act1-bad-ending-time-reset', blackstone_gatekeeper_result: 'lose' },
+  lastEvent: '坏结局：逆时归零',
+  lines: [
+    { speaker: '主持人', text: '小队倒在黑石根区。所有声音都变得遥远，像被厚重石层隔开。' },
+    { speaker: '瑟琳', text: '「对不起……这一次，还是来不及。」' },
+    { speaker: '瑟琳', text: '「如果你醒来后什么都不记得，也请你……再走一次。」' },
+    { speaker: '主持人', text: '银杖彻底裂开。你眼前出现逆穹悬城最初的灯火。你回到了最初，不记得自己曾经失败。游戏结束。' },
+  ], hints: ['[第一幕结束 · 逆时归零]'],
+};
+
 export const SCRIPTED_SCENES: ScriptedScene[] = [
   OPENING,
   OPENING_SUSPENSE,
@@ -1483,6 +1577,15 @@ export const SCRIPTED_SCENES: ScriptedScene[] = [
   RHEIN_ENCOUNTER,
   PRE_BOSS_REST,
   BLACKSTONE_CORE_CHOICE,
+  ACT1_BLUE_SHOAL_AFTERMATH_COMPRESSED,
+  ACT1_BLACK_ROOT_ENTRANCE,
+  ACT1_LAIN_SURVIVOR,
+  ACT1_SERIN_CRACK,
+  ACT1_BOSS_CORE_CHOICE,
+  ...ACT1_ENDINGS,
+  ACT1_OCEAN_REVEAL,
+  ACT1_GAME_COMPLETE,
+  ACT1_BAD_ENDING,
 ];
 
 export function matchScriptedScene(action: string): { scene: ScriptedScene; trigger: string } | null {

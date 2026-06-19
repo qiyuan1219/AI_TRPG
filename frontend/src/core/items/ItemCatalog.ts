@@ -23,6 +23,10 @@ const CORE_ITEMS: ItemDefinition[] = [
   { catalogId: 'wounded_purification_report', name: '伤员净化报告', type: 'document', description: '伤员污染与净化记录。', icon: 'scroll-medicine', rarity: 'story', stackable: false },
   { catalogId: 'kaiya_code_note', name: '凯娅的暗号', aliases: ['黑市暗号纸条'], type: 'quest', description: '写有“断缆不问来路”的暗号纸条。', icon: 'note-pin', rarity: 'story', stackable: false },
   { catalogId: 'yunling_charm', name: '云苓的护身符', type: 'quest', description: '封着蓝色菌叶和白枝烛芯的护身符。', icon: 'yunling-charm', rarity: 'story', stackable: false },
+  { catalogId: 'fortress_emblem', name: '远征要塞徽记', type: 'quest', description: '刻有通往黑石根区旧路的要塞徽记。', icon: 'fortress-emblem', rarity: 'story', stackable: false },
+  { catalogId: 'lain_dogtag', name: '莱因的身份牌', type: 'quest', description: '黑石根区幸存者莱因的身份标识。', icon: 'lain-dogtag', rarity: 'story', stackable: false },
+  { catalogId: 'black_obelisk_shard', name: '黑色方尖碑碎片', type: 'quest', description: '与黑石脉冲同步发光的封印碎片。', icon: 'black-obelisk-shard', rarity: 'story', stackable: false },
+  { catalogId: 'silver_staff_charm', name: '银杖护符', type: 'quest', description: '瑟琳从裂开的银杖上取下的信任之证。', icon: 'silver-staff-charm', rarity: 'story', stackable: false },
 ];
 
 const SHOP_CATALOG: ItemDefinition[] = shopItems.map((item) => ({
