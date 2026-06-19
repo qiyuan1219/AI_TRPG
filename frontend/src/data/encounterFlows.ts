@@ -81,25 +81,25 @@ export const ENCOUNTER_FLOW_CONFIGS: EncounterFlowConfig[] = [
     introSceneId: 'enter-blue-shoal',
     prepActions: [DEFAULT_BATTLE_PREP_ACTION],
     battleId: 'enemy_pack_blue_shoal',
-    afterSceneId: 'act1-blue-shoal-aftermath-compressed',
+    afterSceneId: 'after-battle-blue-shoal-expanded-v2',
     prepDoneFlag: 'blue_shoal_battle_prep_done',
     battleDoneFlag: 'blue_shoal_battle_done',
   },
   {
     encounterId: 'bone-pillar-wetland',
-    introSceneId: 'enter-bone-pillar-wetland',
+    introSceneId: 'bone-beast-prebattle-v2',
     prepActions: [DEFAULT_BATTLE_PREP_ACTION],
     battleId: 'enemy_pack_bone_marsh',
-    afterSceneId: 'rhein-encounter',
+    afterSceneId: 'after-battle-bone-beast-v2',
     prepDoneFlag: 'bone_pillar_wetland_battle_prep_done',
     battleDoneFlag: 'bone_marsh_battle_done',
   },
   {
     encounterId: 'boss-gatekeeper',
-    introSceneId: 'enter-boss-gatekeeper',
+    introSceneId: 'guardian-prebattle-choice-v2',
     prepActions: [DEFAULT_BATTLE_PREP_ACTION],
     battleId: 'boss_blackstone_gatekeeper',
-    afterSceneId: 'act1-boss-core-choice',
+    afterSceneId: 'after-battle-blackstone-guardian-v2',
     prepDoneFlag: 'boss_gatekeeper_battle_prep_done',
     battleDoneFlag: 'boss_defeated',
   },
@@ -118,9 +118,24 @@ export function getEncounterConfigByBattleId(battleId?: string | null) {
 }
 
 export function canShowPrepChoice(state: any, config: EncounterFlowConfig): boolean {
-  const consumedForThisEncounter = state.currentEncounterId === config.encounterId && state.battlePrep?.consumed === true;
+  const selectedActionId = String(
+    state.selectedPrepActionId
+    || state.lastBattlePrepChoice
+    || state.battlePrepSelection?.selectedActionId
+    || '',
+  );
+  const hasRealBlueShoalPrepChoice = config.encounterId === 'blue-shoal'
+    ? selectedActionId.startsWith('blue-shoal-prep-')
+    : true;
+  const consumedForThisEncounter = state.currentEncounterId === config.encounterId
+    && state.battlePrep?.consumed === true
+    && hasRealBlueShoalPrepChoice;
+  const prepDoneFlagSet = Boolean(state.flags?.[config.prepDoneFlag] || state[config.prepDoneFlag]);
+  const prepAlreadyDone = config.encounterId === 'blue-shoal'
+    ? prepDoneFlagSet && hasRealBlueShoalPrepChoice
+    : prepDoneFlagSet;
   return !consumedForThisEncounter
-    && !state.flags?.[config.prepDoneFlag]
+    && !prepAlreadyDone
     && !state.flags?.[config.battleDoneFlag]
     && !state[config.battleDoneFlag];
 }

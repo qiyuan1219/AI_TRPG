@@ -2,7 +2,9 @@ import type { GameState } from '../../types/game';
 import { appendUniqueInventoryItem } from '../inventory/inventoryStatePatch';
 import { buildTrustPatch, getCompanionTrust } from '../../utils/trust';
 
-export const ENABLE_COMPRESSED_ACT1_ENDING = true;
+// [已停用/归档] 旧版“蓝伞浅滩后直接压缩到结局”流程。
+// 数据和计算函数暂时保留用于阅读旧实现，但不允许再进入运行时。
+export const ENABLE_COMPRESSED_ACT1_ENDING = false;
 
 export type Act1CoreChoice = 'destroy' | 'stabilize';
 export type Act1EndingId =

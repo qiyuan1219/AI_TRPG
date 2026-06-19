@@ -633,8 +633,13 @@ SIDE_EVENT_DEFINITIONS: dict[str, dict] = {
     },
 }
 
+# [已停用/归档] 旧版布洛克“回声菌林”和凯娅“少了两个封扣”仍保留在上方，
+# 仅供查阅历史实现；从运行时注册表移除，接口不会再列出或启动它们。
+for _legacy_event_id in ("block_echo_forest", "kaiya_broken_seals"):
+    SIDE_EVENT_DEFINITIONS.pop(_legacy_event_id, None)
 
-def create_side_event_session(event_id: str = "block_echo_forest", initial_trust: int | None = None) -> dict:
+
+def create_side_event_session(event_id: str = "ailin_wounded_names", initial_trust: int | None = None) -> dict:
     if event_id not in SIDE_EVENT_DEFINITIONS:
         raise ValueError(f"支线事件 {event_id} 不存在")
     event = SIDE_EVENT_DEFINITIONS[event_id]

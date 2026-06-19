@@ -117,7 +117,6 @@ export function BattleActionBar<
                 <span>技能</span>
                 <b>{skill.name}</b>
                 <small>{formatSkillFormula(skill)}</small>
-                <em>{getSkillTargetHint(skill)}</em>
               </button>
             );
           })}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import InventoryPanel from '../../components/InventoryPanel';
 import type { GameState } from '../../types/game';
 
@@ -24,34 +25,49 @@ export function AppTopActions({
   onOpenCharacterInfo,
   onInventoryStatePatch,
 }: AppTopActionsProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <div className="game-top-actions">
-      <button type="button" className="game-log-btn" onClick={onOpenDialogueLog}>
-        📜 对话日志
-      </button>
-      {canUseCityMap && (
-        <button type="button" className="game-map-btn" onClick={onOpenCityMap}>
-          🗺️ 城市地图
-        </button>
-      )}
-      <button type="button" className="game-title-btn" onClick={onOpenReturnTitle}>
-        回到标题界面
-      </button>
-      <button type="button" className="game-save-btn" onClick={onOpenSaves}>
-        📂 冒险存档
-      </button>
-      <div className="game-inventory-entry">
-        <InventoryPanel state={gameState} onStatePatch={onInventoryStatePatch} />
-      </div>
+    <aside className={`game-top-actions ${collapsed ? 'is-collapsed' : ''}`} aria-label="冒险快捷侧边栏">
       <button
         type="button"
-        className="game-character-btn"
-        aria-haspopup="dialog"
-        aria-expanded={characterInfoOpen}
-        onClick={onOpenCharacterInfo}
+        className="game-sidebar-toggle"
+        aria-label={collapsed ? '展开快捷侧边栏' : '折叠快捷侧边栏'}
+        aria-expanded={!collapsed}
+        onClick={() => setCollapsed((value) => !value)}
       >
-        角色信息
+        <span>{collapsed ? '›' : '‹'}</span>
       </button>
-    </div>
+
+      <div className="game-sidebar-actions" aria-hidden={collapsed}>
+        <button type="button" className="game-log-btn" onClick={onOpenDialogueLog} tabIndex={collapsed ? -1 : 0}>
+          📜 对话日志
+        </button>
+        {canUseCityMap && (
+          <button type="button" className="game-map-btn" onClick={onOpenCityMap} tabIndex={collapsed ? -1 : 0}>
+            🗺️ 城市地图
+          </button>
+        )}
+        <button type="button" className="game-title-btn" onClick={onOpenReturnTitle} tabIndex={collapsed ? -1 : 0}>
+          回到标题界面
+        </button>
+        <button type="button" className="game-save-btn" onClick={onOpenSaves} tabIndex={collapsed ? -1 : 0}>
+          📂 冒险存档
+        </button>
+        <div className="game-inventory-entry">
+          <InventoryPanel state={gameState} onStatePatch={onInventoryStatePatch} />
+        </div>
+        <button
+          type="button"
+          className="game-character-btn"
+          aria-haspopup="dialog"
+          aria-expanded={characterInfoOpen}
+          onClick={onOpenCharacterInfo}
+          tabIndex={collapsed ? -1 : 0}
+        >
+          角色信息
+        </button>
+      </div>
+    </aside>
   );
 }

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 interface TitleMenuProps {
   onNewGame: () => void;
   onLoadGame: () => void;
+  onGallery: () => void;
   onSettings: () => void;
   onTest: () => void;
   onPrimeAudio?: () => void;
@@ -11,14 +12,14 @@ interface TitleMenuProps {
 const MENU_ITEMS = [
   { label: '新游戏', action: 'new' },
   { label: '载入游戏', action: 'load' },
+  { label: '画廊', action: 'gallery' },
   { label: '设置', action: 'settings' },
-  { label: '画廊', action: 'gallery', disabled: true },
   { label: '测试', action: 'test' },
 ] as const;
 
 const TITLE_VIDEO = '/assets/scenes/title-bg.mp4';
 
-export function TitleMenu({ onNewGame, onLoadGame, onSettings, onTest, onPrimeAudio }: TitleMenuProps) {
+export function TitleMenu({ onNewGame, onLoadGame, onGallery, onSettings, onTest, onPrimeAudio }: TitleMenuProps) {
   return (
     <main className="title-menu-screen" onPointerDownCapture={onPrimeAudio} onKeyDownCapture={onPrimeAudio}>
       <video
@@ -50,8 +51,8 @@ export function TitleMenu({ onNewGame, onLoadGame, onSettings, onTest, onPrimeAu
         <nav className="title-menu-actions" aria-label="主菜单">
           {MENU_ITEMS.map((item, index) => {
             const onClick =
-              item.action === 'new' ? onNewGame : item.action === 'load' ? onLoadGame : item.action === 'settings' ? onSettings : item.action === 'test' ? onTest : undefined;
-            const disabled = 'disabled' in item && item.disabled;
+              item.action === 'new' ? onNewGame : item.action === 'load' ? onLoadGame : item.action === 'gallery' ? onGallery : item.action === 'settings' ? onSettings : item.action === 'test' ? onTest : undefined;
+            const disabled = Boolean('disabled' in item && item.disabled);
 
             return (
               <motion.button

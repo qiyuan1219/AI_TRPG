@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import os
 from typing import AsyncGenerator
 from openai import AsyncOpenAI, OpenAIError
 from pydantic import ValidationError
@@ -18,10 +19,57 @@ client = AsyncOpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL)
 logger = logging.getLogger(__name__)
 LLM_MAX_ATTEMPTS = 3
 LLM_RETRY_DELAY = 0.8
+SUPPORTED_LLM_MODELS = tuple(dict.fromkeys([
+    "deepseek-chat",
+    "deepseek-reasoner",
+    "deepseek-v4-pro",
+    LLM_MODEL,
+]))
+SUPPORTED_HEALTH_MAX_TOKENS = (8, 64, 96)
+_runtime_llm_model = LLM_MODEL
+_runtime_health_max_tokens = 64 if LLM_MODEL == "deepseek-v4-pro" else 8
+
+
+def _coerce_health_max_tokens(value) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = _runtime_health_max_tokens
+    if parsed not in SUPPORTED_HEALTH_MAX_TOKENS:
+        raise ValueError(f"health_max_tokens must be one of {SUPPORTED_HEALTH_MAX_TOKENS}")
+    return parsed
+
+
+try:
+    _runtime_health_max_tokens = _coerce_health_max_tokens(os.getenv("LLM_HEALTH_MAX_TOKENS", _runtime_health_max_tokens))
+except ValueError:
+    _runtime_health_max_tokens = 64 if LLM_MODEL == "deepseek-v4-pro" else 8
+
+
+def get_ai_runtime_settings() -> dict:
+    return {
+        "model": _runtime_llm_model,
+        "health_max_tokens": _runtime_health_max_tokens,
+        "available_models": list(SUPPORTED_LLM_MODELS),
+        "health_max_token_options": list(SUPPORTED_HEALTH_MAX_TOKENS),
+    }
+
+
+def update_ai_runtime_settings(model: str | None = None, health_max_tokens: int | None = None) -> dict:
+    global _runtime_llm_model, _runtime_health_max_tokens
+    if model is not None:
+        normalized_model = str(model).strip()
+        if normalized_model not in SUPPORTED_LLM_MODELS:
+            raise ValueError(f"unsupported model: {normalized_model}")
+        _runtime_llm_model = normalized_model
+    if health_max_tokens is not None:
+        _runtime_health_max_tokens = _coerce_health_max_tokens(health_max_tokens)
+    return get_ai_runtime_settings()
 
 
 async def _create_chat_completion(**kwargs):
     last_error = None
+    kwargs["model"] = _runtime_llm_model
     for attempt in range(LLM_MAX_ATTEMPTS):
         try:
             return await client.chat.completions.create(**kwargs)
@@ -31,12 +79,35 @@ async def _create_chat_completion(**kwargs):
                 break
             logger.warning(
                 "LLM request failed, retrying",
-                extra={"attempt": attempt + 1, "max_attempts": LLM_MAX_ATTEMPTS, "model": kwargs.get("model")},
+                extra={"attempt": attempt + 1, "max_attempts": LLM_MAX_ATTEMPTS, "model": _runtime_llm_model},
             )
             await asyncio.sleep(LLM_RETRY_DELAY * (attempt + 1))
     if last_error is None:
         raise RuntimeError("LLM request failed without an SDK error")
     raise last_error
+
+
+async def dm_health_check() -> dict:
+    """Perform a tiny non-story LLM request for title-screen readiness checks."""
+    settings = get_ai_runtime_settings()
+    try:
+        completion = await asyncio.wait_for(
+            _create_chat_completion(
+                messages=[
+                    {"role": "system", "content": "你是服务健康检查。只回复 OK。"},
+                    {"role": "user", "content": "请回复 OK。"},
+                ],
+                temperature=0,
+                max_tokens=settings["health_max_tokens"],
+                stream=False,
+            ),
+            timeout=12,
+        )
+        text = (completion.choices[0].message.content if completion.choices else "") or ""
+        return {"ok": bool(text.strip()), "reply": text.strip()[:32], **settings}
+    except Exception as error:
+        logger.warning("LLM health check failed: %s", error)
+        return {"ok": False, "error": error.__class__.__name__, **settings}
 
 TOOLS = [
     {

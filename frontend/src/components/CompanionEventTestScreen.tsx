@@ -271,7 +271,7 @@ function SideEventStatusPanel({
 export function CompanionEventTestScreen({
   onBack,
   onComplete,
-  eventId = 'block_echo_forest',
+  eventId = 'ailin_wounded_names',
   initialTrust = 55,
   playerName = '玩家',
   returnLabel = '返回测试',

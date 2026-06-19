@@ -22,6 +22,7 @@ export interface BattlePrepSelectionContext {
 const MANAGED_ENCOUNTERS = new Set([
   'tutorial-crawler-ambush',
   'blue-shoal',
+  'bone-pillar-wetland',
   'boss-gatekeeper',
 ]);
 

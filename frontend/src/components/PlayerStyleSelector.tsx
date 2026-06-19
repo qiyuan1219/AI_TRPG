@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useId } from 'react';
-import { PLAYER_STYLES, abilityModifier, getPlayerStyleById } from '../data/dndClasses';
+import { PLAYER_STYLES, abilityModifier, formatSignedModifier, getPlayerStyleById } from '../data/dndClasses';
 import type { CharacterPreset } from '../types/game';
 
 interface PlayerStyleSelectorProps {
@@ -164,7 +164,9 @@ export default function PlayerStyleSelector({
                 onClick={() => onSelect(item.id)}
                 className={`class-option ${selectedStyleId === item.id ? 'is-selected' : ''}`}
               >
-                <span className="class-mark">{item.hotkey}</span>
+                <span className="class-mark">
+                  {item.iconPath ? <img src={item.iconPath} alt="" aria-hidden="true" /> : item.hotkey}
+                </span>
                 <span>
                   <strong>{item.name}</strong>
                   <small>{item.summary}</small>
@@ -183,7 +185,7 @@ export default function PlayerStyleSelector({
             <div className="sheet-stats-badge">
               <span className="badge-hp">HP {currentStyle.derived.hp}</span>
               <span className="badge-ac">AC {currentStyle.derived.ac}</span>
-              <span className="badge-initiative">先攻 {abilityModifier(currentStyle.attributes.dex)}</span>
+              <span className="badge-initiative">先攻 {formatSignedModifier(currentStyle.derived.initiativeModifier)}</span>
             </div>
           </div>
 

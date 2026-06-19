@@ -746,8 +746,8 @@ const SERIN_SIDE_QUEST: CompanionSideQuestDef = {
 
 export const COMPANION_SIDE_QUESTS: Record<string, CompanionSideQuestDef> = {
   ailin: AILIN_SIDE_QUEST,
-  brock: BROCK_SIDE_QUEST,
-  kaiya: KAIYA_SIDE_QUEST,
+  // [已停用/归档] brock: BROCK_SIDE_QUEST,
+  // [已停用/归档] kaiya: KAIYA_SIDE_QUEST,
   serin: SERIN_SIDE_QUEST,
 };
 
@@ -790,26 +790,14 @@ export const ACT1_UNDERGROUND_FLOW: FlowStep[] = [
     battleType: 'normal',
     battleId: 'enemy_pack_blue_shoal',
     description: '普通战斗一：蓝伞浅滩遭遇战。',
-    nextOnWin: 'sidequest_brock_echo_grove',
+    nextOnWin: 'post-blue-shoal-aftermath',
     nextOnLose: 'defeat_normal_retry',
   },
-  {
-    id: 'sidequest_brock_echo_grove',
-    type: 'companion_sidequest',
-    companion: 'brock',
-    description: '布洛克识破回声菌林假歌，处理污染菌核。',
-  },
-  {
-    id: 'abandoned_forward_post_intro',
-    type: 'fixed_scene',
-    description: '抵达前线废弃据点，发现失踪远征队痕迹。',
-  },
-  {
-    id: 'sidequest_kaiya_broken_seals',
-    type: 'companion_sidequest',
-    companion: 'kaiya',
-    description: '凯娅调查补给箱封扣和黑市暗道。',
-  },
+  /* [已停用/归档]
+  { id: 'sidequest_brock_echo_grove', ... },
+  { id: 'abandoned_forward_post_intro', ... },
+  { id: 'sidequest_kaiya_broken_seals', ... },
+  */
   {
     id: 'battle_bone_marsh_02',
     type: 'battle',

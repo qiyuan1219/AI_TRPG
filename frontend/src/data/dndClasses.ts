@@ -55,10 +55,11 @@ export const PLAYER_STYLES: CharacterPreset[] = [
     id: 'iron-cable',
     name: '铁缆流',
     hotkey: 'W',
+    iconPath: '/assets/icons/style_selection/01.png',
     tagline: '稳健抗压，适合正面承受风险。',
     summary: '体质与力量较高，血量最高，适合在危险环境中稳定推进。',
     attributes: { str: 15, dex: 10, con: 16, int: 10, wis: 12, cha: 10 },
-    derived: { hp: 45, ac: 13, initiativeModifier: 0 },
+    derived: { hp: 55, ac: 11, initiativeModifier: 0 },
     advantages: ['血量最高', '力量与体质检定稳定', '适合承受危险'],
     limitations: ['先攻较低', '潜行与交涉普通', '解谜与奥术分析不突出'],
     skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
@@ -67,10 +68,11 @@ export const PLAYER_STYLES: CharacterPreset[] = [
     id: 'shadow-step',
     name: '影步流',
     hotkey: 'R',
+    iconPath: '/assets/icons/style_selection/02.png',
     tagline: '敏捷侦察，适合先手行动。',
     summary: '敏捷与感知较高，擅长潜行、侦察、发现陷阱和规避伏击。',
     attributes: { str: 10, dex: 16, con: 12, int: 10, wis: 15, cha: 10 },
-    derived: { hp: 39, ac: 16, initiativeModifier: 3 },
+    derived: { hp: 40, ac: 14, initiativeModifier: 3 },
     advantages: ['先攻最高', '潜行与侦察能力强', '容易发现陷阱和伏击'],
     limitations: ['血量一般', '力量检定普通', '交涉与奥术分析不突出'],
     skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
@@ -79,10 +81,11 @@ export const PLAYER_STYLES: CharacterPreset[] = [
     id: 'arcane-analysis',
     name: '秘析流',
     hotkey: 'M',
+    iconPath: '/assets/icons/style_selection/03.png',
     tagline: '理性分析，适合解谜和识破异常。',
     summary: '智力与感知较高，擅长奥术、历史、机关、异常规则和线索分析。',
     attributes: { str: 8, dex: 12, con: 12, int: 16, wis: 15, cha: 10 },
-    derived: { hp: 39, ac: 14, initiativeModifier: 1 },
+    derived: { hp: 45, ac: 12, initiativeModifier: 1 },
     advantages: ['智力最高', '解谜与奥术检定强', '容易识破异常规则'],
     limitations: ['力量最低', '近身压制和搬运较弱', '交涉能力普通'],
     skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
@@ -91,10 +94,11 @@ export const PLAYER_STYLES: CharacterPreset[] = [
     id: 'resonance',
     name: '共鸣流',
     hotkey: 'C',
+    iconPath: '/assets/icons/style_selection/04.png',
     tagline: '善于共情，适合交涉和建立信任。',
     summary: '魅力最高，兼具一定感知，擅长交涉、安抚、套话和提升 NPC 信任。',
     attributes: { str: 8, dex: 12, con: 12, int: 12, wis: 13, cha: 16 },
-    derived: { hp: 39, ac: 14, initiativeModifier: 1 },
+    derived: { hp: 38, ac: 15, initiativeModifier: 2 },
     advantages: ['魅力最高', '交涉和安抚能力强', '更容易提升 NPC 信任'],
     limitations: ['力量较弱', '硬碰硬能力不突出', '高难度奥术分析不如秘析流'],
     skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
@@ -103,10 +107,11 @@ export const PLAYER_STYLES: CharacterPreset[] = [
     id: 'balanced',
     name: '均衡流',
     hotkey: 'P',
+    iconPath: '/assets/icons/style_selection/05.png',
     tagline: '六维均衡，适合第一次游玩。',
     summary: '没有明显短板，所有检定都有基础表现，适合想体验完整内容的新手。',
     attributes: { str: 12, dex: 12, con: 13, int: 12, wis: 12, cha: 12 },
-    derived: { hp: 39, ac: 14, initiativeModifier: 1 },
+    derived: { hp: 50, ac: 12, initiativeModifier: 1 },
     advantages: ['没有明显短板', '所有检定都有基础加值', '适合体验完整内容'],
     limitations: ['没有极端强项', '高 DC 检定不如专精流派', '战斗和剧情都偏稳但不爆发'],
     skills: { combat: COMMON_COMBAT_SKILLS, nonCombat: COMMON_NON_COMBAT_SKILLS },
@@ -419,15 +424,36 @@ export function abilityModifierValue(value: number) {
   return Math.floor((value - 10) / 2);
 }
 
+export function formatSignedModifier(value: number) {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function getStyleByAttributes(attributes: PlayerAttributes) {
+  return PLAYER_STYLES.find((style) => (
+    style.attributes.str === attributes.str
+    && style.attributes.dex === attributes.dex
+    && style.attributes.con === attributes.con
+    && style.attributes.int === attributes.int
+    && style.attributes.wis === attributes.wis
+    && style.attributes.cha === attributes.cha
+  )) || null;
+}
+
 export function getMaxHp(attributes: PlayerAttributes) {
+  const style = getStyleByAttributes(attributes);
+  if (style) return style.derived.hp;
   return 36 + abilityModifierValue(attributes.con) * 3;
 }
 
 export function getAc(attributes: PlayerAttributes) {
+  const style = getStyleByAttributes(attributes);
+  if (style) return style.derived.ac;
   return 13 + abilityModifierValue(attributes.dex);
 }
 
 export function getInitiativeModifier(attributes: PlayerAttributes) {
+  const style = getStyleByAttributes(attributes);
+  if (style) return style.derived.initiativeModifier;
   return abilityModifierValue(attributes.dex);
 }
 

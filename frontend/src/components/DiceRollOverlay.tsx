@@ -772,28 +772,27 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
             )}
           </motion.div>
         )}
+        {effectRevealed && rerollDecision && (
+          <div className="dice-reroll-actions" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="dice-reroll-confirm" onClick={rerollDecision.onConfirm}>确定</button>
+            {!rerollDecision.rerollUsed && <>
+              <button type="button" disabled={rerollDecision.fictionQuantity <= 0} onClick={rerollDecision.onUseFiction}>
+                {rerollDecision.fictionQuantity > 0 ? `使用虚构骰子（剩余 ${rerollDecision.fictionQuantity}）` : '虚构骰子不足'}
+              </button>
+              <button type="button" disabled={rerollDecision.omniQuantity <= 0} onClick={() => setShowOmniPicker((value) => !value)}>
+                {rerollDecision.omniQuantity > 0 ? `使用万能骰子（剩余 ${rerollDecision.omniQuantity}）` : '万能骰子不足'}
+              </button>
+            </>}
+            {showOmniPicker && !rerollDecision.rerollUsed && (
+              <div className="dice-omni-picker">
+                <span>指定 D20 点数</span>
+                <input type="number" min={1} max={20} value={chosenD20} onChange={(event) => setChosenD20(Number(event.target.value))} />
+                <button type="button" onClick={() => rerollDecision.onUseOmni(chosenD20)}>采用</button>
+              </div>
+            )}
+          </div>
+        )}
       </motion.div>
-
-      {effectRevealed && rerollDecision && (
-        <div className="dice-reroll-actions" onClick={(event) => event.stopPropagation()}>
-          <button type="button" className="dice-reroll-confirm" onClick={rerollDecision.onConfirm}>确定</button>
-          {!rerollDecision.rerollUsed && <>
-            <button type="button" disabled={rerollDecision.fictionQuantity <= 0} onClick={rerollDecision.onUseFiction}>
-              {rerollDecision.fictionQuantity > 0 ? `使用虚构骰子（剩余 ${rerollDecision.fictionQuantity}）` : '虚构骰子不足'}
-            </button>
-            <button type="button" disabled={rerollDecision.omniQuantity <= 0} onClick={() => setShowOmniPicker((value) => !value)}>
-              {rerollDecision.omniQuantity > 0 ? `使用万能骰子（剩余 ${rerollDecision.omniQuantity}）` : '万能骰子不足'}
-            </button>
-          </>}
-          {showOmniPicker && !rerollDecision.rerollUsed && (
-            <div className="dice-omni-picker">
-              <span>指定 D20 点数</span>
-              <input type="number" min={1} max={20} value={chosenD20} onChange={(event) => setChosenD20(Number(event.target.value))} />
-              <button type="button" onClick={() => rerollDecision.onUseOmni(chosenD20)}>采用</button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* 点击继续提示 */}
       {effectRevealed && !rerollDecision && (

@@ -4,7 +4,8 @@ import type { BattleConfig, BattleSkill, BattleUnit, QuickRule } from '../../com
  * Debug / test encounter configuration.
  *
  * This module only contains BattleTestScreen test/tutorial encounter data.
- * Do not treat it as the canonical production encounter registry.
+ * Encounter stats remain debug-only. The ally skill lookup exported at the end is
+ * shared with production encounters so every battle presents the same skill set.
  */
 
 const QUICK_RULES: QuickRule[] = [
@@ -659,7 +660,7 @@ const TUTORIAL_BATTLE_UNITS: BattleUnit[] = [
         name: "盾牌压制",
         resource: "战斗技能",
         source: "职业技能",
-        formula: "STR 运动 DC12；1d4+3 钝击",
+        formula: "STR 运动 DC12；1d4+5 钝击",
         effect: "教学重点：技能检定看 D20 + 对应属性/熟练加值 vs 固定 DC。成功会造成伤害并压低小怪攻势。",
         cooldown: "每回合 1 次",
         rule: "技能检定",
@@ -919,7 +920,7 @@ const TEST_BATTLE_UNITS: BattleUnit[] = [
     resourceProfile: ["攻击", "检定", "治疗"], statuses: ["前排"], traits: ["HP30/AC18"],
     skills: [
       { id: "T1", name: "稳步斩击", resource: "战斗技能", source: "职业技能", formula: "STR+熟练 vs AC；1d8+3", effect: "基础攻击", cooldown: "每回合1次", rule: "攻击检定", roll: { kind: "attack", ability: "str", targetAc: 12, label: "稳步斩击" }, tags: ["攻击"] },
-      { id: "T2", name: "盾牌压制", resource: "战斗技能", source: "职业技能", formula: "STR运动 DC12；1d4+3", effect: "技能检定", cooldown: "每回合1次", rule: "技能检定", roll: { kind: "ability", ability: "str", dc: 12, label: "盾牌压制" }, tags: ["检定"] },
+      { id: "T2", name: "盾牌压制", resource: "战斗技能", source: "职业技能", formula: "STR运动 DC12；1d4+5", effect: "技能检定", cooldown: "每回合1次", rule: "技能检定", roll: { kind: "ability", ability: "str", dc: 12, label: "盾牌压制" }, tags: ["检定"] },
       { id: "T3", name: "回气", resource: "战斗技能", source: "职业技能", formula: "恢复1d8+3", effect: "治疗自身", cooldown: "每战斗1次", rule: "治疗骰", roll: { kind: "healing", dieType: "d8", diceCount: 1, bonus: 3, label: "回气" }, tags: ["治疗"] },
     ], nonCombatSkills: [],
   },
@@ -1056,5 +1057,22 @@ export type BattleDebugMode = "test" | "tutorial" | "side-event";
 
 export function getBattleConfig(mode: BattleDebugMode = "test"): BattleConfig {
   return mode === "tutorial" ? TUTORIAL_BATTLE_CONFIG : TEST_BATTLE_CONFIG;
+}
+
+/**
+ * Keep party abilities identical from the tutorial through every story battle.
+ * Adventurer/Serin use the tutorial definitions; companions use the full-party
+ * definitions because they are recruited after the tutorial encounter.
+ */
+export function getSharedPartySkills(model: string): BattleSkill[] | undefined {
+  const source = model === "adventurer" || model === "selin"
+    ? TUTORIAL_BATTLE_UNITS
+    : TEST_BATTLE_UNITS;
+  const unit = source.find((candidate) => candidate.faction === "ally" && candidate.model === model);
+  return unit?.skills.map((skill) => ({
+    ...skill,
+    roll: { ...skill.roll },
+    tags: [...skill.tags],
+  }));
 }
 

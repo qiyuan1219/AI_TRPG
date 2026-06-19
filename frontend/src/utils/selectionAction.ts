@@ -4,7 +4,7 @@ import { finalizeBattlePrepResult, resolveBattlePrepChoice, useFictionDice, useO
 
 const ATTRIBUTE_BY_LABEL: Record<string, 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'> = {
   力量: 'str', 敏捷: 'dex', 体质: 'con', 耐受: 'con', 智力: 'int', 调查: 'int', 奥秘: 'int',
-  感知: 'wis', 观察: 'wis', 洞察: 'wis', 生存: 'wis', 医疗: 'wis', 魅力: 'cha', 说服: 'cha', 威吓: 'cha', 欺瞒: 'cha',
+  感知: 'wis', 观察: 'wis', 洞察: 'wis', 生存: 'wis', 医疗: 'wis', 生态: 'wis', 宗教: 'wis', 魅力: 'cha', 说服: 'cha', 威吓: 'cha', 欺瞒: 'cha',
 };
 
 /** 所有非战斗“选择行动”检定的统一领域对象。 */

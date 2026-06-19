@@ -2,6 +2,7 @@
  * 第一幕后半段战斗配置文件
  */
 import type { BattleConfig } from '../components/BattleTestScreen';
+import { getSharedPartySkills } from '../features/battle/battleDebugConfig';
 
 // ============================================================
 // 普通战斗一：蓝伞浅滩遭遇战
@@ -76,49 +77,50 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       nonCombatSkills: [],
     },
     {
-      id: 'crawler-a', name: '孢化爬虫A', faction: 'enemy', role: '蓝伞浅滩污染生物',
-      portrait: '爬', model: 'crawler',
-      hp: 16, maxHp: 16, ac: 13, speed: 25, proficiency: 1,
-      abilities: { str: 12, dex: 13, con: 11, int: 3, wis: 8, cha: 4 },
-      resourceProfile: ['攻击'],
-      statuses: [],
-      traits: ['HP16/AC13'],
-      skills: [
-        { id: 'crawler-a-sting', name: '孢刺触手', resource: '战斗技能', source: '敌方技能', formula: 'DEX+熟练 vs AC；1d6+2穿刺', effect: '触手刺击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'dex', targetAc: 16, label: '孢刺触手' }, tags: ['攻击'] },
-      ],
-      nonCombatSkills: [],
-    },
-    {
-      id: 'crawler-b', name: '孢化爬虫B', faction: 'enemy', role: '蓝伞浅滩污染生物',
-      portrait: '爬', model: 'crawler',
-      hp: 16, maxHp: 16, ac: 13, speed: 25, proficiency: 1,
-      abilities: { str: 12, dex: 13, con: 11, int: 3, wis: 8, cha: 4 },
-      resourceProfile: ['攻击'],
-      statuses: [],
-      traits: ['HP16/AC13'],
-      skills: [
-        { id: 'crawler-b-sting', name: '孢刺触手', resource: '战斗技能', source: '敌方技能', formula: 'DEX+熟练 vs AC；1d6+2穿刺', effect: '触手刺击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'dex', targetAc: 16, label: '孢刺触手' }, tags: ['攻击'] },
-      ],
-      nonCombatSkills: [],
-    },
-    {
-      id: 'mimic', name: '拟声菌团', faction: 'enemy', role: '菌毯拟声诱捕体',
-      portrait: '菌', model: 'crawler',
+      id: 'mimic-a', name: '拟声菌团A', faction: 'enemy', role: '菌毯拟声诱捕体',
+      portrait: '菌', model: 'fungal_mimic', type: 'fungal_mimic',
       hp: 28, maxHp: 28, ac: 14, speed: 20, proficiency: 2,
       abilities: { str: 10, dex: 12, con: 14, int: 6, wis: 12, cha: 8 },
       resourceProfile: ['拟声', '孢尘'],
       statuses: ['模仿呼救'],
       traits: ['HP28/AC14'],
       skills: [
-        { id: 'mimic-lure', name: '拟声诱捕', resource: '战斗技能', source: '敌方技能', formula: 'WIS豁免DC12；1d8+3精神', effect: '精神攻击干扰', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 1, label: '拟声诱捕' }, tags: ['豁免'] },
-        { id: 'mimic-dust', name: '孢粉爆发', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC12；1d6+2毒素', effect: '范围毒素', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 2, label: '孢粉爆发' }, tags: ['豁免'] },
+        { id: 'mimic-a-lure', name: '拟声诱捕', resource: '战斗技能', source: '敌方技能', formula: 'WIS豁免DC12；1d8+3精神', effect: '精神攻击干扰', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 1, label: '拟声诱捕' }, tags: ['豁免'] },
+        { id: 'mimic-a-dust', name: '孢粉爆发', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC12；1d6+2毒素', effect: '范围毒素', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 2, label: '孢粉爆发' }, tags: ['豁免'] },
+      ],
+      nonCombatSkills: [],
+    },
+    {
+      id: 'mimic-b', name: '拟声菌团B', faction: 'enemy', role: '菌毯拟声诱捕体',
+      portrait: '菌', model: 'fungal_mimic', type: 'fungal_mimic',
+      hp: 28, maxHp: 28, ac: 14, speed: 20, proficiency: 2,
+      abilities: { str: 10, dex: 12, con: 14, int: 6, wis: 12, cha: 8 },
+      resourceProfile: ['拟声', '孢尘'],
+      statuses: ['模仿呼救'],
+      traits: ['HP28/AC14'],
+      skills: [
+        { id: 'mimic-b-lure', name: '拟声诱捕', resource: '战斗技能', source: '敌方技能', formula: 'WIS豁免DC12；1d8+3精神', effect: '精神攻击干扰', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 1, label: '拟声诱捕' }, tags: ['豁免'] },
+        { id: 'mimic-b-dust', name: '孢粉爆发', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC12；1d6+2毒素', effect: '范围毒素', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 2, label: '孢粉爆发' }, tags: ['豁免'] },
+      ],
+      nonCombatSkills: [],
+    },
+    {
+      id: 'spore-crawler', name: '孢化爬虫', faction: 'enemy', role: '蓝伞浅滩污染生物',
+      portrait: '爬', model: 'spore_crawler', type: 'spore_crawler',
+      hp: 16, maxHp: 16, ac: 13, speed: 25, proficiency: 1,
+      abilities: { str: 12, dex: 13, con: 11, int: 3, wis: 8, cha: 4 },
+      resourceProfile: ['攻击'],
+      statuses: [],
+      traits: ['HP16/AC13'],
+      skills: [
+        { id: 'spore-crawler-sting', name: '孢刺触手', resource: '战斗技能', source: '敌方技能', formula: 'DEX+熟练 vs AC；1d6+2穿刺', effect: '触手刺击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'dex', targetAc: 16, label: '孢刺触手' }, tags: ['攻击'] },
       ],
       nonCombatSkills: [],
     },
   ],
   quickRules: [
     { title: '蓝伞菌毯', text: '浅滩上的菌盖会随机亮起，站在不稳定菌毯上的角色攻击可能被光晕干扰。' },
-    { title: '目标', text: '击败所有孢化爬虫和拟声菌团即可获胜。' },
+    { title: '目标', text: '击败两只拟声菌团和孢化爬虫即可获胜。' },
   ],
   backgroundUrl: '/assets/battle/battle01.png',
   eyebrow: '普通战斗 · 第一场',
@@ -130,7 +132,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
   initiativeNote: '凯娅最先察觉菌毯下的震动，而布洛克已经将铁锅挡在队伍最前方。',
   winTitle: '击退孢群',
   loseTitle: '被孢粉逼退',
-  winText: '最后一只孢化爬虫被击退，蓝光渐渐稳定下来。布洛克用锅底翻开菌毯确认没有残留威胁。',
+  winText: '最后一只拟声菌团在菌毯上崩散，孢化爬虫也停止抽动。蓝光渐渐稳定下来，布洛克用锅底翻开菌毯确认没有残留威胁。',
   loseText: '孢群的攻势比预料中更猛烈，队伍不得不后撤到安全距离。下次经过这里得准备更充分才行。',
   completeLabel: '继续前进',
 };
@@ -209,7 +211,7 @@ export const BONE_MARSH_BATTLE_CONFIG: BattleConfig = {
     },
     {
       id: 'bone-beast', name: '骨柱孢兽', faction: 'enemy', role: '湿地大型污染生物',
-      portrait: '兽', model: 'crawler',
+      portrait: '兽', model: 'bone_beast',
       hp: 42, maxHp: 42, ac: 15, speed: 25, proficiency: 2,
       abilities: { str: 17, dex: 11, con: 16, int: 4, wis: 10, cha: 5 },
       resourceProfile: ['攻击', '毒素'],
@@ -223,7 +225,7 @@ export const BONE_MARSH_BATTLE_CONFIG: BattleConfig = {
     },
     {
       id: 'lurker-a', name: '泥沼潜伏者A', faction: 'enemy', role: '湿地伏击生物',
-      portrait: '泥', model: 'crawler',
+      portrait: '泥', model: 'mud_lurker',
       hp: 20, maxHp: 20, ac: 14, speed: 20, proficiency: 1,
       abilities: { str: 13, dex: 14, con: 12, int: 3, wis: 9, cha: 4 },
       resourceProfile: ['伏击'],
@@ -236,7 +238,7 @@ export const BONE_MARSH_BATTLE_CONFIG: BattleConfig = {
     },
     {
       id: 'lurker-b', name: '泥沼潜伏者B', faction: 'enemy', role: '湿地伏击生物',
-      portrait: '泥', model: 'crawler',
+      portrait: '泥', model: 'mud_lurker',
       hp: 20, maxHp: 20, ac: 14, speed: 20, proficiency: 1,
       abilities: { str: 13, dex: 14, con: 12, int: 3, wis: 9, cha: 4 },
       resourceProfile: ['伏击'],
@@ -342,7 +344,7 @@ export const BLACKSTONE_GATEKEEPER_BOSS_CONFIG: BattleConfig = {
     },
     {
       id: 'boss-gatekeeper', name: '黑石门卫', faction: 'enemy', role: '第一幕关底Boss',
-      portrait: 'Boss', model: 'crawler',
+      portrait: 'Boss', model: 'gatekeeper',
       hp: 80, maxHp: 80, ac: 17, speed: 20, proficiency: 3,
       abilities: { str: 20, dex: 10, con: 18, int: 6, wis: 14, cha: 8 },
       resourceProfile: ['攻击', '脉冲', '污染'],
@@ -387,5 +389,14 @@ export const BATTLE_CONFIG_MAP: Record<string, BattleConfig> = {
 };
 
 export function getBattleConfigById(battleId: string): BattleConfig | undefined {
-  return BATTLE_CONFIG_MAP[battleId];
+  const config = BATTLE_CONFIG_MAP[battleId];
+  if (!config) return undefined;
+  return {
+    ...config,
+    units: config.units.map((unit) => {
+      if (unit.faction !== 'ally') return { ...unit };
+      const sharedSkills = getSharedPartySkills(unit.model);
+      return sharedSkills ? { ...unit, skills: sharedSkills } : { ...unit };
+    }),
+  };
 }

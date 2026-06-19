@@ -35,6 +35,11 @@ const AVATAR_MAP: Record<string, string> = {
   ailin: '/assets/chibi/ailin/avatar.png',
   kelaiya: '/assets/chibi/kelaiya/avatar.png',
   crawler: '/assets/chibi/crawler/avatar.png',
+  fungal_mimic: '/assets/chibi/fungal_mimic/avatar.png',
+  spore_crawler: '/assets/chibi/spore_crawler/avatar.png',
+  bone_beast: '/assets/chibi/bone_beast/avatar.png',
+  mud_lurker: '/assets/chibi/mud_lurker/avatar.png',
+  gatekeeper: '/assets/chibi/gatekeeper/avatar.png',
 };
 
 /* ===== Q版战斗精灵图映射 ===== */
@@ -45,6 +50,11 @@ const SPRITE_SHEET_MAP: Record<string, string> = {
   ailin: '/assets/chibi/ailin/ailin_chibi_spritesheet.png',
   kelaiya: '/assets/chibi/kelaiya/kelaiya_chibi_spritesheet.png',
   crawler: '/assets/chibi/crawler/crawler_chibi_spritesheet.png',
+  fungal_mimic: '/assets/chibi/fungal_mimic/fungal_mimic_chibi_spritesheet.png',
+  spore_crawler: '/assets/chibi/spore_crawler/spore_crawler_chibi_spritesheet.png',
+  bone_beast: '/assets/chibi/bone_beast/bone_beast_chibi_spritesheet.png',
+  mud_lurker: '/assets/chibi/mud_lurker/mud_lurker_chibi_spritesheet.png',
+  gatekeeper: '/assets/chibi/gatekeeper/gatekeeper_chibi_spritesheet.png',
 };
 
 interface BattleTestScreenProps {
@@ -98,7 +108,7 @@ export interface NonCombatSkill {
   effect: string;
 }
 
-export type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "ailin" | "kelaiya";
+export type BattleModelKey = "adventurer" | "grum" | "lisa" | "talia" | "templar" | "shade" | "selin" | "crawler" | "senluo" | "ailin" | "kelaiya" | "fungal_mimic" | "spore_crawler" | "bone_beast" | "mud_lurker" | "gatekeeper";
 type BattleFxKind = "slash" | "bash" | "pierce" | "fire" | "ice" | "lightning" | "arcane" | "radiant" | "heal" | "fail" | "poison" | "shadow" | "wind" | "earth" | "water" | "shield" | "buff" | "debuff" | "critical";
 
 export interface BattleUnit {
@@ -108,6 +118,7 @@ export interface BattleUnit {
   role: string;
   portrait: string;
   model: BattleModelKey;
+  type?: string;
   hp: number;
   maxHp: number;
   ac: number;
@@ -331,7 +342,8 @@ function formatCombatTextForPlayer(text: string) {
 }
 
 function formatSkillFormulaForPlayer(skill: BattleSkill) {
-  return formatDiceNotation(skill.formula);
+  const concise = formatDamageFormulaForPlayer(skill.formula);
+  return concise && /\d+D\d+/i.test(concise) ? concise : "无伤害";
 }
 
 function formatSkillEffectForPlayer(skill: BattleSkill) {

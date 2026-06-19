@@ -18,6 +18,9 @@ from kp.dm_service import (
     judge_ailin_recruit_answer,
     judge_serlin_self_introduction,
     dm_story_check_narrate,
+    dm_health_check,
+    get_ai_runtime_settings,
+    update_ai_runtime_settings,
 )
 from kp.memory import (
     get_game_memories,
@@ -282,6 +285,11 @@ class ShopConsultRequest(BaseModel):
     stat: str | None = None
 
 
+class AiSettingsRequest(BaseModel):
+    model: str
+    health_max_tokens: int | None = None
+
+
 class SaveGameRequest(BaseModel):
     slot_key: str
     title: str | None = None
@@ -510,6 +518,23 @@ def _fallback_chat_narrative(message: str, state: dict, systems: list[str] | Non
     player = state.get("player_name") or "冒险者"
     area = state.get("current_area") or "当前区域"
     prompt = (message or "").strip()
+    fixed_marker = "【扩展剧情固定结算】"
+    if fixed_marker in prompt:
+        # The frontend has already resolved dice, rewards, trust and state for these
+        # authored nodes. If the LLM stream is empty/interrupted, replay those facts
+        # instead of presenting the generic "局势继续向前推进" placeholder as AI text.
+        fixed_tail = prompt.split(fixed_marker, 1)[1]
+        fixed_lines = []
+        for raw_line in fixed_tail.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            if "骰子与状态已经由系统结算" in line or "请严格依据以下事实续写" in line:
+                continue
+            fixed_lines.append(line)
+        if fixed_lines:
+            return "\n".join(fixed_lines)
+
     action_line = f"你刚才选择了：{prompt}" if prompt else "你停下脚步，重新整理眼前的局势。"
     dice_line = _dice_summary_from_systems(systems)
     result_line = (
@@ -1112,3 +1137,37 @@ async def judge_advantage(req: AdvantageRequest):
 @router_dnd.get("/health")
 async def health():
     return {"status": "ok", "game": "D&D 鍦板績涔嬮棬"}
+
+
+@router_dnd.get("/ai/health")
+async def ai_health():
+    result = await dm_health_check()
+    if not result.get("ok"):
+        return {
+            "ok": False,
+            "status": "unavailable",
+            "message": "AI 大模型当前无法正常返回文本，请检查后端模型配置或网络状态。",
+            "error": result.get("error", "LLMUnavailable"),
+            "model": result.get("model"),
+            "health_max_tokens": result.get("health_max_tokens"),
+        }
+    return {
+        "ok": True,
+        "status": "ok",
+        "message": "AI 大模型连接正常，可以开始跑团。",
+        "model": result.get("model"),
+        "health_max_tokens": result.get("health_max_tokens"),
+    }
+
+
+@router_dnd.get("/ai/settings")
+async def ai_settings():
+    return get_ai_runtime_settings()
+
+
+@router_dnd.post("/ai/settings")
+async def update_ai_settings(req: AiSettingsRequest):
+    try:
+        return update_ai_runtime_settings(req.model, req.health_max_tokens)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error

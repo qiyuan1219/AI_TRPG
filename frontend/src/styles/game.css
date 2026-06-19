@@ -308,25 +308,28 @@
 
 .adventurer-name-field {
   display: grid;
-  grid-template-columns: auto minmax(220px, 360px);
+  grid-template-columns: 150px minmax(260px, 432px);
   align-items: center;
   gap: 12px;
   margin-top: 14px;
   color: var(--gold-soft);
   font-weight: 800;
+  max-width: 600px;
 }
 
 .adventurer-name-field input {
   width: 100%;
-  border: 1px solid rgba(231, 211, 161, 0.28);
+  border: 1px solid rgba(239, 213, 140, 0.58);
   border-radius: 9px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.045);
+  padding: 12px 14px;
+  background: linear-gradient(180deg, rgba(239, 213, 140, 0.12), rgba(95, 183, 167, 0.075));
   color: #f5ecd8;
   outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 246, 210, 0.04), 0 10px 24px rgba(0, 0, 0, 0.2);
 }
 
-.adventurer-name-field input:focus { border-color: rgba(95, 183, 167, 0.8); box-shadow: 0 0 0 2px rgba(95, 183, 167, 0.14); }
+.adventurer-name-field input::placeholder { color: rgba(245, 236, 216, 0.68); font-weight: 800; }
+.adventurer-name-field input:focus { border-color: rgba(95, 183, 167, 0.95); box-shadow: 0 0 0 2px rgba(95, 183, 167, 0.22), 0 12px 28px rgba(0, 0, 0, 0.24); }
 .start-button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .class-option {
@@ -353,10 +356,28 @@
 }
 
 .class-mark {
-  font-size: 1.4rem;
-  width: 32px;
-  text-align: center;
+  width: 63px;
+  height: 63px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   flex-shrink: 0;
+  background: rgba(239, 213, 140, 0.08);
+  border: 1px solid rgba(239, 213, 140, 0.18);
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.28);
+}
+
+.class-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.class-option.is-selected .class-mark {
+  border-color: rgba(95, 183, 167, 0.62);
+  box-shadow: 0 0 18px rgba(95, 183, 167, 0.18), inset 0 0 16px rgba(0, 0, 0, 0.32);
 }
 
 .class-option strong {
@@ -639,12 +660,65 @@
   left: 20px;
   right: auto;
   z-index: 6;
+  width: 196px;
+  max-width: calc(100% - 40px);
+  transition: width 0.22s ease, transform 0.22s ease;
+}
+
+.game-top-actions.is-collapsed {
+  width: 34px;
+}
+
+.game-sidebar-actions {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
   width: 180px;
-  max-width: calc(100% - 40px);
+  padding: 10px 8px;
+  border: 1px solid rgba(214, 168, 90, 0.22);
+  border-radius: 12px;
+  background: rgba(12, 10, 8, 0.18);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(10px);
+  transform-origin: left center;
+  transition: opacity 0.18s ease, transform 0.22s ease, pointer-events 0.18s ease;
+}
+
+.game-top-actions.is-collapsed .game-sidebar-actions {
+  opacity: 0;
+  transform: translateX(-16px) scaleX(0.72);
+  pointer-events: none;
+}
+
+.game-sidebar-toggle {
+  position: absolute;
+  top: 10px;
+  right: -18px;
+  z-index: 2;
+  width: 28px;
+  height: 58px;
+  border: 1px solid rgba(214, 168, 90, 0.46);
+  border-radius: 0 12px 12px 0;
+  background: rgba(42, 33, 27, 0.86);
+  color: var(--gold-soft);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.game-sidebar-toggle span {
+  display: block;
+  font-size: 1.6rem;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.game-sidebar-toggle:hover {
+  border-color: rgba(239, 213, 140, 0.68);
+  background: rgba(214, 168, 90, 0.24);
 }
 
 .game-log-btn,
@@ -708,6 +782,10 @@
   font-size: 1rem;
   font-weight: 700;
   color: var(--gold-soft);
+}
+
+.game-top-actions.is-collapsed .game-inventory-entry .inventory-panel-popover {
+  display: none;
 }
 
 /* 背包/角色按钮位置与环境已由上方统一按钮样式接管 */
@@ -1441,9 +1519,12 @@
   border-color: rgba(159, 128, 218, 0.82);
 }
 
-.rarity-key,
-.rarity-quest {
+.rarity-key {
   border-color: rgba(214, 168, 90, 0.9);
+}
+
+.rarity-quest {
+  border-color: rgba(201, 92, 92, 0.9);
 }
 
 .inventory-slot.rarity-common,
@@ -2203,29 +2284,77 @@
 }
 
 .opening-action-tutorial-card header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   padding: 18px 18px 0;
 }
 
 .opening-action-tutorial-card header span {
-  display: inline-grid;
-  place-items: center;
-  min-width: 58px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid rgba(95, 183, 167, 0.42);
-  border-radius: 6px;
-  background: rgba(95, 183, 167, 0.12);
+  display: inline-block;
+  padding: 0;
   color: var(--teal);
   font-family: Consolas, monospace;
   font-size: 0.8rem;
   font-weight: 900;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+}
+
+.trust-change-toast {
+  position: fixed;
+  top: 92px;
+  right: 392px;
+  z-index: 92;
+  display: grid;
+  grid-template-columns: 48px minmax(150px, 1fr);
+  align-items: center;
+  gap: 11px;
+  width: min(270px, calc(100vw - 32px));
+  padding: 10px 12px;
+  border: 1px solid rgba(95, 183, 167, 0.48);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(17, 27, 29, 0.96), rgba(22, 20, 18, 0.97));
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.44), inset 3px 0 0 rgba(95, 183, 167, 0.72);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.trust-change-toast.is-negative {
+  border-color: rgba(196, 91, 91, 0.52);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.44), inset 3px 0 0 rgba(196, 91, 91, 0.78);
+}
+
+.trust-change-toast img {
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(231, 211, 161, 0.24);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.24);
+  object-fit: cover;
+  object-position: top center;
+}
+
+.trust-change-toast div { display: grid; gap: 2px; }
+.trust-change-toast span { color: var(--teal); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; }
+.trust-change-toast strong { color: var(--gold-soft); font-size: 0.98rem; }
+.trust-change-toast strong b { margin-left: 4px; color: #8edfcf; }
+.trust-change-toast.is-negative strong b { color: #e69a9a; }
+.trust-change-toast small { color: var(--muted); font-size: 0.74rem; }
+
+@media (max-width: 720px) {
+  .trust-change-toast { top: 128px; right: 12px; }
+}
+
+@media (min-width: 721px) and (max-width: 1080px) {
+  .trust-change-toast { top: 146px; right: 24px; }
 }
 
 .opening-action-tutorial-card header button {
+  position: absolute;
+  right: 0;
   width: 30px;
   min-height: 30px;
   padding: 0;
@@ -2408,6 +2537,19 @@
 .vn-choice-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.vn-choice-btn.is-choice-disabled {
+  border-color: rgba(231, 211, 161, 0.14);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.vn-choice-btn small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 
 .vn-choice-custom {

@@ -25,4 +25,24 @@ describe('story reward diff', () => {
     expect(collectRewardNotices({ gold: 10 }, { gold: 20 }, () => 1)).toEqual([]);
     expect(collectRewardNotices({ inventory: '长剑' }, { inventory: '长剑' }, () => 1)).toEqual([]);
   });
+
+  it('creates a compact notice for every companion trust change', () => {
+    let id = 0;
+    const notices = collectRewardNotices(
+      { se_trust: 50, al_trust: 50, sl_trust: 50, kl_trust: 50 },
+      { se_trust: 53, al_trust: 48, sl_trust: 50, kl_trust: 54 },
+      () => ++id,
+    );
+
+    expect(notices.map(({ kind, name, delta, value }) => ({ kind, name, delta, value }))).toEqual([
+      { kind: 'trust', name: '瑟琳', delta: 3, value: 53 },
+      { kind: 'trust', name: '艾琳', delta: -2, value: 48 },
+      { kind: 'trust', name: '凯娅', delta: 4, value: 54 },
+    ]);
+    expect(notices.map((notice) => notice.image)).toEqual([
+      '/assets/chibi/selin/avatar.png',
+      '/assets/chibi/ailin/avatar.png',
+      '/assets/chibi/kelaiya/avatar.png',
+    ]);
+  });
 });

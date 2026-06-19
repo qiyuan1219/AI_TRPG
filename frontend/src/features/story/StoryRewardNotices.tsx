@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getItemSummaryByName, resolveItemIconPath } from '../../data/itemIconPaths';
 import type { RewardNotice, RewardNoticeKind } from './storyRewardDiff';
 
 function rewardNoticeLabel(kind: RewardNoticeKind) {
+  if (kind === 'trust') return '伙伴信任';
   if (kind === 'document') return '获得档案';
   if (kind === 'clue') return '记录线索';
   return '获得物品';
@@ -13,9 +15,39 @@ export interface StoryRewardNoticesProps {
   onDismiss: (id: number) => void;
 }
 
+function TrustNotice({ notice, onDismiss }: { notice: RewardNotice; onDismiss: (id: number) => void }) {
+  useEffect(() => {
+    const timer = window.setTimeout(() => onDismiss(notice.id), 7600);
+    return () => window.clearTimeout(timer);
+  }, [notice.id, onDismiss]);
+
+  const delta = Number(notice.delta || 0);
+  return (
+    <motion.aside
+      key={notice.id}
+      className={`trust-change-toast ${delta >= 0 ? 'is-positive' : 'is-negative'}`}
+      role="status"
+      initial={{ opacity: 0, x: 28, y: -8 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      exit={{ opacity: 0, x: 24 }}
+      onClick={() => onDismiss(notice.id)}
+    >
+      <img src={notice.image} alt="" />
+      <div>
+        <span>伙伴信任</span>
+        <strong>{notice.name} <b>{delta > 0 ? '+' : ''}{delta}</b></strong>
+        <small>当前信任 {notice.value}</small>
+      </div>
+    </motion.aside>
+  );
+}
+
 export function StoryRewardNotices({ notices, onDismiss }: StoryRewardNoticesProps) {
   const notice = notices[0];
   if (!notice) return null;
+  if (notice.kind === 'trust') {
+    return <AnimatePresence mode="wait"><TrustNotice notice={notice} onDismiss={onDismiss} /></AnimatePresence>;
+  }
 
   return (
     <AnimatePresence mode="wait">

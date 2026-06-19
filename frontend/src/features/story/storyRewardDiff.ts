@@ -1,8 +1,9 @@
 import { getItemSummaryByName, resolveItemIconPath } from '../../data/itemIconPaths';
 import type { GameState } from '../../types/game';
+import { getCompanionTrust } from '../../utils/trust';
 import { inventoryCounts } from '../inventory/inventoryStatePatch';
 
-export type RewardNoticeKind = 'item' | 'document' | 'clue';
+export type RewardNoticeKind = 'item' | 'document' | 'clue' | 'trust';
 export interface RewardNotice {
   id: number;
   kind: RewardNoticeKind;
@@ -11,6 +12,8 @@ export interface RewardNotice {
   image: string;
   quantity?: number;
   summary?: string;
+  delta?: number;
+  value?: number;
 }
 
 function rewardEntryId(entry: unknown) {
@@ -25,6 +28,29 @@ export function collectRewardNotices(
   nextId: () => number,
 ): RewardNotice[] {
   const notices: RewardNotice[] = [];
+  const companions = [
+    { id: 'serin' as const, name: '瑟琳', image: '/assets/chibi/selin/avatar.png' },
+    { id: 'ailin' as const, name: '艾琳', image: '/assets/chibi/ailin/avatar.png' },
+    { id: 'brock' as const, name: '布洛克', image: '/assets/chibi/senluo/avatar.png' },
+    { id: 'kaiya' as const, name: '凯娅', image: '/assets/chibi/kelaiya/avatar.png' },
+  ];
+
+  companions.forEach((companion) => {
+    const before = getCompanionTrust(previous, companion.id);
+    const value = getCompanionTrust(next, companion.id);
+    const delta = value - before;
+    if (!delta) return;
+    notices.push({
+      id: nextId(),
+      kind: 'trust',
+      name: companion.name,
+      icon: 'trust',
+      image: companion.image,
+      delta,
+      value,
+      summary: `${companion.name}信任${delta > 0 ? '提升' : '下降'} ${Math.abs(delta)} 点`,
+    });
+  });
   const prevInventory = inventoryCounts(String(previous.inventory || ''));
   const nextInventory = inventoryCounts(String(next.inventory || ''));
 
@@ -72,5 +98,5 @@ export function collectRewardNotices(
     });
   });
 
-  return notices.slice(0, 5);
+  return notices.slice(0, 10);
 }

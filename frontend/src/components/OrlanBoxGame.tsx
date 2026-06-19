@@ -157,7 +157,7 @@ function GameTutorialPrompt({
   );
 }
 
-export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
+export function OrlanBoxGame({ gold, onComplete }: OrlanBoxGameProps) {
   const [drawCount, setDrawCount] = useState(0);
   const [totalCost, setTotalCost] = useState(0);
   const [hasDiamond, setHasDiamond] = useState(false);
@@ -298,9 +298,6 @@ export function OrlanBoxGame({ gold, onBack, onComplete }: OrlanBoxGameProps) {
           <div className="orlan-box-actions">
             <button type="button" onClick={() => setTutorialStep(0)}>
               规则
-            </button>
-            <button type="button" onClick={onBack}>
-              返回
             </button>
           </div>
         </header>

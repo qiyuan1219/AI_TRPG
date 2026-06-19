@@ -21,6 +21,7 @@ export type BattlePrepResultType = 'success' | 'failed' | 'greatSuccess';
  *
  * 禁止恢复旧版 3 次战前行动逻辑。
  */
+import { buildTrustPatch, getCompanionTrust } from './trust';
 export const BATTLE_PREP_ACTION_LIMIT = 1;
 
 export type BattlePrepPhase =
@@ -92,6 +93,9 @@ export interface BattlePrepChoice {
 export interface BattlePrepEffect {
   flags?: Record<string, boolean>;
   battleEffects?: Record<string, any>;
+  statePatch?: Record<string, any>;
+  scoreDeltas?: Record<string, number>;
+  trustDeltas?: Partial<Record<'serin' | 'ailin' | 'brock' | 'kaiya', number>>;
 }
 
 export interface BattlePrepRoll {
@@ -514,6 +518,7 @@ export function applyBattlePrepEffect(
   const prepDoneFlag = options.prepDoneFlag || 'blue_shoal_battle_prep_done';
   const nextState = {
     ...state,
+    ...(result.effect?.statePatch || {}),
     flags: {
       ...(state.flags || {}),
       ...(result.effect?.flags || {}),
@@ -527,6 +532,16 @@ export function applyBattlePrepEffect(
     nextAfterBattleSceneId: options.afterSceneId || state.nextAfterBattleSceneId,
     encounterPhase: 'aiNarration',
   };
+
+  Object.entries(result.effect?.scoreDeltas || {}).forEach(([key, delta]) => {
+    nextState[key] = Number(state[key] || 0) + Number(delta || 0);
+  });
+
+  const trustTargets: Record<string, number> = {};
+  Object.entries(result.effect?.trustDeltas || {}).forEach(([companion, delta]) => {
+    trustTargets[companion] = Math.max(0, Math.min(100, getCompanionTrust(nextState, companion as 'serin' | 'ailin' | 'brock' | 'kaiya') + Number(delta || 0)));
+  });
+  if (Object.keys(trustTargets).length) Object.assign(nextState, buildTrustPatch(nextState, trustTargets));
 
   const currentBattleEffects = state.battleEffects || {};
   const incomingBattleEffects = result.effect?.battleEffects || {};

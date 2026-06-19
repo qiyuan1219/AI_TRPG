@@ -14,6 +14,8 @@ export interface ActionSuggestion {
   id: string;
   label: string;
   text: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export interface DocumentSection {
@@ -147,6 +149,7 @@ export interface CharacterPreset {
   id: string;
   name: string;
   hotkey: string;
+  iconPath?: string;
   tagline: string;
   summary: string;
   attributes: PlayerAttributes;

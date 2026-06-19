@@ -1,0 +1,109 @@
+.act1-ending-summary {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 32px;
+  color: #eadcae;
+  background: #020304;
+  font-family: inherit;
+}
+
+.act1-ending-summary__glow {
+  position: absolute;
+  width: min(70vw, 900px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(84, 151, 143, 0.13), transparent 66%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.act1-ending-summary__card {
+  position: relative;
+  width: min(760px, 92vw);
+  padding: 52px 58px 46px;
+  text-align: center;
+  border: 1px solid rgba(213, 178, 89, 0.34);
+  background: linear-gradient(180deg, rgba(14, 18, 20, 0.92), rgba(4, 6, 7, 0.96));
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.8), inset 0 0 60px rgba(79, 141, 132, 0.04);
+  animation: act1-ending-enter 900ms ease both;
+}
+
+.act1-ending-summary__eyebrow,
+.act1-ending-summary__achieved {
+  margin: 0;
+  color: #69b9ad;
+  font-size: 0.82rem;
+  letter-spacing: 0.28em;
+}
+
+.act1-ending-summary h1 {
+  margin: 18px 0;
+  color: #f1d98b;
+  font-size: clamp(2.5rem, 7vw, 4.6rem);
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+}
+
+.act1-ending-summary__rule {
+  width: 120px;
+  height: 1px;
+  margin: 0 auto 28px;
+  background: linear-gradient(90deg, transparent, #c89d43, transparent);
+}
+
+.act1-ending-summary__achieved {
+  color: #bfa45f;
+  letter-spacing: 0.16em;
+}
+
+.act1-ending-summary h2 {
+  margin: 12px 0 24px;
+  color: #f3e5bd;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 600;
+}
+
+.act1-ending-summary__copy {
+  color: rgba(236, 230, 210, 0.82);
+  font-size: 1.05rem;
+  line-height: 1.9;
+}
+
+.act1-ending-summary__copy p {
+  margin: 0;
+}
+
+.act1-ending-summary button {
+  margin-top: 34px;
+  padding: 13px 32px;
+  color: #17120a;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border: 1px solid #e2bd64;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #e0bd62, #a9771c);
+  box-shadow: 0 8px 28px rgba(179, 126, 29, 0.22);
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.act1-ending-summary button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-2px);
+}
+
+@keyframes act1-ending-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .act1-ending-summary { padding: 16px; }
+  .act1-ending-summary__card { padding: 38px 22px 34px; }
+  .act1-ending-summary__copy { font-size: 0.95rem; }
+}

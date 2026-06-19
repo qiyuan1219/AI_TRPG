@@ -153,7 +153,61 @@ function formatStateChange(change: Record<string, any>) {
 }
 
 function applyStateChange(state: GameState, change: Record<string, any>): GameState {
-  if (change.type === 'snapshot') return { ...(change.state || state) };
+  if (change.type === 'snapshot') {
+    const snapshot = change.state && typeof change.state === 'object' ? change.state : {};
+    const preserveExpandedStory = Boolean(state.postBlueShoalExpandedStarted);
+    // 后端快照只包含后端认识的字段。直接替换会把前端剧情节点、调查次数和
+    // “蓝伞浅滩后扩展”标记一起删掉，随后界面只能按区域名退回旧 fallback。
+    // 快照在这里必须是增量合并；几个由前后端共同维护的对象也要保留本地扩展字段。
+    const merged: GameState = {
+      ...state,
+      ...snapshot,
+      flags: {
+        ...(preserveExpandedStory ? snapshot.flags : state.flags || {}),
+        ...(preserveExpandedStory ? state.flags : snapshot.flags || {}),
+      },
+      relationships: {
+        ...(preserveExpandedStory ? snapshot.relationships : state.relationships || {}),
+        ...(preserveExpandedStory ? state.relationships : snapshot.relationships || {}),
+      },
+      companionTrust: {
+        ...(preserveExpandedStory ? snapshot.companionTrust : state.companionTrust || {}),
+        ...(preserveExpandedStory ? state.companionTrust : snapshot.companionTrust || {}),
+      },
+      questLog: {
+        ...(preserveExpandedStory ? snapshot.questLog : state.questLog || {}),
+        ...(preserveExpandedStory ? state.questLog : snapshot.questLog || {}),
+      },
+      sceneState: {
+        ...(preserveExpandedStory ? snapshot.sceneState : state.sceneState || {}),
+        ...(preserveExpandedStory ? state.sceneState : snapshot.sceneState || {}),
+      },
+    };
+
+    if (preserveExpandedStory) {
+      // 本地规则先结算，随后才发起 AI 续写；此时后端推来的 snapshot 可能比
+      // 本地慢一拍。扩展主线的路由、调查记录与本地奖励必须以当前前端状态为准。
+      [
+        'currentNodeId',
+        'current_area',
+        'postBlueShoalExpandedStarted',
+        'blueShoalInvestigationActions',
+        'boneMarshActions',
+        'expeditionCampActions',
+        'fortressInnerActions',
+        'inventory',
+        'documents',
+        'clues',
+      ].forEach((key) => {
+        if (key in state) merged[key] = state[key];
+      });
+      Object.keys(state).forEach((key) => {
+        if (key.startsWith('choice_') || key.startsWith('node_')) merged[key] = state[key];
+      });
+    }
+
+    return merged;
+  }
 
   let next = { ...state };
 

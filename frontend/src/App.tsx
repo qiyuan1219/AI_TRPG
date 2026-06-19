@@ -14,6 +14,14 @@ import { resolveSpeakerName } from './data/characterRegistry';
 import { resolveDndScene } from './data/dndScenes';
 import { getAc, getInitiativeModifier, getMaxHp, getPlayerStyleById, migrateClassToStyleState } from './data/dndClasses';
 import { getScriptedScene, matchScriptedScene, type ScriptedScene } from './data/scriptedScenes';
+import {
+  getBoneMarshPrepActions,
+  getGatekeeperPrepActions,
+  getPostBlueShoalHintState,
+  getPostBlueShoalHints,
+  POST_BLUE_SHOAL_IDS,
+  resolvePostBlueShoalAction,
+} from './data/postBlueShoalStory';
 import { getBattleConfigById } from './data/battleConfigs';
 import {
   canShowPrepChoice,
@@ -27,7 +35,7 @@ import { BATTLE_PREP_ACTION_LIMIT, createBattlePrepFlowState, evaluateCondition,
 import { getEndingFeedback } from './data/companionSideQuests';
 import type { StoryTestCheckpoint } from './data/storyTestCheckpoints';
 import { shopItems } from './data/shopItems';
-import { fetchStoryCheckNarration, judgeAilinRecruitAnswer, judgeSerlinIntro, listSaves, loadGame, patchGameState, saveGame } from './services/api';
+import { checkAiHealth, fetchStoryCheckNarration, getAiSettings, judgeAilinRecruitAnswer, judgeSerlinIntro, listSaves, loadGame, patchGameState, saveGame, updateAiSettings } from './services/api';
 import { dndRuntime } from './services/dndRuntime';
 import type {
   ActionSuggestion,
@@ -48,8 +56,9 @@ import { AppModals } from './features/app/AppModals';
 import { AppTopActions } from './features/app/AppTopActions';
 import { SaveLoadBinding } from './features/save/SaveLoadBinding';
 import { StoryRewardNotices } from './features/story/StoryRewardNotices';
+import { Act1EndingSummary } from './features/story/Act1EndingSummary';
 import { collectRewardNotices, type RewardNotice } from './features/story/storyRewardDiff';
-import { addInventoryQuantity, appendUniqueInventoryItem, buildInventoryStatePatch } from './features/inventory/inventoryStatePatch';
+import { addInventoryQuantity, buildInventoryStatePatch } from './features/inventory/inventoryStatePatch';
 import { buildApothecaryFarewellInventory, buildApothecaryPurchasePatch, buildBargainPurchasePatch } from './features/shop/shopFlow';
 import { buildYunlingBonusInventory, resolveOrlanCompletion, type OrlanBoxResult } from './features/minigames/blackMarketDrawFlow';
 import { buildSaveSnapshot, normalizePersistedGameState } from './features/save/saveSnapshot';
@@ -66,17 +75,7 @@ import {
   resolveBattlePrepSelectionConfig,
 } from './features/battlePrep/BattlePrepSelectionController';
 import {
-  ACT1_ITEM_NAMES,
   ACT1_SCENE_IDS,
-  buildAct1EndingPatch,
-  buildCompressedAct1StartPatch,
-  buildLainChoicePatch,
-  buildSerinCrackPatch,
-  ENABLE_COMPRESSED_ACT1_ENDING,
-  resolveAct1EndingId,
-  type Act1CoreChoice,
-  type LainChoice,
-  type SerinCrackChoice,
 } from './features/story/act1CompressedEnding';
 
 
@@ -85,6 +84,7 @@ const TitleMenu = lazy(() => import('./components/TitleMenu').then((module) => (
 const LoadGameScreen = lazy(() => import('./components/LoadGameScreen').then((module) => ({ default: module.LoadGameScreen })));
 const TestScreen = lazy(() => import('./components/TestScreen').then((module) => ({ default: module.TestScreen })));
 const BattleTestScreen = lazy(() => import('./components/BattleTestScreen').then((module) => ({ default: module.BattleTestScreen })));
+const GalleryScreen = lazy(() => import('./features/gallery/GalleryScreen').then((module) => ({ default: module.GalleryScreen })));
 const CompanionEventTestScreen = lazy(() => import('./components/CompanionEventTestScreen').then((module) => ({ default: module.CompanionEventTestScreen })));
 const BargainTestScreen = lazy(() => import('./components/BargainTestScreen').then((module) => ({ default: module.BargainTestScreen })));
 const DrinkingDiceGame = lazy(() => import('./components/DrinkingDiceGame').then((module) => ({ default: module.DrinkingDiceGame })));
@@ -98,7 +98,7 @@ function LazyBoundary({ children }: { children: ReactNode }) {
   return <Suspense fallback={<LoadingScreen />}>{children}</Suspense>;
 }
 
-type Screen = 'main-menu' | 'load-game' | 'test' | 'loading' | 'game' | 'tutorial-battle' | 'companion-event' | 'deep-battle';
+type Screen = 'main-menu' | 'load-game' | 'gallery' | 'test' | 'loading' | 'game' | 'tutorial-battle' | 'companion-event' | 'deep-battle';
 type GamePhase = 'narrating' | 'action';
 
 function storyCheckDiceResult(roll: { d20: number; modifier: number; total: number; dc: number; skill: string }): DiceResult {
@@ -112,6 +112,14 @@ const AUDIO_STORAGE_KEYS = {
   bgmVolume: 'dnd_bgm_volume',
   sfxVolume: 'dnd_sfx_volume',
 };
+
+const AI_STORAGE_KEYS = {
+  model: 'dnd_ai_model',
+  healthMaxTokens: 'dnd_ai_health_max_tokens',
+};
+
+const AI_MODEL_OPTIONS = ['deepseek-chat', 'deepseek-reasoner', 'deepseek-v4-pro'];
+const AI_HEALTH_MAX_TOKEN_OPTIONS = [8, 64, 96];
 
 const BGM_TRACK_EVENT = 'dnd-bgm-track';
 
@@ -133,8 +141,25 @@ function readStoredVolume(key: string, fallback: number) {
   return Math.min(1, Math.max(0, stored));
 }
 
+function readStoredAiModel() {
+  if (typeof window === 'undefined') return 'deepseek-chat';
+  const stored = String(window.localStorage.getItem(AI_STORAGE_KEYS.model) || '').trim();
+  return stored || 'deepseek-chat';
+}
+
+function hasStoredAiSettings() {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.localStorage.getItem(AI_STORAGE_KEYS.model));
+}
+
+function readStoredAiHealthMaxTokens() {
+  if (typeof window === 'undefined') return 64;
+  const stored = Number(window.localStorage.getItem(AI_STORAGE_KEYS.healthMaxTokens));
+  return AI_HEALTH_MAX_TOKEN_OPTIONS.includes(stored) ? stored : 64;
+}
+
 function resolveBgmTrack(screen: Screen, currentLine: StoryLine | undefined, state: GameState) {
-  if (screen === 'main-menu') return BGM_TRACKS.title;
+  if (screen === 'main-menu' || screen === 'gallery') return BGM_TRACKS.title;
   if (screen === 'tutorial-battle') return BGM_TRACKS.battleGeneral;
   if (currentLine?.bgm) return currentLine.bgm;
 
@@ -204,6 +229,12 @@ const GUILD_INTEL_NODE_HINTS = [
   '检查委托火漆与公会认证【智力DC10】',
 ];
 
+function getGuildIntelNodeHints(state: GameState) {
+  return hasClue(state, 'expedition_saw_spore_beasts')
+    ? [GUILD_INTEL_NODE_HINTS[0], '追问书记员报告中的孢化地底兽', ...GUILD_INTEL_NODE_HINTS.slice(1)].slice(0, ACTION_OPTION_LIMIT)
+    : GUILD_INTEL_NODE_HINTS;
+}
+
 const AUTO_SAVE_SLOT: SaveSlotKey = 'auto';
 const PHASE_LIMIT_DIRECTIVE = '阶段选择次数已用完。完成本次玩家行动的叙事后，必须立即承接到下一段主线推进，不要继续停留在当前选择阶段，也不要把这条规则写进叙事、任务目标、对话或存档。';
 
@@ -255,6 +286,11 @@ function getDisplayedStyleName(state: GameState) {
 function buildAct1SummaryScene(state: GameState): ScriptedScene {
   const endingTitles: Record<string, string> = {
     'guardian-remains': '守门者仍在',
+    guardian_remains: '守门者仍在',
+    cut_black_root: '斩断黑根',
+    reverse_clock_anchor: '逆钟锚定',
+    forced_seal: '强制暂封',
+    gate_opens: '门缝开启',
     'wounded-through-gate': '带伤者穿门',
     'cold-expedition': '冷静的远征',
     'gate-split-open': '裂门而下',
@@ -262,9 +298,16 @@ function buildAct1SummaryScene(state: GameState): ScriptedScene {
   };
   const endingId = String(state.act1EndingId || state.endingId || 'guardian-remains');
   const endingTitle = endingTitles[endingId] || String(state.act1_ending_title || '地心之门');
-  const choiceSummary = endingId === 'time-reset'
-    ? '黑石根区吞没了这次远征，但裂开的银杖将时间送回起点。失败已经发生，只是无人记得。'
-    : `${state.lainHelped ? '你没有抛下受伤的莱因。' : '你选择让队伍继续承担任务的代价。'}${state.bossCoreChoice === 'destroy' ? '你破坏了核心，强行打开道路。' : '你稳定了核心，保留了封印。'}`;
+  const endingSummaries: Record<string, string> = {
+    guardian_remains: '你们揭开伪造命令，让守门者重新记起职责。地心之门继续关闭，阿格洛恩仍守在门前。',
+    cut_black_root: '你们斩断污染黑根，保住逆穹悬城，也结束了守门者漫长而痛苦的职责。',
+    reverse_clock_anchor: '你们以莱因的记忆和门卫真名建立逆钟锚点，为逆穹悬城争取了寻找真正解法的时间。',
+    forced_seal: '证据不足时，你们选择强制暂封地心之门。城市暂时安全，而真相等待下一次远征。',
+    gate_opens: '封印处置失败，红色孢雨越过门缝。远征结束了，但灾难才刚刚抵达逆穹悬城。',
+    'time-reset': '黑石根区吞没了这次远征，但裂开的银杖将时间送回起点。失败已经发生，只是无人记得。',
+  };
+  const choiceSummary = endingSummaries[endingId]
+    || `${state.lainHelped ? '你没有抛下受伤的莱因。' : '你选择让队伍继续承担任务的代价。'}${state.bossCoreChoice === 'destroy' ? '你破坏了核心，强行打开道路。' : '你稳定了核心，保留了封印。'}`;
   return {
     id: ACT1_SCENE_IDS.summary,
     manualOnly: true,
@@ -284,7 +327,9 @@ function buildAct1SummaryScene(state: GameState): ScriptedScene {
   };
 }
 
-function getEncounterPrepActions(config: EncounterFlowConfig): BattlePrepChoice[] {
+function getEncounterPrepActions(config: EncounterFlowConfig, state: GameState = {}): BattlePrepChoice[] {
+  if (config.encounterId === 'bone-pillar-wetland') return getBoneMarshPrepActions();
+  if (config.encounterId === 'boss-gatekeeper') return getGatekeeperPrepActions(state);
   const introScene = getScriptedScene(config.introSceneId);
   if (Array.isArray(introScene?.battlePrep) && introScene.battlePrep.length) {
     return introScene.battlePrep as BattlePrepChoice[];
@@ -474,17 +519,15 @@ function hasDocument(state: GameState, documentId: string) {
 }
 
 function getForcedCompanionEventId(state: GameState): string | null {
-  if (state.compressedAct1EndingStarted) return null;
+  // [已停用/归档] 压缩主线不再参与同伴事件判断。
+  // if (state.compressedAct1EndingStarted) return null;
   // Ailin's outpost event is offered as a staging action so the player sees the
   // outpost setup before entering her companion event.
-  if (hasStateFlag(state, 'blue_shoal_battle_done', 'completedBlueShoalBattle')
-      && !hasStateFlag(state, 'block_echo_forest_done', 'completedBrockSideQuest')) {
-    return 'block_echo_forest';
-  }
-  if (hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost')
-      && !hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest')) {
-    return 'kaiya_broken_seals';
-  }
+  // [已停用/归档] 凯娅旧支线“少了两个封扣”不再强制触发。
+  // if (hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost')
+  //     && !hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest')) {
+  //   return 'kaiya_broken_seals';
+  // }
   if (state.pre_boss_rest_done && !hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3')) {
     return 'serin_cracked_silver_staff';
   }
@@ -611,9 +654,7 @@ function linearRecruitmentHints(state: GameState): string[] {
         ? ['听萨洛说明三名队友的位置', '领取萨洛的情报卡片', '查看酒馆布告栏【智力DC10】', '和瑟琳讨论远征路线']
         : ['和萨洛玩一局快艇骰子', '先在酒馆里转转再说', '查看酒馆布告栏【智力DC10】'];
     }
-    return hasClue(state, 'expedition_saw_spore_beasts')
-      ? [GUILD_INTEL_NODE_HINTS[0], '追问书记员报告中的孢化地底兽', ...GUILD_INTEL_NODE_HINTS.slice(1)].slice(0, 4)
-      : GUILD_INTEL_NODE_HINTS;
+    return getGuildIntelNodeHints(state);
   }
 
   if (state.salo_intel_done && !state.al_recruited) {
@@ -670,7 +711,7 @@ function linearRecruitmentHints(state: GameState): string[] {
 
   // 云苓商店已开放，尚未完成购买 → 显示入口选项
   if (state.kaiya_recruited && state.yunling_shop_unlocked && state.yunling_met && !state.expedition_registered) {
-    return ['购买药剂', '返回公会登记'];
+    return state.yunling_farewell_done ? ['返回公会登记'] : ['购买药剂', '返回公会登记'];
   }
 
   if (state.kaiya_recruited && !state.expedition_registered) {
@@ -680,24 +721,18 @@ function linearRecruitmentHints(state: GameState): string[] {
   const arrivedSporeOutpost = hasStateFlag(state, 'spore_outpost_reached', 'spore_outpost_arrived', 'arrivedSporeOutpost');
   const ailinSideDone = hasStateFlag(state, 'ailin_wounded_names_done', 'completedAilinSideQuest');
   const blueShoalDone = hasStateFlag(state, 'blue_shoal_battle_done', 'completedBlueShoalBattle');
-  const brockSideDone = hasStateFlag(state, 'block_echo_forest_done', 'completedBrockSideQuest');
-  const forwardPostReached = hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost');
-  const kaiyaSideDone = hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest');
-  const boneMarshDone = hasStateFlag(state, 'bone_marsh_battle_done', 'completedBoneMarshBattle');
   const serinSideDone = hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3');
   const bossDone = hasStateFlag(state, 'boss_defeated', 'bossDefeated');
 
-  if (state.compressedAct1EndingStarted) {
-    if (state.currentNodeId === ACT1_SCENE_IDS.aftermath) return ['沿远征标记前往黑石根区'];
-    if (state.currentNodeId === ACT1_SCENE_IDS.blackRootEntrance) return ['追踪血迹寻找幸存者'];
-    if (state.currentNodeId === ACT1_SCENE_IDS.lain && typeof state.lainHelped !== 'boolean') {
-      return ['救治莱因并带他同行', '先追问莱因发生了什么', '检查莱因的伤势与身份牌', '取走身份牌线索后离开', '无视莱因，继续前进'];
-    }
-    if (state.currentNodeId === ACT1_SCENE_IDS.serinCrack && !state.serinStaffCrackSeen) {
-      return ['安慰瑟琳，要求她先休息', '克制地追问银杖裂痕', '只问这会如何影响任务', '强迫瑟琳说出真相', '要求瑟琳强行继续施法'];
-    }
-    if (state.currentNodeId === ACT1_SCENE_IDS.coreChoice && !state.bossCoreChoice) return ['破坏核心，强行开路', '稳定核心，保留封印'];
+  if (state.postBlueShoalExpandedStarted) {
+    return getPostBlueShoalHints(state) || [];
   }
+
+  /* [已停用/归档] 旧版压缩主线选项提示。
+  if (state.compressedAct1EndingStarted) {
+    ...
+  }
+  */
 
   if (state.expedition_registered && arrivedSporeOutpost && !ailinSideDone && !state.ailin_request_ignored) {
     return ['陪艾琳去伤员棚确认污染情况', '向尼布索要巡逻日志【魅力DC11】', '检查据点补给箱【智力DC12】', '整理阵亡者木牌与伤员名册【智力DC13】'];
@@ -710,21 +745,10 @@ function linearRecruitmentHints(state: GameState): string[] {
     return ['前往蓝伞浅滩', '留意浅滩边缘的巡逻队遗物【感知DC14】', '确认蓝伞浅滩安全路线【感知DC13】', '让艾琳评估队伍污染状态'];
   }
 
-  if (blueShoalDone && !brockSideDone) {
-    return ['跟随布洛克调查回声菌林', '听布洛克解释呼救声规律【感知DC13】', '协助布洛克配置净化粉【感知DC14】', '让艾琳评估菌林污染风险'];
-  }
-
-  if (brockSideDone && !forwardPostReached) {
-    return ['前往前线废弃据点', '调查旧远征标记【智力DC13】', '检查沿途旧路标【智力DC12】', '让布洛克追踪污染痕迹【感知DC13】'];
-  }
-
-  if (forwardPostReached && !kaiyaSideDone) {
-    return ['让凯娅检查少了两个封扣', '识别补给箱中的黑石污染【智力DC14】', '检查补给箱封扣与锁痕【智力DC12】', '让凯娅判断暗道机关【敏捷DC13】'];
-  }
-
-  if (kaiyaSideDone && !boneMarshDone) {
-    return ['前往骨柱湿地', '搜索废弃装备袋中的怪物图鉴【感知DC14】', '确认骨柱湿地的怪物活动【感知DC13】', '追踪拖拽痕迹前往骨柱湿地【感知DC13】'];
-  }
+  /* [已停用/归档] 凯娅旧支线及其后续骨柱湿地入口。
+  if (forwardPostReached && !kaiyaSideDone) { ... }
+  if (kaiyaSideDone && !boneMarshDone) { ... }
+  */
 
   if (state.rhein_encounter_started && typeof state.helpedRhein !== 'boolean') {
     return ['帮助莱因', '记录莱因断片证言【医疗DC12】', '无视莱因，继续前进'];
@@ -754,9 +778,10 @@ interface ActionNodeConfig {
 function getActiveActionNode(state: GameState): ActionNodeConfig | null {
   const area = String(state.current_area || '');
   if (state.guild_registered && !state.salo_intel_done && !area.includes('酒馆')) {
+    const hints = getGuildIntelNodeHints(state);
     return {
       id: 'guild_intel',
-      hints: GUILD_INTEL_NODE_HINTS,
+      hints,
       mainHint: GUILD_INTEL_NODE_HINTS[0],
     };
   }
@@ -817,7 +842,7 @@ function isNodeMainAction(action: string, node: ActionNodeConfig, matchedHint: s
 
 function actionChoiceRouteKey(state: GameState) {
   const area = String(state.current_area || state.currentNodeId || 'unknown');
-  if (state.compressedAct1EndingStarted) return String(state.currentNodeId || 'compressed_act1');
+  // [已停用/归档] if (state.compressedAct1EndingStarted) return String(state.currentNodeId || 'compressed_act1');
   if (state.guild_registered && !state.salo_intel_done) return area.includes('酒馆') ? 'salo_intel_tavern' : 'guild_intel';
   if (state.salo_intel_done && !state.al_recruited) return 'recruit_ailin';
   if (state.al_recruited && !state.brock_recruited) return 'recruit_brock';
@@ -826,10 +851,10 @@ function actionChoiceRouteKey(state: GameState) {
   const atSporeOutpost = hasStateFlag(state, 'spore_outpost_reached', 'spore_outpost_arrived', 'arrivedSporeOutpost');
   if (state.expedition_registered && atSporeOutpost && !hasStateFlag(state, 'ailin_wounded_names_done', 'completedAilinSideQuest')) return 'spore_outpost_ailin';
   if (hasStateFlag(state, 'ailin_wounded_names_done', 'completedAilinSideQuest') && !hasStateFlag(state, 'blue_shoal_battle_done', 'completedBlueShoalBattle')) return 'blue_shoal_route';
-  if (hasStateFlag(state, 'blue_shoal_battle_done', 'completedBlueShoalBattle') && !hasStateFlag(state, 'block_echo_forest_done', 'completedBrockSideQuest')) return 'echo_grove_brock';
-  if (hasStateFlag(state, 'block_echo_forest_done', 'completedBrockSideQuest') && !hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost')) return 'frontline_outpost';
-  if (hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost') && !hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest')) return 'kaiya_seals';
-  if (hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest') && !hasStateFlag(state, 'bone_marsh_battle_done', 'completedBoneMarshBattle')) return 'bone_marsh_route';
+  // [已停用/归档] 布洛克/凯娅旧支线的路线键不再注册。
+  // if (hasStateFlag(state, 'block_echo_forest_done', 'completedBrockSideQuest') && ...) return 'frontline_outpost';
+  // if (hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost') && ...) return 'kaiya_seals';
+  // if (hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest') && ...) return 'bone_marsh_route';
   if (state.rhein_encounter_started && typeof state.helpedRhein !== 'boolean') return 'rhein_choice';
   if (state.pre_boss_rest_done && !hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3')) return 'serin_rest';
   if (hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3') && !hasStateFlag(state, 'boss_defeated', 'bossDefeated')) return 'blackstone_root';
@@ -858,7 +883,9 @@ function getActionChoiceStage(state: GameState, hints: string[]): ActionNodeConf
   if (node) return node;
   if (state.core_choice_pending && !state.bossCoreChoice) return null;
   if (!hints.length) return null;
-  const mainHint = hints[0];
+  const mainHint = hints.find((hint) => (
+    /^(离开蓝伞浅滩|结束调查|结束营地调查|进入第三远征队营地|接近守门者|继续到最终处置选择|乘降渊缆梯|结束第一幕)/.test(hint)
+  )) || hints[0];
   return {
     id: `stage_${actionChoiceRouteKey(state)}`,
     hints,
@@ -871,12 +898,27 @@ function isOpeningChoiceStage(stage: ActionNodeConfig | null) {
   return stage.hints.some((hint) => /裂隙爬兽|观察弱点寻找破绽|请求瑟琳施展辅助法术|闪避并寻找掩护位置/.test(hint));
 }
 
+function isUnlimitedPostBlueShoalStage(state: GameState, stage: ActionNodeConfig | null) {
+  if (!state.postBlueShoalExpandedStarted || !stage) return false;
+  // 这些节点会停留在原地反复调查，直到玩家主动选择固定出口。
+  // 路线选择、莱因处置、夜谈和战前准备等“一选即推进”的节点不在此列。
+  return stage.hints.some((hint) => (
+    /^(离开蓝伞浅滩|结束调查|结束营地调查|进入第三远征队营地|接近守门者)/.test(hint)
+  ));
+}
+
 function choiceLimitForStage(state: GameState, stage: ActionNodeConfig | null) {
   if (isBattlePrepSelectionActive(state)) {
     return BATTLE_PREP_ACTION_LIMIT;
   }
   if (isOpeningChoiceStage(stage) && isOpeningTutorialBattleNode(state) && !state.tutorial_battle_done && !state.first_choice_resolved) {
     return BATTLE_PREP_ACTION_LIMIT;
+  }
+  if (
+    state.currentNodeId === POST_BLUE_SHOAL_IDS.laineSurvivor ||
+    state.currentNodeId === POST_BLUE_SHOAL_IDS.finalChoice
+  ) {
+    return 1;
   }
   // 云苓商店阶段：只能选择一次（买药或回公会登记）
   if (stage && stage.hints.includes('购买药剂') && stage.hints.some((h) => /返回公会登记/.test(h))) {
@@ -886,11 +928,16 @@ function choiceLimitForStage(state: GameState, stage: ActionNodeConfig | null) {
   if (stage && stage.hints.some((h) => /前往蓝伞浅滩/.test(h)) && stage.hints.some((h) => /判断前方风向|确认旧巡逻路线/.test(h))) {
     return 1;
   }
+  if (isUnlimitedPostBlueShoalStage(state, stage)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
   return STORY_NODE_CHOICE_LIMIT;
 }
 
 function forcedSceneForChoiceStage(stage: ActionNodeConfig | null) {
-  if (stage?.id === 'guild_intel') return getScriptedScene('tavern-intro');
+  // 公会初次调查不能因调查次数用完而自动跳酒馆；
+  // 玩家必须主动选择“前往回声酒馆找萨洛打听三名队友”，再由 tavern-intro 脚本接管。
+  if (stage?.id === 'guild_intel') return null;
   // 蓝伞浅滩战斗前：选择次数用完后，自动播放旁白过渡剧情，然后进入战斗
   if (stage && stage.hints.some((h) => /前往蓝伞浅滩/.test(h)) && stage.hints.some((h) => /判断前方风向|确认旧巡逻路线/.test(h))) {
     return getScriptedScene('enter-blue-shoal');
@@ -906,28 +953,47 @@ function filterNodeSuggestions(state: GameState, hints: string[]) {
   const node = getActionChoiceStage(state, hints);
   if (!node) return hints;
 
+  const sourceHints = uniqueHints(hints.length ? hints : node.hints);
+  if (sourceHints.length) {
+    const isExpandedInvestigation = Boolean(getPostBlueShoalHints(state));
+    const optionLimit = isExpandedInvestigation ? 8 : ACTION_OPTION_LIMIT;
+    const visible = sourceHints.slice(0, optionLimit);
+    const mainKey = normalizeNodeAction(node.mainHint);
+    if (!visible.some((hint) => normalizeNodeAction(hint) === mainKey)) {
+      if (visible.length >= optionLimit) visible[visible.length - 1] = node.mainHint;
+      else visible.push(node.mainHint);
+    }
+    return uniqueHints(visible);
+  }
+  return [node.mainHint];
+}
+
+function decorateActionSuggestions(state: GameState, items: ActionSuggestion[]) {
+  const hints = items.map((item) => item.text || item.label).filter(Boolean);
+  const node = getActionChoiceStage(state, hints);
+  if (!node) return items;
+
   const used = new Set(readChoiceStageUsedChoices(state, node));
   const count = Number(state[choiceStageCountKey(node)] ?? used.size);
   const choiceLimit = choiceLimitForStage(state, node);
   const mainKey = normalizeNodeAction(node.mainHint);
-  const sourceHints = uniqueHints(hints.length ? hints : node.hints);
-  const filtered = sourceHints.filter((hint) => {
-    const key = normalizeNodeAction(hint);
-    if (count >= choiceLimit) return key === mainKey;
-    return key === mainKey || !used.has(key);
-  });
 
-  if (!filtered.some((hint) => normalizeNodeAction(hint) === mainKey)) {
-    filtered.unshift(node.mainHint);
-  }
-  if (filtered.length) {
-    const optionLimit = state.compressedAct1EndingStarted
-      && (state.currentNodeId === ACT1_SCENE_IDS.lain || state.currentNodeId === ACT1_SCENE_IDS.serinCrack)
-      ? 5
-      : ACTION_OPTION_LIMIT;
-    return uniqueHints(filtered).slice(0, count >= choiceLimit ? 1 : optionLimit);
-  }
-  return [node.mainHint];
+  return items.map((item) => {
+    const key = normalizeNodeAction(item.text || item.label);
+    let disabledReason = '';
+    if (used.has(key) && key !== mainKey) {
+      disabledReason = '已完成';
+    } else if (count >= choiceLimit && key !== mainKey) {
+      disabledReason = '本阶段行动次数已用完';
+    }
+
+    const postBlueState = getPostBlueShoalHintState(state, item.text || item.label);
+    if (postBlueState.disabled) disabledReason = postBlueState.reason || '当前不可用';
+
+    return disabledReason
+      ? { ...item, disabled: true, disabledReason }
+      : { ...item, disabled: false, disabledReason: undefined };
+  });
 }
 
 function constrainActionSuggestions(state: GameState, incoming: ActionSuggestion[] = []) {
@@ -938,10 +1004,24 @@ function constrainActionSuggestions(state: GameState, incoming: ActionSuggestion
   if (state.act1GameCompleted) {
     return state.currentNodeId === ACT1_SCENE_IDS.summary ? [] : makeSuggestions(['结束']);
   }
+  // 蓝伞浅滩后的细化主线拥有完整、固定的节点选项。这里必须先于按区域名生成的
+  // 通用 fallback；否则一次不完整的 AI 快照就会让“骨柱湿地”串入下一地点的
+  // 怪物图鉴、莱因证言等旧选项。
+  if (state.postBlueShoalExpandedStarted) {
+    const expandedHints = getPostBlueShoalHints(state);
+    if (expandedHints) {
+      return decorateActionSuggestions(state, makeSuggestions(filterNodeSuggestions(state, expandedHints)));
+    }
+    // 新主线进行中但节点暂不可识别时宁可暂不显示选项，也不能拿区域 fallback
+    // 猜测下一步；正常情况下后续固定场景会立即补齐 currentNodeId。
+    return [];
+  }
   const linearHints = linearRecruitmentHints(state);
-  if (linearHints.length) return makeSuggestions(filterNodeSuggestions(state, linearHints));
+  if (linearHints.length) {
+    return decorateActionSuggestions(state, makeSuggestions(filterNodeSuggestions(state, linearHints)));
+  }
   const hints = incoming.length ? incoming.map((item) => item.text || item.label) : fallbackSuggestions(state).map((item) => item.text);
-  return makeSuggestions(filterNodeSuggestions(state, hints));
+  return decorateActionSuggestions(state, makeSuggestions(filterNodeSuggestions(state, hints)));
 }
 
 function actionChoiceStatusText(state: GameState, visibleSuggestions: ActionSuggestion[]) {
@@ -972,6 +1052,9 @@ function actionChoiceStatusText(state: GameState, visibleSuggestions: ActionSugg
   }
   const used = readChoiceStageUsedChoices(state, stage);
   const count = Number(state[choiceStageCountKey(stage)] ?? used.length);
+  if (isUnlimitedPostBlueShoalStage(state, stage)) {
+    return `选择行动：已完成 ${count} 项；已选择的行动不可重复，选择推进主线的出口后进入下一段剧情`;
+  }
   const choiceLimit = choiceLimitForStage(state, stage);
   if (count >= choiceLimit) {
     return `选择行动：已完成 ${choiceLimit}/${choiceLimit} 次，下一次将推进剧情`;
@@ -1107,17 +1190,69 @@ interface AudioSettingsModalProps {
   open: boolean;
   bgmVolume: number;
   sfxVolume: number;
+  aiModel: string;
+  aiHealthMaxTokens: number;
+  aiSettingsStatus: string;
   onBgmVolumeChange: (value: number) => void;
   onSfxVolumeChange: (value: number) => void;
+  onAiModelChange: (value: string) => void;
+  onAiHealthMaxTokensChange: (value: number) => void;
   onClose: () => void;
+}
+
+function AiHealthModal({
+  notice,
+  onClose,
+}: {
+  notice: { tone: 'checking' | 'ok' | 'error'; message: string } | null;
+  onClose: () => void;
+}) {
+  return (
+    <AnimatePresence>
+      {notice && (
+        <motion.div
+          className="ai-health-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={notice.tone === 'checking' ? undefined : onClose}
+        >
+          <motion.section
+            className={`ai-health-modal is-${notice.tone}`}
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="AI 大模型状态"
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span>{notice.tone === 'checking' ? 'AI CHECK' : notice.tone === 'ok' ? 'AI READY' : 'AI OFFLINE'}</span>
+            <h2>{notice.tone === 'checking' ? '正在检查 AI 主持人' : notice.tone === 'ok' ? 'AI 主持人已就位' : 'AI 主持人暂不可用'}</h2>
+            <p>{notice.message}</p>
+            {notice.tone !== 'checking' && (
+              <button type="button" onClick={onClose}>
+                知道了
+              </button>
+            )}
+          </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 function AudioSettingsModal({
   open,
   bgmVolume,
   sfxVolume,
+  aiModel,
+  aiHealthMaxTokens,
+  aiSettingsStatus,
   onBgmVolumeChange,
   onSfxVolumeChange,
+  onAiModelChange,
+  onAiHealthMaxTokensChange,
   onClose,
 }: AudioSettingsModalProps) {
   return (
@@ -1167,6 +1302,43 @@ function AudioSettingsModal({
               />
               <b>{Math.round(sfxVolume * 100)}%</b>
             </label>
+
+            <div className="audio-settings-section">
+              <div>
+                <strong>AI 模型</strong>
+                <small>会同步到后端运行时配置，影响 AI 主持人后续请求。</small>
+              </div>
+
+              <label className="audio-setting-row is-select">
+                <span>模型</span>
+                <select
+                  value={aiModel}
+                  onChange={(event) => onAiModelChange(event.currentTarget.value)}
+                >
+                  {Array.from(new Set([...AI_MODEL_OPTIONS, aiModel])).map((model) => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </select>
+                <b>{aiModel === 'deepseek-v4-pro' ? '推理' : '对话'}</b>
+              </label>
+
+              {aiModel === 'deepseek-v4-pro' && (
+                <label className="audio-setting-row is-select">
+                  <span>max_tokens</span>
+                  <select
+                    value={aiHealthMaxTokens}
+                    onChange={(event) => onAiHealthMaxTokensChange(Number(event.currentTarget.value))}
+                  >
+                    {AI_HEALTH_MAX_TOKEN_OPTIONS.map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                  <b>{aiHealthMaxTokens}</b>
+                </label>
+              )}
+
+              {aiSettingsStatus && <p className="audio-settings-status">{aiSettingsStatus}</p>}
+            </div>
           </motion.section>
         </motion.div>
       )}
@@ -1276,7 +1448,7 @@ export default function App() {
   const [selectedOpeningStyleId, setSelectedOpeningStyleId] = useState('balanced');
   const [openingPlayerName, setOpeningPlayerName] = useState('');
   const [fullyVisibleLineId, setFullyVisibleLineId] = useState<StoryLine['id'] | null>(null);
-  const [companionEventId, setCompanionEventId] = useState('block_echo_forest'); // 当前同伴支线 ID
+  const [companionEventId, setCompanionEventId] = useState(''); // 当前同伴支线 ID（旧布洛克/凯娅支线已停用）
   const [deepBattleId, setDeepBattleId] = useState(''); // 深层战斗ID（蓝伞/骨柱/Boss）
   const [helpedRhein, setHelpedRhein] = useState<boolean | null>(null); // 莱因选择
   const [bossCoreChoice, setBossCoreChoice] = useState<string | null>(null); // Boss核心选择
@@ -1309,6 +1481,11 @@ export default function App() {
   const [sfxVolume, setSfxVolume] = useState(() => readStoredVolume(AUDIO_STORAGE_KEYS.sfxVolume, 0.8));
   const [externalBgmTrack, setExternalBgmTrack] = useState('');
   const [rewardNotices, setRewardNotices] = useState<RewardNotice[]>([]);
+  const [aiHealthNotice, setAiHealthNotice] = useState<{ tone: 'checking' | 'ok' | 'error'; message: string } | null>(null);
+  const [aiHealthChecking, setAiHealthChecking] = useState(false);
+  const [aiModel, setAiModel] = useState(() => readStoredAiModel());
+  const [aiHealthMaxTokens, setAiHealthMaxTokens] = useState(() => readStoredAiHealthMaxTokens());
+  const [aiSettingsStatus, setAiSettingsStatus] = useState('');
 
   const lineId = useRef(1);
   const eventId = useRef(1);
@@ -1321,6 +1498,7 @@ export default function App() {
   const kpSpeakerRef = useRef('');
   const eventTimersRef = useRef<number[]>([]);
   const rewardNoticeIdRef = useRef(1);
+  const aiInitialSettingsSyncedRef = useRef(false);
   const passphraseHintShownRef = useRef(false);
   const pendingBattleRef = useRef<string>(''); // 前置剧情结束后触发战斗
   const pendingBattlePrepRef = useRef<BattlePrepChoice[] | null>(null); // 战前行动选项
@@ -1360,7 +1538,7 @@ export default function App() {
 
   const pushRewardNotices = useCallback((notices: RewardNotice[]) => {
     if (!notices.length) return;
-    setRewardNotices((prev) => [...prev, ...notices].slice(-6));
+    setRewardNotices((prev) => [...prev, ...notices].slice(-10));
   }, []);
 
   const flushDeferredRewardNotices = useCallback(() => {
@@ -1372,16 +1550,16 @@ export default function App() {
   useEffect(() => {
     const previous = rewardBaselineRef.current;
     stateRef.current = gameState;
-    if (previous && screen === 'game') {
+    if (previous) {
       const notices = collectRewardNotices(previous, gameState, () => rewardNoticeIdRef.current++);
       if (rewardNoticeDeferRef.current && notices.length) {
-        queuedRewardNoticesRef.current = [...queuedRewardNoticesRef.current, ...notices].slice(-6);
+        queuedRewardNoticesRef.current = [...queuedRewardNoticesRef.current, ...notices].slice(-10);
       } else {
         pushRewardNotices(notices);
       }
     }
     rewardBaselineRef.current = gameState;
-  }, [gameState, pushRewardNotices, screen]);
+  }, [gameState, pushRewardNotices]);
 
   useEffect(() => {
     if (!rewardNoticeDeferRef.current) return;
@@ -1440,6 +1618,70 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(AUDIO_STORAGE_KEYS.sfxVolume, String(sfxVolume));
   }, [sfxVolume]);
+
+  const applyAiSettings = useCallback(async (nextModel: string, nextHealthMaxTokens = aiHealthMaxTokens, silent = false) => {
+    const normalizedTokens = AI_HEALTH_MAX_TOKEN_OPTIONS.includes(nextHealthMaxTokens) ? nextHealthMaxTokens : 64;
+    setAiModel(nextModel);
+    setAiHealthMaxTokens(normalizedTokens);
+    window.localStorage.setItem(AI_STORAGE_KEYS.model, nextModel);
+    window.localStorage.setItem(AI_STORAGE_KEYS.healthMaxTokens, String(normalizedTokens));
+    if (!silent) setAiSettingsStatus('正在同步 AI 设置……');
+    try {
+      const saved = await updateAiSettings({ model: nextModel, health_max_tokens: normalizedTokens });
+      setAiModel(saved.model);
+      setAiHealthMaxTokens(AI_HEALTH_MAX_TOKEN_OPTIONS.includes(saved.health_max_tokens) ? saved.health_max_tokens : normalizedTokens);
+      if (!silent) {
+        setAiSettingsStatus('AI 设置已同步到后端');
+        window.setTimeout(() => setAiSettingsStatus(''), 1800);
+      }
+      return saved;
+    } catch (error: any) {
+      if (!silent) setAiSettingsStatus(error?.message || 'AI 设置同步失败，请确认后端已启动');
+      throw error;
+    }
+  }, [aiHealthMaxTokens]);
+
+  useEffect(() => {
+    if (aiInitialSettingsSyncedRef.current) return;
+    aiInitialSettingsSyncedRef.current = true;
+    if (hasStoredAiSettings()) {
+      void applyAiSettings(aiModel, aiHealthMaxTokens, true).catch(() => undefined);
+      return;
+    }
+    getAiSettings()
+      .then((settings) => {
+        setAiModel(settings.model || aiModel);
+        setAiHealthMaxTokens(AI_HEALTH_MAX_TOKEN_OPTIONS.includes(settings.health_max_tokens) ? settings.health_max_tokens : aiHealthMaxTokens);
+        window.localStorage.setItem(AI_STORAGE_KEYS.model, settings.model || aiModel);
+        window.localStorage.setItem(AI_STORAGE_KEYS.healthMaxTokens, String(
+          AI_HEALTH_MAX_TOKEN_OPTIONS.includes(settings.health_max_tokens) ? settings.health_max_tokens : aiHealthMaxTokens,
+        ));
+      })
+      .catch(() => undefined);
+  }, [aiHealthMaxTokens, aiModel, applyAiSettings]);
+
+  useEffect(() => {
+    if (!showAudioSettings) return;
+    let disposed = false;
+    setAiSettingsStatus('正在读取 AI 设置……');
+    getAiSettings()
+      .then((settings) => {
+        if (disposed) return;
+        setAiModel(settings.model || aiModel);
+        setAiHealthMaxTokens(AI_HEALTH_MAX_TOKEN_OPTIONS.includes(settings.health_max_tokens) ? settings.health_max_tokens : aiHealthMaxTokens);
+        window.localStorage.setItem(AI_STORAGE_KEYS.model, settings.model || aiModel);
+        window.localStorage.setItem(AI_STORAGE_KEYS.healthMaxTokens, String(
+          AI_HEALTH_MAX_TOKEN_OPTIONS.includes(settings.health_max_tokens) ? settings.health_max_tokens : aiHealthMaxTokens,
+        ));
+        setAiSettingsStatus('');
+      })
+      .catch((error: any) => {
+        if (!disposed) setAiSettingsStatus(error?.message || '读取 AI 设置失败，请确认后端已启动');
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [aiHealthMaxTokens, aiModel, showAudioSettings]);
 
   const playBgmTrack = useCallback(
     (track: string) => {
@@ -1509,7 +1751,13 @@ export default function App() {
 
       const nextLines: StoryLine[] = cleanTexts.flatMap((text): StoryLine[] => {
         if (role !== 'kp') {
-          return [{ id: lineId.current++, role, speaker, text }];
+          return [{
+            id: lineId.current++,
+            role,
+            speaker,
+            text,
+            portrait: role === 'player' ? '/assets/characters/adventurer/adventurer_idle.png' : undefined,
+          }];
         }
 
         const parsed = parseNarrativeSegments(text, speaker || '主持人', kpSpeakerRef.current);
@@ -1664,6 +1912,8 @@ export default function App() {
 
       // 孢海据点调查门控（仅在艾琳支线未开始前生效，防止已进入支线后调查选项仍然弹出）
       let finalHints = options.dynamicHints ?? scene.hints;
+      const postBlueShoalHints = getPostBlueShoalHints(nextState, scene.id);
+      if (postBlueShoalHints) finalHints = postBlueShoalHints;
       if (nextState.outpost_name_list_checked && nextState.patrol_log_checked && !nextState.ailin_wounded_pre_seen) {
         finalHints = ['确认据点调查结果'];
       } else if (!nextState.ailin_wounded_pre_seen && (scene.id === 'outpost-name-list' || scene.id === 'outpost-patrol-log' || scene.id === 'spore-outpost-arrival')) {
@@ -1687,7 +1937,7 @@ export default function App() {
           if (isManagedBattlePrepEncounter(encounterConfig.encounterId)) {
             Object.assign(nextState, createBattlePrepSelectionPatch(encounterConfig));
           }
-          pendingBattlePrepRef.current = getEncounterPrepActions(encounterConfig);
+          pendingBattlePrepRef.current = getEncounterPrepActions(encounterConfig, nextState);
           battlePrepStateRef.current = nextState;
           battlePrepResultRef.current = null;
           pendingBattleRef.current = '';
@@ -1849,7 +2099,7 @@ export default function App() {
             : { ...lockBattlePrepForNarration(), phase: 'transitioning_to_battle' as const };
           stateRef.current = { ...restoredState, battlePrep: restoredFlow };
           setGameState(stateRef.current);
-          pendingBattlePrepRef.current = getEncounterPrepActions(currentEncounterConfigRef.current);
+          pendingBattlePrepRef.current = getEncounterPrepActions(currentEncounterConfigRef.current, stateRef.current);
           battlePrepResultRef.current = restoredState.lastPrepResult;
           battlePrepStateRef.current = restoredState;
           const restoredNarration = String(restoredState.lastPrepNarration || restoredState.lastPrepResult.text || '判定结果已经确认，队伍完成了战前准备。');
@@ -2014,6 +2264,49 @@ export default function App() {
     });
   }, [startGame]);
 
+  const startDefaultGameWithAiCheck = useCallback(async () => {
+    if (aiHealthChecking) return;
+    setAiHealthChecking(true);
+    setAiHealthNotice({ tone: 'checking', message: '正在检查 AI 大模型连接，请稍候……' });
+    try {
+      let modelForCheck = aiModel;
+      let tokensForCheck = aiHealthMaxTokens;
+      if (hasStoredAiSettings()) {
+        const saved = await applyAiSettings(aiModel, aiHealthMaxTokens, true);
+        modelForCheck = saved.model;
+        tokensForCheck = saved.health_max_tokens;
+      } else {
+        const settings = await getAiSettings();
+        modelForCheck = settings.model || aiModel;
+        tokensForCheck = AI_HEALTH_MAX_TOKEN_OPTIONS.includes(settings.health_max_tokens) ? settings.health_max_tokens : aiHealthMaxTokens;
+        setAiModel(modelForCheck);
+        setAiHealthMaxTokens(tokensForCheck);
+      }
+      const result = await checkAiHealth();
+      if (!result.ok) {
+        const modelLabel = result.model || modelForCheck;
+        const tokenLabel = result.health_max_tokens || tokensForCheck;
+        setAiHealthNotice({
+          tone: 'error',
+          message: `${result.message || 'AI 大模型当前无法正常返回文本，请检查后端模型配置或网络状态。'}\n当前模型：${modelLabel}，健康检查 max_tokens：${tokenLabel}`,
+        });
+        return;
+      }
+      setAiHealthNotice({ tone: 'ok', message: `${result.message || 'AI 大模型连接正常，可以开始跑团。'}\n当前模型：${result.model || modelForCheck}` });
+      window.setTimeout(() => {
+        setAiHealthNotice(null);
+        startDefaultGame();
+      }, 850);
+    } catch (error: any) {
+      setAiHealthNotice({
+        tone: 'error',
+        message: error?.message || 'AI 大模型连接检查失败，请确认后端服务已启动。',
+      });
+    } finally {
+      setAiHealthChecking(false);
+    }
+  }, [aiHealthChecking, aiHealthMaxTokens, aiModel, applyAiSettings, startDefaultGame]);
+
   const startStoryTest = useCallback(
     async (checkpoint: StoryTestCheckpoint) => {
       setScreen('loading');
@@ -2174,26 +2467,10 @@ export default function App() {
             currentNodeId: 'battle_blue_shoal_01',
           },
         },
-        block_echo_forest: {
-          trustKey: 'trust_block',
-          doneKey: 'block_echo_forest_done',
-          area: '无光孢海·回声菌林出口',
-          nextHints: ['前往前线废弃据点', '检查沿途旧路标【智力DC12】', '让布洛克追踪污染痕迹【感知DC13】'],
-          extraPatch: {
-            completedBrockSideQuest: true,
-            currentNodeId: 'abandoned_forward_post_intro',
-          },
-        },
-        kaiya_broken_seals: {
-          trustKey: 'trust_kl',
-          doneKey: 'kaiya_broken_seals_done',
-          area: '无光孢海·废弃据点暗道出口',
-          nextHints: ['前往骨柱湿地', '让凯娅检查路线上可能残留的机关', '确认骨柱湿地的怪物活动【感知DC13】'],
-          extraPatch: {
-            completedKaiyaSideQuest: true,
-            currentNodeId: 'battle_bone_marsh_02',
-          },
-        },
+        /* [已停用/归档]
+        block_echo_forest: { ... },
+        kaiya_broken_seals: { ... },
+        */
         serin_cracked_silver_staff: {
           trustKey: 'trust_sl',
           doneKey: 'serin_cracked_silver_staff_done',
@@ -2205,8 +2482,13 @@ export default function App() {
           },
         },
       };
-      const config = companionConfig[eventId] || companionConfig.block_echo_forest;
-      const companionId = COMPANION_ID_BY_EVENT_ID[eventId] || 'brock';
+      const config = companionConfig[eventId];
+      if (!config) {
+        addEvent(`已停用的旧支线不会结算：${eventId}`, 'error');
+        setScreen('game');
+        return;
+      }
+      const companionId = COMPANION_ID_BY_EVENT_ID[eventId] || 'serin';
       const trustPatch = buildTrustPatch(current, { [companionId]: result.state.trust });
 
       const patch: GameState = {
@@ -2288,7 +2570,7 @@ export default function App() {
         ...(usesTutorialChoiceUi ? createBattlePrepSelectionPatch(config) : {}),
       };
       currentEncounterConfigRef.current = config;
-      pendingBattlePrepRef.current = getEncounterPrepActions(config);
+      pendingBattlePrepRef.current = getEncounterPrepActions(config, prepState);
       battlePrepStateRef.current = prepState;
       battlePrepResultRef.current = resumeCompletedPrep ? resumedResult! : null;
       pendingBattleRef.current = '';
@@ -2357,7 +2639,7 @@ export default function App() {
         selectionActionResumeRef.current = null;
       } else {
         const prepSelectionConfig = resolveBattlePrepSelectionConfig(currentState);
-        const configuredChoices = prepSelectionConfig ? getEncounterPrepActions(prepSelectionConfig) : [];
+        const configuredChoices = prepSelectionConfig ? getEncounterPrepActions(prepSelectionConfig, currentState) : [];
         const configuredPrepChoice = prepSelectionConfig
           ? matchBattlePrepSelectionChoice(action, configuredChoices)
           : null;
@@ -2380,6 +2662,7 @@ export default function App() {
       }
       let forcedStageAdvanceScene: ScriptedScene | null = null;
       let stageLimitNextAction = '';
+      let postBlueShoalResolution: ReturnType<typeof resolvePostBlueShoalAction> = null;
       const blockRoute = (message: string, nextHints: string[]) => {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
         appendStoryLines([message], 'kp', '瑟琳', true);
@@ -2512,7 +2795,8 @@ export default function App() {
           const trustFeedback = trustDelta > 0
             ? `对你的回答，艾琳轻轻点头，信任${signedDelta}。`
             : `艾琳听完，沉默了一瞬，信任${signedDelta || '不变'}。`;
-          appendStoryLines([trustFeedback], 'system', '系统', true);
+          // 从艾琳的第一句回复开始播放，后续系统结算与入队尾声按顺序翻页。
+          appendStoryLines([trustFeedback], 'system', '系统', false);
           if (trustDelta !== 0) addEvent(`艾琳信任 ${signedDelta}`, 'state');
           else addEvent('艾琳信任维持不变', 'state');
 
@@ -2620,6 +2904,7 @@ export default function App() {
           if (nextCount >= choiceLimit) {
             forcedStageAdvanceScene = forcedSceneForChoiceStage(activeNode);
             stageLimitNextAction = activeNode.mainHint;
+            if (forcedStageAdvanceScene?.bgImage) setScriptedBgOverride(forcedStageAdvanceScene.bgImage);
           }
         }
       }
@@ -2691,51 +2976,10 @@ export default function App() {
       //   return;
       // }
 
-      // 凯娅支线：少了两个封扣（废弃据点后）
-      const wantsKaiyaSideEvent = /检查封扣|检查补给箱|调查封扣|凯娅.*调查|凯娅.*暗道|少了.*封扣/.test(action);
-      if (wantsKaiyaSideEvent && currentState.frontline_abandoned_outpost_reached && !currentState.kaiya_broken_seals_done) {
-        appendStoryLines([action], 'player', gameState.player_name || '你', true);
-        setCompanionEventId('kaiya_broken_seals');
-        setSuggestions([]);
-        setPhase('narrating');
-        setScreen('companion-event');
-        return;
-      }
-
-      // 布洛克支线：回声菌林（已有）
-      const wantsBrockSideEvent = /回声菌林|跟随布洛克|布洛克.*调查|布洛克.*菌林|呼救声规律|净化粉/.test(action);
-      if (wantsBrockSideEvent && !currentState.block_echo_forest_done) {
-        if (!currentState.blue_shoal_battle_done) {
-          blockRoute('布洛克：「那片喊救命的菌林在蓝伞浅滩后面。先把浅滩里的东西处理掉，不然我们连声音从哪来都听不清。」', [
-            '前往蓝伞浅滩',
-            '确认蓝伞浅滩安全路线【感知DC13】',
-            '让艾琳评估队伍污染状态',
-          ]);
-          return;
-        }
-
-        if (!currentState.brock_recruited) {
-          blockRoute('瑟琳：「这片菌林必须由熟悉孢海生态的人判断。先回酒馆把布洛克请入队。」', linearRecruitmentHints(currentState));
-          return;
-        }
-
-        appendStoryLines([action], 'player', gameState.player_name || '你', true);
-        appendStoryLines([
-          '布洛克把铁锅从背上放低，示意所有人别再往前踏一步。前方菌盖之间传来干净得过分的求救声，像某种东西反复练习过同一句话。',
-        ], 'kp', '主持人', true);
-        setCompanionEventId('block_echo_forest');
-        const patch: GameState = {
-          block_echo_forest_started: true,
-          current_area: '无光孢海·回声菌林',
-          actions_in_area: 0,
-          last_event: '跟随布洛克调查回声菌林',
-        };
-        patchStateNow(patch, '布洛克支线启动状态同步失败');
-        setSuggestions([]);
-        setPhase('narrating');
-        setScreen('companion-event');
-        return;
-      }
+      /* [已停用/归档] 凯娅支线：少了两个封扣（废弃据点后）。
+      const wantsKaiyaSideEvent = ...;
+      if (wantsKaiyaSideEvent && ...) { ... }
+      */
 
       // 瑟琳支线：银杖的第一次裂痕（Boss 前必经）
       const wantsSerinSideEvent = /检查瑟琳银杖|银杖裂痕|瑟琳.*银杖|和瑟琳交谈|黑石脉冲规律/.test(action);
@@ -2758,25 +3002,10 @@ export default function App() {
         return;
       }
 
-      const wantsAbandonedPost = /前往前线废弃据点|前往废弃据点|调查废弃据点|进入废弃据点/.test(action);
-      if (currentState.blue_shoal_battle_done && !currentState.block_echo_forest_done && wantsAbandonedPost) {
-        blockRoute('布洛克抬手拦住队伍：「先别走直线。那片回声菌林在学人喊救命，不把污染菌核处理掉，后路会一直跟着我们叫。」', [
-          '跟随布洛克调查回声菌林',
-          '听布洛克解释呼救声规律【感知DC13】',
-          '协助布洛克配置净化粉【感知DC14】',
-        ]);
-        return;
-      }
-
-      const wantsBoneMarsh = /前往骨柱湿地|进入骨柱|骨柱湿地|穿过湿地/.test(action);
-      if (currentState.frontline_abandoned_outpost_reached && !currentState.kaiya_broken_seals_done && wantsBoneMarsh) {
-        blockRoute('凯娅蹲在补给箱前，指尖按住新鲜的切痕：「少了两个封扣。先查清楚这条暗道，不然湿地里会有人替我们收账。」', [
-          '让凯娅检查少了两个封扣',
-          '检查补给箱封扣与锁痕【智力DC12】',
-          '让凯娅判断暗道机关【敏捷DC13】',
-        ]);
-        return;
-      }
+      /* [已停用/归档] 凯娅旧支线对骨柱湿地的前置拦截。
+      const wantsBoneMarsh = ...;
+      if (currentState.frontline_abandoned_outpost_reached && ...) { ... }
+      */
 
       const wantsBoss = /进入黑石根区|黑石根区|黑石深处|黑石门卫|黑石守门者|确认进入黑石根区深处/.test(action);
       if (currentState.pre_boss_rest_done && !currentState.serin_cracked_silver_staff_done && wantsBoss) {
@@ -2808,18 +3037,41 @@ export default function App() {
       if (/帮艾琳记录伤员说出的名字/.test(action) && !currentState.ailin_wounded_names_done) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
         const ct = getCompanionTrust(currentState,'ailin'); const tp = buildTrustPatch(currentState,{ailin:Math.min(100,ct+5)});
-        const sq = getScriptedScene('ailin-sidequest-complete'); if(sq){playScriptedScene(sq,{focus:false,extraStatePatch:{...tp,player_helped_record_names:true}});addEvent('艾琳信任+5','state');}
+        const reportInventory = addInventoryQuantity(String(currentState.inventory || '长剑,冒险者工具包'), '伤员净化报告', 1);
+        const sq = getScriptedScene('ailin-sidequest-complete'); if(sq){playScriptedScene(sq,{focus:false,extraStatePatch:{...tp,inventory:reportInventory,player_helped_record_names:true}});addEvent('艾琳信任+5','state');}
         return;
       }
       if (/优先追问第三巡逻队路线/.test(action) && !currentState.ailin_wounded_names_done) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
-        const sq = getScriptedScene('ailin-sidequest-complete'); if(sq){playScriptedScene(sq,{focus:false,extraStatePatch:{player_prioritized_route_info:true}});}
+        const reportInventory = addInventoryQuantity(String(currentState.inventory || '长剑,冒险者工具包'), '伤员净化报告', 1);
+        const sq = getScriptedScene('ailin-sidequest-complete'); if(sq){playScriptedScene(sq,{focus:false,extraStatePatch:{inventory:reportInventory,player_prioritized_route_info:true}});}
         return;
       }
       // 无视艾琳→信任-20
       if (/无视伤员继续前进/.test(action)) {
         const ig = getScriptedScene('ignore-ailin');
         if(ig){const ct=getCompanionTrust(currentState,'ailin');const tp=buildTrustPatch(currentState,{ailin:Math.max(0,ct-20)});stateRef.current={...currentState,...tp};setGameState(stateRef.current);appendStoryLines([action],'player',gameState.player_name||'你',true);playScriptedScene(ig,{focus:false});addEvent('艾琳信任-20','state');}
+        return;
+      }
+
+      // 据点残缺名册只提供遗物层面的初步记录；艾琳认可玩家认真对待死者姓名。
+      // “罗德、伊芙、卡恩”的完整姓名记录仍只在后续艾琳支线收束时获得。
+      if (/整理阵亡者名册/.test(action) && !currentState.outpost_name_list_checked) {
+        const rosterScene = getScriptedScene('outpost-name-list');
+        if (rosterScene) {
+          const currentTrust = getCompanionTrust(currentState, 'ailin');
+          const trustPatch = buildTrustPatch(currentState, { ailin: Math.min(100, currentTrust + 5) });
+          playScriptedScene(rosterScene, { playerAction: action, extraStatePatch: trustPatch });
+        }
+        return;
+      }
+
+      // 结局已经落定后只允许进入本幕总结，避免旧“降渊缆梯”触发器
+      // 把玩家重新送回第一次下潜场景。
+      if (currentState.act1GameCompleted && currentState.currentNodeId !== ACT1_SCENE_IDS.summary) {
+        if (/^(?:\[.*\])?结束(?:第一幕)?(?:.*\])?$/.test(action.trim())) {
+          playScriptedScene(buildAct1SummaryScene(currentState), { focus: true });
+        }
         return;
       }
 
@@ -2923,15 +3175,10 @@ export default function App() {
         return;
       }
 
-      // ====== 深层主线触发：骨柱湿地战斗 ======
-      if (currentState.kaiya_broken_seals_done
-          && !currentState.bone_marsh_battle_done
-          && /前往骨柱湿地|进入骨柱|骨柱湿地|穿过湿地/.test(action)) {
-        appendStoryLines([action], 'player', gameState.player_name || '你', true);
-        const encounterConfig = getEncounterConfigById('bone-pillar-wetland');
-        if (encounterConfig) queueEncounterPrep(encounterConfig, currentState);
-        return;
-      }
+      /* [已停用/归档] 凯娅旧支线完成后进入骨柱湿地战斗的入口。
+      if (currentState.kaiya_broken_seals_done && ...) { ... }
+      新主线由 postBlueShoalStory 的固定场景直接推进到骨柱湿地。
+      */
 
       // ====== 深层主线触发：莱因选择 ======
       if (currentState.rhein_encounter_started && /帮助莱因|帮助.*莱因/.test(action)) {
@@ -2979,71 +3226,11 @@ export default function App() {
         return;
       }
 
-      // ====== 压缩第一幕：蓝伞浅滩战后至结局 ======
-      if (currentState.compressedAct1EndingStarted && currentState.currentNodeId === ACT1_SCENE_IDS.aftermath
-          && /黑石根区|远征标记|继续前进/.test(action)) {
-        const scene = getScriptedScene(ACT1_SCENE_IDS.blackRootEntrance);
-        if (scene) playScriptedScene(scene, { playerAction: action, extraStatePatch: {
-          inventory: appendUniqueInventoryItem(String(currentState.inventory || ''), ACT1_ITEM_NAMES.obeliskShard),
-          blackRootEntranceSeen: true,
-        } });
-        return;
-      }
-      if (currentState.compressedAct1EndingStarted && currentState.currentNodeId === ACT1_SCENE_IDS.blackRootEntrance
-          && /血迹|幸存者|追踪|继续前进/.test(action)) {
-        const scene = getScriptedScene(ACT1_SCENE_IDS.lain);
-        if (scene) playScriptedScene(scene, { playerAction: action });
-        return;
-      }
-      if (currentState.compressedAct1EndingStarted && currentState.currentNodeId === ACT1_SCENE_IDS.lain
-          && typeof currentState.lainHelped !== 'boolean') {
-        let choice: LainChoice | null = null;
-        if (/救治|带他|帮助莱因/.test(action)) choice = 'help';
-        else if (/追问|询问|发生了什么/.test(action)) choice = 'question';
-        else if (/带走.*线索|拿走.*身份牌|取走.*身份牌/.test(action)) choice = 'take-clue';
-        else if (/检查|伤势|身份牌/.test(action)) choice = 'inspect';
-        else if (/无视|不管|继续前进/.test(action)) choice = 'ignore';
-        if (choice) {
-          const scene = getScriptedScene(ACT1_SCENE_IDS.serinCrack);
-          if (scene) playScriptedScene(scene, { playerAction: action, extraStatePatch: buildLainChoicePatch(currentState, choice) });
-          return;
-        }
-      }
-      if (currentState.compressedAct1EndingStarted && currentState.currentNodeId === ACT1_SCENE_IDS.serinCrack
-          && !currentState.serinStaffCrackSeen) {
-        let choice: SerinCrackChoice | null = null;
-        if (/安慰|先休息|别勉强/.test(action)) choice = 'comfort';
-        else if (/克制|追问|裂痕/.test(action)) choice = 'careful';
-        else if (/影响任务|只问任务/.test(action)) choice = 'mission';
-        else if (/继续施法|强制施法|要求.*施法/.test(action)) choice = 'force-cast';
-        else if (/强迫|真相|必须回答/.test(action)) choice = 'force-answer';
-        if (choice) {
-          appendStoryLines([action], 'player', gameState.player_name || '你', true);
-          const choicePatch = buildSerinCrackPatch(currentState, choice);
-          patchStateNow(choicePatch, '瑟琳银杖选择状态同步失败');
-          const encounterConfig = getEncounterConfigById('boss-gatekeeper');
-          if (encounterConfig) queueEncounterPrep(encounterConfig, { ...currentState, ...choicePatch });
-          return;
-        }
-      }
-      if (currentState.compressedAct1EndingStarted && /^act1-ending-(guardian-remains|wounded-through-gate|cold-expedition|gate-split-open)$/.test(String(currentState.currentNodeId))
-          && /穿过|黑暗之门|继续深入/.test(action)) {
-        const scene = getScriptedScene(ACT1_SCENE_IDS.oceanReveal);
-        if (scene) playScriptedScene(scene, { playerAction: action });
-        return;
-      }
-      if (currentState.compressedAct1EndingStarted && currentState.currentNodeId === ACT1_SCENE_IDS.oceanReveal
-          && /结束第一幕|继续/.test(action)) {
-        const scene = getScriptedScene(ACT1_SCENE_IDS.complete);
-        if (scene) playScriptedScene(scene, { playerAction: action });
-        return;
-      }
-      if (currentState.act1GameCompleted && currentState.currentNodeId !== ACT1_SCENE_IDS.summary
-          && /^(?:\[.*\])?结束(?:第一幕)?(?:.*\])?$/.test(action.trim())) {
-        playScriptedScene(buildAct1SummaryScene(currentState), { focus: true });
-        return;
-      }
-
+      /* [已停用/归档]
+       * 旧版压缩第一幕：蓝伞浅滩战后 → 黑石根区 → 简化莱因 → 瑟琳裂痕 → 四个旧结局。
+       * 完整实现保留在 features/story/act1CompressedEnding.ts 和对应历史场景中，
+       * 当前运行时只使用 postBlueShoalStory.ts 的细化主线与莱因补丁。
+       */
       // ====== 深层主线触发：Boss 战 ======
       if ((currentState.serin_cracked_silver_staff_done || currentState.serinStaffCrackSeen) && !currentState.boss_defeated && /进入黑石根区|黑石根区|黑石深处|黑石门卫/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
@@ -3083,6 +3270,31 @@ export default function App() {
         return;
       }
 
+      // 扩展剧情仍由本地规则结算骰子、奖励与信任；叙事复用下方现有 AI 流式续写。
+      // 只有 AI 未返回有效内容时，才展示 resolution.lines 中的本地兜底文本。
+      postBlueShoalResolution = resolvePostBlueShoalAction(stateRef.current, action);
+      if (postBlueShoalResolution) {
+        patchStateNow(postBlueShoalResolution.patch, '扩展剧情状态同步失败');
+        if (postBlueShoalResolution.nextSceneId) {
+          forcedStageAdvanceScene = getScriptedScene(postBlueShoalResolution.nextSceneId);
+        }
+        // “离开 / 结束调查 / 继续”等固定出口只负责切换到下一段脚本，
+        // 不掷骰、不请求 AI，也不生成额外过渡旁白。
+        if (postBlueShoalResolution.skipAiNarration) {
+          setOpeningActionTutorialDismissed(true);
+          appendStoryLines([action], 'player', gameState.player_name || '你', true);
+          if (forcedStageAdvanceScene) {
+            playScriptedScene(forcedStageAdvanceScene, { focus: false });
+          } else {
+            const nextState = stateRef.current;
+            const nextHints = getPostBlueShoalHints(nextState);
+            setSuggestions(nextHints ? constrainActionSuggestions(nextState, makeSuggestions(nextHints)) : []);
+            setPhase('narrating');
+          }
+          return;
+        }
+      }
+
       setOpeningActionTutorialDismissed(true);
 
       // 自我介绍也是 player 消息，不能用聊天记录判断是否已经完成首次战前行动。
@@ -3101,7 +3313,10 @@ export default function App() {
       const resolvedActionBase = forcedStageAdvanceScene
         ? withStageLimitDirective(baseResolvedAction, stageLimitNextAction || forcedStageAdvanceScene.triggers[0] || forcedStageAdvanceScene.id)
         : baseResolvedAction;
-      const resolvedAction = `${resolvedActionBase}${resumedSelection?.lockedPrompt || ''}`;
+      const postBlueShoalNarrationDirective = postBlueShoalResolution
+        ? `\n【扩展剧情固定结算】骰子与状态已经由系统结算。请严格依据以下事实续写 2—4 段现场剧情，写出环境变化、行动过程和伙伴反应；不得改变成败、奖励、线索或信任结果，不要复述“检定成功/失败”等系统判定句，也不要输出下一步选项。\n${postBlueShoalResolution.lines.join('\n')}`
+        : '';
+      const resolvedAction = `${resolvedActionBase}${resumedSelection?.lockedPrompt || ''}${postBlueShoalNarrationDirective}`;
 
       rewardNoticeDeferRef.current = true;
       queuedRewardNoticesRef.current = [];
@@ -3149,7 +3364,7 @@ export default function App() {
         onSuggestions: (items) => {
           streamSuggestionsRef.current = items;
           // 战前行动已锁定：AI 续写期间丢弃模型返回的下一轮选项，避免闪现“第 2/3 次行动”。
-          if (!tutorialBattleIntentRef.current && !encounterBattleIntentRef.current && !shouldSuppressBattlePrepSuggestions(stateRef.current.battlePrep)) {
+          if (!postBlueShoalResolution && !tutorialBattleIntentRef.current && !encounterBattleIntentRef.current && !shouldSuppressBattlePrepSuggestions(stateRef.current.battlePrep)) {
             setSuggestions(constrainActionSuggestions(stateRef.current, items));
           }
         },
@@ -3184,6 +3399,10 @@ export default function App() {
             streamNarrativeFocused = true;
           }
           flushDeferredSystemEvents();
+          if (postBlueShoalResolution && streamedNarrativeLineCount === 0 && postBlueShoalResolution.lines.length) {
+            addEvent('AI续写未返回有效剧情，已启用扩展剧情本地兜底。', 'error');
+            appendStoryLines(postBlueShoalResolution.lines, 'kp', '主持人', true);
+          }
           if (tutorialBattleIntentRef.current) {
             if (streamedNarrativeLineCount === 0) {
               addEvent('AI续写未返回有效剧情，已启用本地战前旁白。', 'error');
@@ -3220,7 +3439,9 @@ export default function App() {
                 appendStoryLines([
                   config.encounterId === 'boss-gatekeeper'
                     ? '黑石门卫在震动的根脉间抬起武器。队伍完成最后一次站位确认，只等你下令迎战。'
-                    : '浅滩上的孢光骤然收紧，敌人的轮廓从菌雾中逼近。队伍已经完成战前准备，只等你下令迎战。',
+                    : config.encounterId === 'bone-pillar-wetland'
+                      ? '骨柱间的雾骤然收紧，骨片孢兽与拟声菌团从两侧逼近。队伍已完成唯一一次准备行动。'
+                      : '浅滩上的孢光骤然收紧，敌人的轮廓从菌雾中逼近。队伍已经完成战前准备，只等你下令迎战。',
                 ], 'kp', '主持人');
               }
               const battleReadyState = {
@@ -3236,6 +3457,11 @@ export default function App() {
             }
           } else if (forcedStageAdvanceScene) {
             playScriptedScene(forcedStageAdvanceScene, { focus: false });
+          } else if (postBlueShoalResolution) {
+            const nextState = stateRef.current;
+            const nextHints = getPostBlueShoalHints(nextState);
+            setSuggestions(nextHints ? constrainActionSuggestions(nextState, makeSuggestions(nextHints)) : []);
+            setPhase('narrating');
           } else {
             setSuggestions(constrainActionSuggestions(stateRef.current, streamSuggestionsRef.current));
           }
@@ -3266,6 +3492,20 @@ export default function App() {
           addEvent(message, 'error');
           flushDeferredSystemEvents();
           appendStoryLines([message], 'system', '系统', true);
+          if (postBlueShoalResolution) {
+            if (postBlueShoalResolution.lines.length) {
+              appendStoryLines(postBlueShoalResolution.lines, 'kp', '主持人');
+            }
+            if (forcedStageAdvanceScene) {
+              playScriptedScene(forcedStageAdvanceScene, { focus: false });
+            } else {
+              const nextState = stateRef.current;
+              const nextHints = getPostBlueShoalHints(nextState);
+              setSuggestions(nextHints ? constrainActionSuggestions(nextState, makeSuggestions(nextHints)) : []);
+              setPhase('narrating');
+            }
+            return;
+          }
           if (tutorialBattleIntentRef.current) {
             const fallbackSetup = buildTutorialBattleSetup(null, tutorialBattleActionRef.current);
             setPendingTutorialBattleSetup(fallbackSetup);
@@ -3295,7 +3535,9 @@ export default function App() {
               appendStoryLines([
                 config.encounterId === 'boss-gatekeeper'
                   ? '黑石脉冲淹没了远处的回声。瑟琳重新稳住银杖，队伍在门卫面前完成最后列阵。'
-                  : '孢雾遮住了更远处的动静，但敌影已经逼近。队伍依照刚才的判定结果完成列阵。',
+                  : config.encounterId === 'bone-pillar-wetland'
+                    ? '拟声菌团用最后一段假呼救掩护骨片孢兽逼近。队伍依照已锁定的判定结果完成列阵。'
+                    : '孢雾遮住了更远处的动静，但敌影已经逼近。队伍依照刚才的判定结果完成列阵。',
               ], 'kp', '主持人');
               const fallbackBattleState = {
                 ...stateRef.current,
@@ -3611,8 +3853,7 @@ export default function App() {
         if (config.encounterId === 'blue-shoal') {
           winPatch.completedBlueShoalBattle = true;
           winPatch.battle_blue_shoal_result = 'win';
-          if (ENABLE_COMPRESSED_ACT1_ENDING) Object.assign(winPatch, buildCompressedAct1StartPatch(stateRef.current));
-          else winPatch.currentNodeId = 'sidequest_brock_echo_grove';
+          winPatch.currentNodeId = config.afterSceneId;
         }
         if (config.encounterId === 'bone-pillar-wetland') {
           winPatch.completedBoneMarshBattle = true;
@@ -3881,18 +4122,9 @@ export default function App() {
     const current = stateRef.current;
     const helpedRhein = current.lainHelped === true || current.helpedRhein === true;
 
-    if (current.compressedAct1EndingStarted && (coreChoice === 'destroy' || coreChoice === 'stabilize')) {
-      const choice = coreChoice as Act1CoreChoice;
-      const endingId = resolveAct1EndingId(helpedRhein, choice);
-      const endingScene = getScriptedScene(`act1-ending-${endingId}`);
-      if (endingScene) {
-        playScriptedScene(endingScene, {
-          focus: true,
-          extraStatePatch: buildAct1EndingPatch(choice, helpedRhein),
-        });
-      }
-      return;
-    }
+    /* [已停用/归档] 旧压缩主线的二选一结局分流。
+    if (current.compressedAct1EndingStarted && ...) { ... }
+    */
 
     let endingId = '';
     if (helpedRhein && coreChoice === 'stabilize') endingId = 'ending_guardian_still_stands';
@@ -4110,7 +4342,7 @@ export default function App() {
     if (gameState.encounterPhase === 'battleRunning') return;
 
     currentEncounterConfigRef.current = config;
-    pendingBattlePrepRef.current = getEncounterPrepActions(config);
+    pendingBattlePrepRef.current = getEncounterPrepActions(config, gameState);
     battlePrepStateRef.current = gameState;
 
     if (canShowPrepChoice(gameState, config)) {
@@ -4150,7 +4382,7 @@ export default function App() {
     stateRef.current = nextState;
     setGameState(nextState);
     currentEncounterConfigRef.current = config;
-    pendingBattlePrepRef.current = getEncounterPrepActions(config);
+    pendingBattlePrepRef.current = getEncounterPrepActions(config, nextState);
     setSuggestions(makeSuggestions(pendingBattlePrepRef.current.map((choice) => choice.label)));
     if (gameId) void patchGameState(gameId, selectionPatch).catch(() => {});
   }, [gameId, gameState, phase, screen, streaming]);
@@ -4163,7 +4395,7 @@ export default function App() {
     }
     const style = getPlayerStyleById(selectedOpeningStyleId || 'balanced');
     const maxHp = getMaxHp(style.attributes);
-    const nextHp = Math.min(Number(stateRef.current.current_hp ?? maxHp), maxHp);
+    const nextHp = maxHp;
     const stylePatch: GameState = {
       selectedStyleId: style.id,
       selected_style_id: style.id,
@@ -4234,19 +4466,11 @@ export default function App() {
         void saveCurrentGame(AUTO_SAVE_SLOT, { silent: true, phaseOverride: 'action' });
         return;
       }
-      // 战斗胜利后播放战后剧情（模仿 completeTutorialBattle：state 驱动 + advanceLine 播放）
-      if (stateRef.current.flags?.after_battle_shoal_pending && !stateRef.current.compressedAct1EndingStarted) {
-        setGameState((prev) => ({
-          ...prev,
-          flags: { ...(prev.flags || {}), after_battle_shoal_pending: false },
-        }));
-        const af = getScriptedScene('after-battle-blue-shoal');
-        if (af) playScriptedScene(af, { focus: true });
-        return;
-      }
       // 战前行动：pendingBattlePrepRef 有值时，直接进入 action 阶段，显示战前行动选项
-      if (pendingBattlePrepRef.current && shouldShowBattlePrepPanel(stateRef.current.battlePrep)) {
-        if (isManagedBattlePrepEncounter(stateRef.current.currentEncounterId)) {
+      const isManagedPrepSelection = isManagedBattlePrepEncounter(stateRef.current.currentEncounterId)
+        && isBattlePrepSelectionActive(stateRef.current);
+      if (pendingBattlePrepRef.current && (isManagedPrepSelection || shouldShowBattlePrepPanel(stateRef.current.battlePrep))) {
+        if (isManagedPrepSelection) {
           // 教学战、蓝伞浅滩和 Boss 统一复用原对话选项 + SelectionActionCheck 判定 UI。
           setShowBattlePrepPanel(false);
           setSuggestions(makeSuggestions(pendingBattlePrepRef.current.map((choice) => choice.label)));
@@ -4412,18 +4636,29 @@ export default function App() {
     return (
       <LazyBoundary>
         <TitleMenu
-          onNewGame={startDefaultGame}
+          onNewGame={startDefaultGameWithAiCheck}
           onLoadGame={openLoadGame}
+          onGallery={() => setScreen('gallery')}
           onSettings={() => setShowAudioSettings(true)}
           onTest={() => setScreen('test')}
           onPrimeAudio={() => playBgmTrack(BGM_TRACKS.title)}
         />
+        <AiHealthModal notice={aiHealthNotice} onClose={() => !aiHealthChecking && setAiHealthNotice(null)} />
         <AudioSettingsModal
           open={showAudioSettings}
           bgmVolume={bgmVolume}
           sfxVolume={sfxVolume}
+          aiModel={aiModel}
+          aiHealthMaxTokens={aiHealthMaxTokens}
+          aiSettingsStatus={aiSettingsStatus}
           onBgmVolumeChange={setBgmVolume}
           onSfxVolumeChange={setSfxVolume}
+          onAiModelChange={(value) => {
+            void applyAiSettings(value, aiHealthMaxTokens).catch(() => undefined);
+          }}
+          onAiHealthMaxTokensChange={(value) => {
+            void applyAiSettings(aiModel, value).catch(() => undefined);
+          }}
           onClose={() => setShowAudioSettings(false)}
         />
       </LazyBoundary>
@@ -4444,6 +4679,10 @@ export default function App() {
         />
       </LazyBoundary>
     );
+  }
+
+  if (screen === 'gallery') {
+    return <LazyBoundary><GalleryScreen onBack={() => setScreen('main-menu')} /></LazyBoundary>;
   }
 
   if (screen === 'test') {
@@ -4477,12 +4716,12 @@ export default function App() {
   if (screen === 'companion-event') {
     const eventTrustKeys: Record<string, string> = {
       ailin_wounded_names: 'trust_al',
-      block_echo_forest: 'trust_block',
-      kaiya_broken_seals: 'trust_kl',
+      // [已停用/归档] block_echo_forest: 'trust_block',
+      // [已停用/归档] kaiya_broken_seals: 'trust_kl',
       serin_cracked_silver_staff: 'trust_sl',
     };
-    const trustKey = eventTrustKeys[companionEventId] || 'trust_block';
-    const companionId = COMPANION_ID_BY_EVENT_ID[companionEventId] || 'brock';
+    const trustKey = eventTrustKeys[companionEventId] || 'trust_sl';
+    const companionId = COMPANION_ID_BY_EVENT_ID[companionEventId] || 'serin';
     return (
       <LazyBoundary>
         <ErrorBoundary>
@@ -4511,13 +4750,14 @@ export default function App() {
     const openingEffects: any[] = [];
     // 禁用敌方技能 → 日志反馈
     if (Array.isArray(be.disableEnemySkillFirstRound) && be.disableEnemySkillFirstRound.length) {
-      const enemyId = battleConfig.units.find((u: any) => u.faction === 'enemy' && u.type === 'fungal_mimic')?.id;
-      if (enemyId) {
+      const affectedEnemies = battleConfig.units.filter((u: any) => u.faction === 'enemy' && u.type === 'fungal_mimic');
+      affectedEnemies.forEach((enemy: any) => {
         openingEffects.push({
-          unitId: enemyId,
-          log: `战前行动：拟声菌团第一回合无法使用【拟声扰乱】。`,
+          unitId: enemy.id,
+          statuses: ['拟声受阻'],
+          log: `战前行动：${enemy.name}第一回合无法使用【拟声扰乱】。`,
         });
-      }
+      });
     }
     // 前排 AC 加成
     if (be.frontlineAcBonus) {
@@ -4545,9 +4785,14 @@ export default function App() {
     }
     // 攻击加成（日志反馈）
     if (be.attackBonusFirstRound) {
+      const enemyTypeName = be.targetEnemyType === 'fungal_mimic'
+        ? '拟声菌团'
+        : be.targetEnemyType === 'spore_crawler'
+          ? '孢化爬虫'
+          : be.targetEnemyType || '敌人';
       openingEffects.push({
         unitId: 'player',
-        log: `战前行动：我方第一回合攻击${be.targetEnemyType === 'fungal_mimic' ? '拟声菌团' : be.targetEnemyType || '敌人'}时命中 +${be.attackBonusFirstRound}。`,
+        log: `战前行动：我方第一回合攻击${enemyTypeName}时命中 +${be.attackBonusFirstRound}。`,
       });
     }
     // 敌方惩罚（日志反馈）
@@ -4575,6 +4820,19 @@ export default function App() {
           />
         </ErrorBoundary>
       </LazyBoundary>
+    );
+  }
+
+  if (
+    screen === 'game' &&
+    gameState.act1GameCompleted &&
+    gameState.currentNodeId === POST_BLUE_SHOAL_IDS.complete
+  ) {
+    return (
+      <Act1EndingSummary
+        endingId={String(gameState.act1EndingId || gameState.endingId || '')}
+        onReturnTitle={returnToTitleMenu}
+      />
     );
   }
 
@@ -4629,7 +4887,7 @@ export default function App() {
               onSubmit={submitAction}
               placeholder={actionInputPlaceholder}
               helperText={choiceHelperText}
-              hideFreeInput={gameState.act1GameCompleted || isBattlePrepReadyToEnter(gameState) || visibleSuggestions.some((s) => /整理阵亡者名册|翻看旧巡逻记录|确认据点调查结果|停下协助艾琳|无视伤员继续前进|帮艾琳记录|优先追问第三巡逻队/.test(s.text))}
+              hideFreeInput={gameState.act1GameCompleted || gameState.currentNodeId === POST_BLUE_SHOAL_IDS.laineSurvivor || gameState.currentNodeId === POST_BLUE_SHOAL_IDS.finalChoice || isBattlePrepReadyToEnter(gameState) || visibleSuggestions.some((s) => /整理阵亡者名册|翻看旧巡逻记录|确认据点调查结果|停下协助艾琳|无视伤员继续前进|帮艾琳记录|优先追问第三巡逻队/.test(s.text))}
             />
           ) : undefined
         }

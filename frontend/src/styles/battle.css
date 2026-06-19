@@ -533,6 +533,40 @@
   transform-origin: 50% 100%;
 }
 
+.battle-combatant.is-enemy .battle-sprite {
+  --enemy-model-scale: 2.25;
+  --enemy-model-cast-scale: 2.385;
+  animation: battle-idle-enemy 2.7s ease-in-out infinite;
+  transform: scale(var(--enemy-model-scale));
+}
+
+.battle-combatant.is-enemy::before {
+  transform: scaleX(1.55);
+}
+
+.battle-combatant.is-enemy.is-active .battle-sprite {
+  animation: battle-idle-enemy 2.7s ease-in-out infinite, battle-model-flicker 820ms ease-in-out infinite alternate;
+}
+
+.battle-combatant.is-enemy.is-casting .battle-sprite {
+  animation: battle-cast-lunge-enemy 820ms ease-out 1, battle-model-flicker 420ms ease-in-out infinite alternate;
+  animation-fill-mode: both;
+}
+
+.battle-combatant.is-enemy.is-impacted .battle-sprite {
+  animation: battle-impact-shake-enemy 460ms ease-out 1;
+  animation-fill-mode: both;
+}
+
+.battle-combatant.is-enemy.is-impacted.is-missed .battle-sprite {
+  animation: battle-miss-dodge-enemy 520ms ease-out 1;
+  animation-fill-mode: both;
+}
+
+.battle-combatant.is-enemy.is-defeated .battle-sprite {
+  transform: rotate(-6deg) translateY(12px) scale(var(--enemy-model-scale));
+}
+
 .sprite-aura {
   position: absolute;
   inset: -14px -12px -4px;
@@ -2832,11 +2866,55 @@
   }
 }
 
+@keyframes battle-impact-shake-enemy {
+  0% {
+    transform: translateX(0) translateY(0) scale(var(--enemy-model-scale));
+  }
+  28% {
+    transform: translateX(-7px) translateY(2px) scale(var(--enemy-model-scale));
+  }
+  56% {
+    transform: translateX(8px) translateY(-2px) scale(var(--enemy-model-scale));
+  }
+  100% {
+    transform: translateX(0) translateY(0) scale(var(--enemy-model-scale));
+  }
+}
+
+@keyframes battle-cast-lunge-enemy {
+  0% {
+    transform: translateY(0) scale(var(--enemy-model-scale));
+  }
+  40% {
+    transform: translateY(-8px) scale(var(--enemy-model-cast-scale));
+  }
+  100% {
+    transform: translateY(0) scale(var(--enemy-model-scale));
+  }
+}
+
+@keyframes battle-idle-enemy {
+  0%,
+  100% {
+    transform: translateY(0) scale(var(--enemy-model-scale)) scaleY(1);
+  }
+  50% {
+    transform: translateY(-9px) scale(var(--enemy-model-scale)) scaleY(1.015);
+  }
+}
+
 @keyframes battle-miss-dodge {
   0% { transform: translateX(0) translateY(0); }
   35% { transform: translateX(12px) translateY(-4px); }
   72% { transform: translateX(-4px) translateY(1px); }
   100% { transform: translateX(0) translateY(0); }
+}
+
+@keyframes battle-miss-dodge-enemy {
+  0% { transform: translateX(0) translateY(0) scale(var(--enemy-model-scale)); }
+  35% { transform: translateX(12px) translateY(-4px) scale(var(--enemy-model-scale)); }
+  72% { transform: translateX(-4px) translateY(1px) scale(var(--enemy-model-scale)); }
+  100% { transform: translateX(0) translateY(0) scale(var(--enemy-model-scale)); }
 }
 
 @keyframes battle-feedback-rise {
@@ -3259,12 +3337,23 @@
     top: 72px;
     left: 12px;
     right: auto;
-    gap: 8px;
-    width: 168px;
+    width: 184px;
     max-width: calc(100% - 24px);
   }
 
-  .game-top-actions > button,
+  .game-sidebar-actions {
+    width: 168px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .game-sidebar-toggle {
+    right: -16px;
+    width: 26px;
+    height: 52px;
+  }
+
+  .game-top-actions .game-sidebar-actions > button,
   .game-top-actions .inventory-open-button {
     height: 46px;
     min-height: 46px;

@@ -36,17 +36,20 @@ export function ActionPanel({
         <button
           key={item.id}
           type="button"
-          className="vn-choice-btn"
+          className={`vn-choice-btn ${item.disabled ? 'is-choice-disabled' : ''}`}
+          title={item.disabledReason}
           onClick={() => {
+            if (item.disabled) return;
             if (suggestionMode === 'fill') {
               setCustomAction(item.text);
               return;
             }
             submit(item.text);
           }}
-          disabled={disabled}
+          disabled={disabled || item.disabled}
         >
-          {item.label}
+          <span>{item.label}</span>
+          {item.disabledReason && <small>{item.disabledReason}</small>}
         </button>
       ))}
       {!hideFreeInput && (

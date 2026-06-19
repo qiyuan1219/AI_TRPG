@@ -50,6 +50,8 @@
   box-shadow:
     0 0 60px rgba(72, 30, 120, 0.2),
     0 30px 80px rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+  width: min(620px, calc(100vw - 32px));
   min-width: 320px;
 }
 
@@ -59,22 +61,30 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px;
-  max-width: min(92vw, 760px);
+  width: 100%;
+  margin-top: 2px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(212, 168, 67, 0.18);
 }
 
 .dice-reroll-actions > button,
 .dice-omni-picker button {
-  border: 1px solid rgba(212, 168, 67, 0.45);
-  border-radius: 12px;
+  flex: 1 1 150px;
+  border: 1px solid rgba(184, 159, 112, 0.3);
+  border-radius: 9px;
   padding: 11px 20px;
-  background: rgba(62, 35, 105, 0.95);
-  color: #f4e3b2;
+  background: linear-gradient(180deg, rgba(47, 40, 58, 0.92), rgba(28, 24, 36, 0.96));
+  color: #ddd0ae;
   font-weight: 800;
   cursor: pointer;
 }
 
 .dice-reroll-actions > button:disabled { opacity: 0.45; cursor: not-allowed; }
-.dice-reroll-actions .dice-reroll-confirm { background: #9a6518; color: #fff8df; }
+.dice-reroll-actions .dice-reroll-confirm {
+  border-color: rgba(202, 166, 94, 0.38);
+  background: linear-gradient(180deg, rgba(112, 86, 45, 0.9), rgba(72, 54, 31, 0.96));
+  color: #efe2bd;
+}
 .dice-omni-picker { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; color: #f4e3b2; }
 .dice-omni-picker input { width: 74px; border: 1px solid rgba(212,168,67,.45); border-radius: 8px; padding: 9px; background: #151020; color: white; text-align: center; }
 

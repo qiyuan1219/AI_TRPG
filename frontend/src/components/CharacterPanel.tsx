@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
-import { abilityModifier, COMMON_COMBAT_SKILLS, COMMON_NON_COMBAT_SKILLS, DND_COMPANIONS } from '../data/dndClasses';
-import type { GameState, SkillEntry } from '../types/game';
+import { abilityModifier, DND_COMPANIONS } from '../data/dndClasses';
+import type { GameState } from '../types/game';
 import { COMPANION_ID_BY_UI_ID, getCompanionTrust, getTrustTier, recentTrustLogs } from '../utils/trust';
 
 interface CharacterPanelProps {
@@ -80,12 +80,6 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
         <b>{state.gold || 200} GP</b>
       </div>
 
-      <div className="panel-block skill-block">
-        <h2>流派技能</h2>
-        <SkillGroup label="战斗" skills={COMMON_COMBAT_SKILLS} />
-        <SkillGroup label="探索/对话" skills={COMMON_NON_COMBAT_SKILLS} />
-      </div>
-
       <div className="panel-block">
         <h2>同伴信任</h2>
         {visibleCompanions.map((companion) => (
@@ -144,20 +138,6 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
         })}
       </div>
     </aside>
-  );
-}
-
-function SkillGroup({ label, skills }: { label: string; skills: SkillEntry[] }) {
-  return (
-    <div className="skill-group">
-      <span>{label}</span>
-      {skills.map((skill) => (
-        <p key={skill.name}>
-          <b>{skill.name}</b>
-          <small>{skill.check}</small>
-        </p>
-      ))}
-    </div>
   );
 }
 

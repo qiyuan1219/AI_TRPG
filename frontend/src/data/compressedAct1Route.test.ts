@@ -10,10 +10,11 @@ const PRE_REVEAL_SCENES = [
   'act1-boss-core-choice',
 ];
 
-describe('compressed act 1 route data', () => {
-  it('routes blue shoal and boss victories into the compressed ending flow', () => {
-    expect(getEncounterConfigById('blue-shoal')?.afterSceneId).toBe('act1-blue-shoal-aftermath-compressed');
-    expect(getEncounterConfigById('boss-gatekeeper')?.afterSceneId).toBe('act1-boss-core-choice');
+describe('act 1 route data', () => {
+  it('routes victories into the expanded post-blue-shoal flow', () => {
+    expect(getEncounterConfigById('blue-shoal')?.afterSceneId).toBe('after-battle-blue-shoal-expanded-v2');
+    expect(getEncounterConfigById('bone-pillar-wetland')?.afterSceneId).toBe('after-battle-bone-beast-v2');
+    expect(getEncounterConfigById('boss-gatekeeper')?.afterSceneId).toBe('after-battle-blackstone-guardian-v2');
   });
 
   it('uses the dedicated one-shot battle prep choices at blue shoal', () => {

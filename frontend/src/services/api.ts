@@ -156,6 +156,50 @@ export async function createGame(payload: CreateGamePayload): Promise<CreateGame
   return response.json();
 }
 
+export interface AiHealthResult {
+  ok: boolean;
+  status: string;
+  message: string;
+  error?: string;
+  model?: string;
+  health_max_tokens?: number;
+}
+
+export async function checkAiHealth(): Promise<AiHealthResult> {
+  const response = await apiFetch(`${BASE}/ai/health`, undefined, 'AI 大模型连接检查失败');
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, 'AI 大模型连接检查失败'));
+  }
+  return response.json();
+}
+
+export interface AiSettingsResult {
+  model: string;
+  health_max_tokens: number;
+  available_models: string[];
+  health_max_token_options: number[];
+}
+
+export async function getAiSettings(): Promise<AiSettingsResult> {
+  const response = await apiFetch(`${BASE}/ai/settings`, undefined, '获取 AI 设置失败');
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '获取 AI 设置失败'));
+  }
+  return response.json();
+}
+
+export async function updateAiSettings(payload: { model: string; health_max_tokens?: number }): Promise<AiSettingsResult> {
+  const response = await apiFetch(`${BASE}/ai/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }, '更新 AI 设置失败');
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '更新 AI 设置失败'));
+  }
+  return response.json();
+}
+
 export async function getState(gameId: string) {
   const response = await apiFetch(`${BASE}/game/${gameId}/state`, undefined, '获取状态失败');
   if (!response.ok) throw new Error(await readErrorMessage(response, '获取状态失败'));
@@ -287,7 +331,7 @@ export async function fetchStoryCheckNarration(payload: StoryCheckNarratePayload
 }
 
 export async function startCompanionSideEvent(
-  eventId = 'block_echo_forest',
+  eventId = 'ailin_wounded_names',
   initialTrust = 55,
 ): Promise<CompanionSideEventStartResult> {
   const response = await apiFetch(`${BASE}/side-events/start`, {

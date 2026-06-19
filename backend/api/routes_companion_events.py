@@ -22,7 +22,7 @@ _side_event_sessions: dict[str, dict] = {}
 
 
 class StartSideEventRequest(BaseModel):
-    event_id: str = "block_echo_forest"
+    event_id: str = "ailin_wounded_names"
     initial_trust: int | None = Field(default=None, ge=0, le=100)
 
 
