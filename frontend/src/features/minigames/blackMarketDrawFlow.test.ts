@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { resolveOrlanCompletion, resolveOrlanDraw, type OrlanBoxResult } from './blackMarketDrawFlow';
 
 describe('black market draw flow', () => {
-  it('awards a natural diamond on D20 >= 19', () => {
-    expect(resolveOrlanDraw(18, 0, false).reward.itemId).toBe('blackmarket_chips');
+  it('awards a natural diamond on D20 >= 18', () => {
+    expect(resolveOrlanDraw(17, 0, false).reward.itemId).toBe('blackmarket_chips');
+    expect(resolveOrlanDraw(18, 0, false).reward.itemId).toBe('diamond');
     expect(resolveOrlanDraw(19, 0, false).reward.itemId).toBe('diamond');
     expect(resolveOrlanDraw(20, 0, false).reward.itemId).toBe('diamond');
   });
@@ -17,7 +18,7 @@ describe('black market draw flow', () => {
   it('keeps the no-gold debt outcome and Kaiya trust penalty', () => {
     const result: OrlanBoxResult = {
       drawCount: 2,
-      spent: 40,
+      spent: 100,
       rewards: [resolveOrlanDraw(1, 0, false).reward],
       finalD20: 1,
       guaranteed: false,
@@ -25,7 +26,7 @@ describe('black market draw flow', () => {
       hasDiamond: false,
       failedNoGoldNoDiamond: true,
     };
-    const outcome = resolveOrlanCompletion({ gold: 40, inventory: '长剑', trust_kl: 50 }, result);
+    const outcome = resolveOrlanCompletion({ gold: 100, inventory: '长剑', trust_kl: 50 }, result);
     expect(outcome.failedNoGoldNoDiamond).toBe(true);
     expect(outcome.patch.gold).toBe(0);
     expect(outcome.patch.trust_kl).toBe(10);

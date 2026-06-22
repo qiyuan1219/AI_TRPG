@@ -2,7 +2,6 @@ import type { GameState } from '../../types/game';
 import {
   DEFAULT_INVENTORY,
   addInventoryQuantity,
-  appendInventoryItem,
   appendUniqueInventoryItem,
 } from '../inventory/inventoryStatePatch';
 
@@ -31,34 +30,37 @@ export interface ApothecaryPurchaseInput {
   name: string;
   price: number;
   stat?: string;
+  stock?: number;
 }
 
 export function buildApothecaryPurchasePatch(
   current: GameState,
-  { itemId, name, price, stat }: ApothecaryPurchaseInput,
+  { itemId, name, price, stat, stock }: ApothecaryPurchaseInput,
 ): GameState | null {
+  const purchaseCountKey = `yunling_${itemId}_purchase_count`;
+  const purchaseCount = Math.max(0, Number(current[purchaseCountKey] || 0));
   const alreadyPurchased = Boolean(
     current[`yunling_${itemId}_bought`]
     || (itemId === 'purification_heart' && current.purification_heart_owned),
   );
   if ((stat || itemId === 'purification_heart') && alreadyPurchased) return null;
+  if (stock !== undefined && purchaseCount >= stock) return null;
+  if (Number(current.gold ?? 200) < price) return null;
 
   const inventoryText = String(current.inventory || DEFAULT_INVENTORY);
   const nextInventory = itemId === 'purification_heart' && inventoryText.includes(name)
     ? inventoryText
-    : appendInventoryItem(inventoryText, name);
+    : addInventoryQuantity(inventoryText, name, 1);
   const patch: GameState = {
     gold: Math.max(0, Number(current.gold ?? 200) - price),
     inventory: nextInventory,
     [`yunling_${itemId}_bought`]: true,
+    [purchaseCountKey]: purchaseCount + 1,
     last_event: `在云苓处购买${name}`,
   };
 
   if (stat) {
-    patch[stat] = Number(current[stat] ?? 10) + 2;
-  } else if (itemId === 'healing_potion') {
-    const maxHp = Number(current.max_hp ?? current.current_hp ?? 20);
-    patch.current_hp = Math.min(maxHp, Number(current.current_hp ?? 20) + 5);
+    patch[`yunling_${itemId}_ready_to_use`] = true;
   } else if (itemId === 'purification_heart') {
     patch.purification_heart_owned = true;
   }

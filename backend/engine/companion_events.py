@@ -479,7 +479,7 @@ SIDE_EVENT_DEFINITIONS: dict[str, dict] = {
         "opening": (
             "前线废弃据点后方的窄路渐渐被蓝白荧光吞没。菌盖像倒挂的耳朵一样层叠，"
             "远处传来断断续续的呼救声。布洛克停下脚步，把铁锅从背上放低，声音压得很沉："
-            "“别急着跑。会学人喊救命的东西，通常不急着让你活。”"
+            "\u201c别急着跑。会学人喊救命的东西，通常不急着让你活。\u201d"
         ),
         "objectives": [
             "判断回声菌林是真正求救、拟声诱捕，还是污染扩散。",
@@ -633,8 +633,6 @@ SIDE_EVENT_DEFINITIONS: dict[str, dict] = {
     },
 }
 
-# [已停用/归档] 旧版布洛克“回声菌林”和凯娅“少了两个封扣”仍保留在上方，
-# 仅供查阅历史实现；从运行时注册表移除，接口不会再列出或启动它们。
 for _legacy_event_id in ("block_echo_forest", "kaiya_broken_seals"):
     SIDE_EVENT_DEFINITIONS.pop(_legacy_event_id, None)
 

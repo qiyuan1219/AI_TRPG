@@ -14,6 +14,7 @@
 
 const SOUND_BASE = "/assets/sounds";
 let _muted = false;
+let _volume = 1;
 
 // 缓存已加载的 Audio 对象，避免重复创建
 const _cache: Record<string, HTMLAudioElement> = {};
@@ -22,10 +23,10 @@ function tryPlay(path: string) {
   if (_muted) return;
   if (!_cache[path]) {
     _cache[path] = new Audio(path);
-    _cache[path].volume = 0.85;
     _cache[path].preload = "auto";
   }
   const a = _cache[path];
+  a.volume = _volume;
   a.currentTime = 0;
   a.play().catch(() => {});
 }
@@ -59,6 +60,12 @@ export function playClick() {
 export function mute() { _muted = true; }
 export function unmute() { _muted = false; }
 export function isMuted() { return _muted; }
+export function setVolume(value: number) {
+  _volume = Math.min(1, Math.max(0, Number.isFinite(value) ? value : 1));
+  Object.values(_cache).forEach((audio) => {
+    audio.volume = _volume;
+  });
+}
 
 export const sfx = {
   diceRoll: playDiceRoll,
@@ -68,4 +75,5 @@ export const sfx = {
   mute,
   unmute,
   isMuted,
+  setVolume,
 };

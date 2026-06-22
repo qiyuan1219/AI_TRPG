@@ -8,7 +8,19 @@ import { rollDiceEvent } from '../core/dice/createDiceEvent';
 
 type Phase = 'prep' | 'skill_result' | 'ready' | 'rolling' | 'play' | 'round_result' | 'plead' | 'final';
 type SkillChoice = 'peek' | 'persuade' | 'none';
+type TavernSkillCheckChoice = 'peek' | 'persuade' | 'plead';
 type RoundOutcome = 'win' | 'tie' | 'lose';
+
+interface TavernSkillCheckDecision {
+  choice: TavernSkillCheckChoice;
+  label: string;
+  bonus: number;
+  dc: number;
+  initialRoll: number;
+  finalRoll: number;
+  rerollRoll?: number;
+  rerollUsed: boolean;
+}
 
 interface HandScore {
   rank: number;
@@ -41,6 +53,9 @@ interface TavernDicePokerProps {
   gold?: number;
   onClose: () => void;
   onComplete?: (result: TavernDicePokerResult) => void;
+  fictionQuantity?: number;
+  omniQuantity?: number;
+  onConsumeRerollItem?: (itemId: 'fiction-dice' | 'omni-dice') => boolean;
 }
 
 const SELIN_INT = 4;
@@ -60,6 +75,11 @@ const PIPS: Record<number, number[]> = {
 
 function rollDie(sides = 6) {
   return rollDiceEvent('dice_poker', 'minigame', sides).rolls[0];
+}
+
+function rollDifferentDie(previous: number, sides = 6) {
+  const next = rollDie(sides);
+  return next === previous ? (previous % sides) + 1 : next;
 }
 
 function rollDice(count: number) {
@@ -108,7 +128,7 @@ function chooseKeepIndexes(dice: number[]) {
 
 function improveOpponentHand(dice: number[]) {
   const keep = new Set(chooseKeepIndexes(dice));
-  return dice.map((die, index) => (keep.has(index) ? die : rollDie()));
+  return dice.map((die, index) => (keep.has(index) ? die : rollDifferentDie(die)));
 }
 
 function getPeekCount(total: number) {
@@ -255,7 +275,7 @@ const TAVERN_DICE_TUTORIAL: TutorialStep[] = [
   },
 ];
 
-export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps) {
+export function TavernDicePoker({ gold = 200, onComplete, fictionQuantity = 0, omniQuantity = 0, onConsumeRerollItem }: TavernDicePokerProps) {
   const [phase, setPhase] = useState<Phase>('prep');
   const [round, setRound] = useState(1);
   const [stake, setStake] = useState(BASE_STAKE);
@@ -280,6 +300,7 @@ export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [serinAdvice, setSerinAdvice] = useState('「等骰子落稳。我会告诉你哪些该留，哪些该重新交给运气。」');
+  const [skillCheckDecision, setSkillCheckDecision] = useState<TavernSkillCheckDecision | null>(null);
 
   const visibleSaloDice = useMemo(
     () => saloDice.map((die, index) => (index < peekCount ? die : null)),
@@ -305,8 +326,88 @@ export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps
     setPlayerDice([]);
     setSaloDice([]);
     setSelected(new Set());
+    setSkillDice(null);
+    setSkillCheckDecision(null);
     setPhase('prep');
     setMessage(`第${nextRound}局准备开始。萨洛敲了敲桌面，示意先把${nextStake}G押到桌上。`);
+  }
+
+  function skillCheckSucceeded(choice: TavernSkillCheckChoice, total: number, dc: number) {
+    return choice === 'plead' ? total > dc : total >= dc;
+  }
+
+  function openSkillCheck(choice: TavernSkillCheckChoice, label: string, bonus: number, dc: number) {
+    const roll = rollDie(20);
+    const decision: TavernSkillCheckDecision = { choice, label, bonus, dc, initialRoll: roll, finalRoll: roll, rerollUsed: false };
+    setSkillCheckDecision(decision);
+    setSkillDice(createSkillDice(label, roll, bonus, dc, skillCheckSucceeded(choice, roll + bonus, dc)));
+    setPhase('skill_result');
+    setMessage(`${label}判定：D20=${roll}+${bonus}=${roll + bonus}。确认前可以使用虚构骰子或万能骰子改变这次 D20 判定。`);
+  }
+
+  function finalizeSkillCheck() {
+    const decision = skillCheckDecision;
+    if (!decision) {
+      setSkillDice(null);
+      return;
+    }
+    const roll = decision.finalRoll;
+    const total = roll + decision.bonus;
+    setSkillDice(null);
+    setSkillCheckDecision(null);
+
+    if (decision.choice === 'peek') {
+      const revealed = getPeekCount(total);
+      setPeekUsed(true);
+      setPeekCount(revealed);
+      if (revealed === 0) {
+        setMessage(`D20=${roll}+${decision.bonus}=${total}。瑟琳低声说：「老板盯得紧，这一局我无法获得任何信息。」`);
+      } else if (revealed === 5) {
+        setMessage(`D20=${roll}+${decision.bonus}=${total}。瑟琳眼底银光一闪：「大成功，我能看到萨洛的所有骰子。」`);
+      } else {
+        setMessage(`D20=${roll}+${decision.bonus}=${total}。瑟琳贴近你耳侧：「我能看清萨洛的${revealed}枚骰子，其余还被杯影挡着。」`);
+      }
+      setPhase('ready');
+      return;
+    }
+
+    if (decision.choice === 'persuade') {
+      const bonus = getPersuadeBonus(total);
+      setPersuadeUsed(true);
+      setPersuadeBonus(bonus);
+      if (bonus === 0) {
+        setMessage(`D20=${roll}+${decision.bonus}=${total}。萨洛笑着摇头：「规矩就是规矩，银杖小姐。」`);
+      } else if (bonus === 1) {
+        setMessage(`D20=${roll}+${decision.bonus}=${total}。萨洛挑眉：「行，看在银杖的面子上，多给你一次机会。」`);
+      } else {
+        setMessage(`D20=${roll}+${decision.bonus}=${total}。萨洛微微摇了摇头：「看在银杖的面子上，多给你两次机会吧。」`);
+      }
+      setPhase('ready');
+      return;
+    }
+
+    setPleadUsed(true);
+    if (skillCheckSucceeded('plead', total, decision.dc)) {
+      setMessage(`D20=${roll}+${decision.bonus}=${total}。瑟琳没有替你们找借口，只提醒萨洛：下孢海的人少一个都可能回不来。萨洛沉默片刻，算你们取得一次有效情报胜利。`);
+      window.setTimeout(() => finishGame(0, { effectiveWins: 1 }), 900);
+    } else {
+      setMessage(`D20=${roll}+${decision.bonus}=${total}。萨洛摇头：「规矩不能每次都软。」你们只能花50G购买情报。`);
+      setPhase('plead');
+    }
+  }
+
+  function useSkillReroll(itemId: 'fiction-dice' | 'omni-dice', chosenD20?: number) {
+    const decision = skillCheckDecision;
+    if (!decision || decision.rerollUsed) return;
+    const reroll = itemId === 'fiction-dice' ? rollDie(20) : Math.max(1, Math.min(20, Math.floor(chosenD20 ?? 20)));
+    const finalRoll = itemId === 'fiction-dice' ? Math.max(decision.initialRoll, reroll) : reroll;
+    if (!onConsumeRerollItem?.(itemId)) return;
+    const nextDecision = { ...decision, finalRoll, rerollRoll: reroll, rerollUsed: true };
+    setSkillCheckDecision(nextDecision);
+    setSkillDice(createSkillDice(decision.label, finalRoll, decision.bonus, decision.dc, skillCheckSucceeded(decision.choice, finalRoll + decision.bonus, decision.dc)));
+    setMessage(itemId === 'fiction-dice'
+      ? `虚构骰子掷出 ${reroll} 点，${finalRoll === decision.initialRoll ? '未超过原判定，保留原结果。' : '高于原判定，采用新结果。'}`
+      : `万能骰子将这次 D20 判定指定为 ${finalRoll} 点。`);
   }
 
   function useSkill(choice: SkillChoice) {
@@ -317,41 +418,11 @@ export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps
       setMessage('瑟琳收回银杖，轻声说：「那就按普通规则来。我会只根据你能看到的骰面给建议。」');
       return;
     }
-
-    const roll = rollDie(20);
-
     if (choice === 'peek') {
-      const total = roll + SELIN_INT;
-      const revealed = getPeekCount(total);
-      setPeekUsed(true);
-      setPeekCount(revealed);
-      setSkillDice(createSkillDice('瑟琳透视', roll, SELIN_INT, 10, revealed > 0));
-      setPhase('skill_result');
-      if (revealed === 0) {
-        setMessage(`D20=${roll}+${SELIN_INT}=${total}。瑟琳低声说：「老板盯得紧，这一局我无法获得任何信息。」`);
-      } else if (revealed === 5) {
-        setMessage(`D20=${roll}+${SELIN_INT}=${total}。瑟琳眼底银光一闪：「大成功，我能看到萨洛的所有骰子。」`);
-      } else {
-        setMessage(`D20=${roll}+${SELIN_INT}=${total}。瑟琳贴近你耳侧：「我能看清萨洛的${revealed}枚骰子，其余还被杯影挡着。」`);
-      }
-      window.setTimeout(() => setPhase('ready'), 1000);
+      openSkillCheck('peek', '瑟琳透视', SELIN_INT, 10);
       return;
     }
-
-    const total = roll + SELIN_CHA;
-    const bonus = getPersuadeBonus(total);
-    setPersuadeUsed(true);
-    setPersuadeBonus(bonus);
-    setSkillDice(createSkillDice('瑟琳说服', roll, SELIN_CHA, 13, bonus > 0));
-    setPhase('skill_result');
-    if (bonus === 0) {
-      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛笑着摇头：「规矩就是规矩，银杖小姐。」`);
-    } else if (bonus === 1) {
-      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛挑眉：「行，看在银杖的面子上，多给你一次机会。」`);
-    } else {
-      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛微微摇了摇头：「看在银杖的面子上，多给你两次机会吧。」`);
-    }
-    window.setTimeout(() => setPhase('ready'), 1000);
+    openSkillCheck('persuade', '瑟琳说服', SELIN_CHA, 13);
   }
 
   function startRound() {
@@ -392,7 +463,7 @@ export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps
       ? '你把未保留的骰子重新扣进杯里。萨洛也眯起眼，挑走几枚骰子重投。'
       : '你把未保留的骰子重新扣进杯里。萨洛按住自己的骰杯，没有继续追你的节奏。');
     window.setTimeout(() => {
-      setPlayerDice((dice) => dice.map((die, index) => (kept.has(index) ? die : rollDie())));
+      setPlayerDice((dice) => dice.map((die, index) => (kept.has(index) ? die : rollDifferentDie(die))));
       setSaloDice((dice) => (saloWillReroll ? improveOpponentHand(dice) : dice));
       if (saloWillReroll) setSaloRerollsLeft((value) => Math.max(0, value - 1));
       setRerollsLeft((value) => value - 1);
@@ -466,20 +537,10 @@ export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps
 
   function plead() {
     if (pleadUsed) return;
-    setPleadUsed(true);
-    const roll = rollDie(20);
-    const total = roll + SELIN_CHA;
-    const success = total > 15;
-    setSkillDice(createSkillDice('瑟琳求情', roll, SELIN_CHA, 15, success));
-    if (success) {
-      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。瑟琳没有替你们找借口，只提醒萨洛：下孢海的人少一个都可能回不来。萨洛沉默片刻，算你们取得一次有效情报胜利。`);
-      window.setTimeout(() => finishGame(0, { effectiveWins: 1 }), 900);
-    } else {
-      setMessage(`D20=${roll}+${SELIN_CHA}=${total}。萨洛摇头：「规矩不能每次都软。」你们只能花50G购买情报。`);
-    }
+    openSkillCheck('plead', '瑟琳求情', SELIN_CHA, 15);
   }
 
-  const canStart = phase === 'ready' || phase === 'skill_result';
+  const canStart = phase === 'ready';
 
   useEffect(() => {
     if (phase !== 'play' || rolling || !playerDice.length) return;
@@ -687,7 +748,6 @@ export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps
             <section className="tavern-status-row">
               <span>透视：{peekUsed ? '已使用' : '可用'}{peekCount ? ` · 已透露${peekCount}枚` : ''}</span>
               <span>说服：{persuadeUsed ? '已使用' : '可用'}{persuadeBonus ? ` · +${persuadeBonus}重投` : ''}</span>
-              <span>萨洛调整：{saloRerollsLeft}</span>
               <span>预计金币：{projectedGold}G</span>
             </section>
 
@@ -717,7 +777,24 @@ export function TavernDicePoker({ gold = 200, onComplete }: TavernDicePokerProps
         )}
       </motion.section>
 
-      <DiceRollOverlay dice={skillDice} dieType="d20" onClose={() => setSkillDice(null)} />
+      <DiceRollOverlay
+        dice={skillDice}
+        dieType="d20"
+        onClose={() => setSkillDice(null)}
+        rerollDecision={skillCheckDecision ? {
+          fictionQuantity,
+          omniQuantity,
+          rerollUsed: skillCheckDecision.rerollUsed,
+          onConfirm: finalizeSkillCheck,
+          onUseFiction: () => useSkillReroll('fiction-dice'),
+          onUseOmni: (value) => useSkillReroll('omni-dice', value),
+        } : undefined}
+        comparisonRolls={skillCheckDecision?.rerollRoll !== undefined ? {
+          initial: skillCheckDecision.initialRoll,
+          reroll: skillCheckDecision.rerollRoll,
+          selected: skillCheckDecision.finalRoll === skillCheckDecision.initialRoll ? 'initial' : 'reroll',
+        } : undefined}
+      />
     </motion.div>
       )}
     </>

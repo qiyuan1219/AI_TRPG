@@ -267,14 +267,17 @@
 .tavern-kp-box strong {
   display: block;
   margin-bottom: 7px;
-  color: #efd58c;
+  color: #91eadb;
+  font-size: 1.05rem;
   font-weight: 900;
+  text-shadow: 0 0 12px rgba(95, 183, 167, 0.28);
 }
 
 .tavern-kp-box p {
   margin: 0;
-  color: #e0dcc8;
-  font-size: 0.98rem;
+  color: #f3ead0;
+  font-size: 1.04rem;
+  font-weight: 700;
   line-height: 1.62;
   white-space: pre-wrap;
 }

@@ -37,4 +37,20 @@ describe('save snapshot', () => {
     expect(snapshot.title).toBe('遗迹入口');
     expect(snapshot.active_index).toBe(-3);
   });
+
+  it('preserves nested camp-night talk logs through snapshot JSON and state migration', () => {
+    const talkLogs = {
+      serin: ['瑟琳把银杖横在膝前。', '「明天别离我太远。」'],
+      brock: ['布洛克往火里添了一块干菌木。'],
+    };
+    const snapshot = buildSaveSnapshot({
+      slotKey: 'slot-2',
+      state: { player_name: '测试者01', campNightTalkLogs: talkLogs },
+      story: [], suggestions: [], activeIndex: 0, phase: 'action', saveArea: '营地夜火',
+    });
+    const serializedState = JSON.parse(JSON.stringify(snapshot.state));
+    const restoredState = normalizePersistedGameState(serializedState, (state) => state);
+
+    expect(restoredState.campNightTalkLogs).toEqual(talkLogs);
+  });
 });

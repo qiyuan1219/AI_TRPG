@@ -45,14 +45,16 @@ class RoutesDndFallbackTests(unittest.TestCase):
         )
         visible = _strip_player_protocol_text(fallback)
 
-        self.assertIn("测试者在逆穹悬城·主缆街", visible)
+        self.assertIn("闪避并寻找掩护位置", visible)
         self.assertIn("判定失败", visible)
+        self.assertNotIn("你刚才选择了", visible)
+        self.assertNotIn("局势继续向前推进", visible)
         self.assertNotIn("HINTS", visible)
 
     def test_phase_limit_notice_is_removed_from_persisted_payloads(self):
         notice = "[系统提示：这是本阶段第3/3次选择行动。请在完成本次叙事后直接推进到下一段剧情，不要继续停留在当前选择阶段。]"
         payload = {
-            "state": {"last_event": f"追问书记员报告中的孢化地底兽\n{notice}"},
+            "state": {"last_event": f"追问米娜报告中的孢化地底兽\n{notice}"},
             "story": [{"text": f"玩家: 调查报告\n{notice}"}],
             "chat_history": [{"role": "user", "content": f"行动\n{notice}"}],
         }
@@ -60,7 +62,7 @@ class RoutesDndFallbackTests(unittest.TestCase):
         sanitized = _sanitize_for_persistence(payload)
 
         self.assertNotIn("系统提示", json.dumps(sanitized, ensure_ascii=False))
-        self.assertEqual(sanitized["state"]["last_event"], "追问书记员报告中的孢化地底兽")
+        self.assertEqual(sanitized["state"]["last_event"], "追问米娜报告中的孢化地底兽")
 
 
 if __name__ == "__main__":

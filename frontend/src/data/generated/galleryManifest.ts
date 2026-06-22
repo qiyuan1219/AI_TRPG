@@ -158,6 +158,34 @@ export const galleryManifest: GalleryAsset[] = [
     "sortKey": "audio/bgm/bgm_09_observatory(1).mp3"
   },
   {
+    "id": "audio-bgm-bgm-12-candidate1-raw-1",
+    "title": "bgm 12 candidate1 raw(1)",
+    "path": "/assets/bgm/bgm_12_candidate1_raw(1).mp3",
+    "category": "audio",
+    "mediaType": "audio",
+    "ext": ".mp3",
+    "fileName": "bgm_12_candidate1_raw(1).mp3",
+    "folder": "bgm",
+    "tags": [
+      "bgm"
+    ],
+    "sortKey": "audio/bgm/bgm_12_candidate1_raw(1).mp3"
+  },
+  {
+    "id": "audio-bgm-bgm-12-candidate2-raw",
+    "title": "bgm 12 candidate2 raw",
+    "path": "/assets/bgm/bgm_12_candidate2_raw.mp3",
+    "category": "audio",
+    "mediaType": "audio",
+    "ext": ".mp3",
+    "fileName": "bgm_12_candidate2_raw.mp3",
+    "folder": "bgm",
+    "tags": [
+      "bgm"
+    ],
+    "sortKey": "audio/bgm/bgm_12_candidate2_raw.mp3"
+  },
+  {
     "id": "audio-bgm-bgm-12-v2-candidate1-raw",
     "title": "bgm 12 v2 candidate1 raw",
     "path": "/assets/bgm/bgm_12_v2_candidate1_raw.mp3",
@@ -170,6 +198,48 @@ export const galleryManifest: GalleryAsset[] = [
       "bgm"
     ],
     "sortKey": "audio/bgm/bgm_12_v2_candidate1_raw.mp3"
+  },
+  {
+    "id": "audio-bgm-bgm-12-v2-candidate2-raw-1",
+    "title": "bgm 12 v2 candidate2 raw(1)",
+    "path": "/assets/bgm/bgm_12_v2_candidate2_raw(1).mp3",
+    "category": "audio",
+    "mediaType": "audio",
+    "ext": ".mp3",
+    "fileName": "bgm_12_v2_candidate2_raw(1).mp3",
+    "folder": "bgm",
+    "tags": [
+      "bgm"
+    ],
+    "sortKey": "audio/bgm/bgm_12_v2_candidate2_raw(1).mp3"
+  },
+  {
+    "id": "audio-bgm-bgm-13-candidate1-raw-1",
+    "title": "bgm 13 candidate1 raw(1)",
+    "path": "/assets/bgm/bgm_13_candidate1_raw(1).mp3",
+    "category": "audio",
+    "mediaType": "audio",
+    "ext": ".mp3",
+    "fileName": "bgm_13_candidate1_raw(1).mp3",
+    "folder": "bgm",
+    "tags": [
+      "bgm"
+    ],
+    "sortKey": "audio/bgm/bgm_13_candidate1_raw(1).mp3"
+  },
+  {
+    "id": "audio-bgm-bgm-13-candidate2-raw-1",
+    "title": "bgm 13 candidate2 raw(1)",
+    "path": "/assets/bgm/bgm_13_candidate2_raw(1).mp3",
+    "category": "audio",
+    "mediaType": "audio",
+    "ext": ".mp3",
+    "fileName": "bgm_13_candidate2_raw(1).mp3",
+    "folder": "bgm",
+    "tags": [
+      "bgm"
+    ],
+    "sortKey": "audio/bgm/bgm_13_candidate2_raw(1).mp3"
   },
   {
     "id": "audio-bgm-temple",
@@ -202,100 +272,114 @@ export const galleryManifest: GalleryAsset[] = [
   {
     "id": "cg-cg-cg01",
     "title": "cg01",
-    "path": "/assets/CG/cg01.png",
+    "path": "/assets/CG/cg01.webp",
     "category": "cg",
     "mediaType": "image",
-    "ext": ".png",
-    "fileName": "cg01.png",
+    "ext": ".webp",
+    "fileName": "cg01.webp",
     "folder": "CG",
     "tags": [
       "CG"
     ],
-    "sortKey": "cg/cg/cg01.png"
+    "sortKey": "cg/cg/cg01.webp"
   },
   {
     "id": "cg-cg-cg02",
     "title": "cg02",
-    "path": "/assets/CG/cg02.png",
+    "path": "/assets/CG/cg02.webp",
     "category": "cg",
     "mediaType": "image",
-    "ext": ".png",
-    "fileName": "cg02.png",
+    "ext": ".webp",
+    "fileName": "cg02.webp",
     "folder": "CG",
     "tags": [
       "CG"
     ],
-    "sortKey": "cg/cg/cg02.png"
+    "sortKey": "cg/cg/cg02.webp"
   },
   {
     "id": "cg-cg-cg03",
     "title": "cg03",
-    "path": "/assets/CG/cg03.png",
+    "path": "/assets/CG/cg03.webp",
     "category": "cg",
     "mediaType": "image",
-    "ext": ".png",
-    "fileName": "cg03.png",
+    "ext": ".webp",
+    "fileName": "cg03.webp",
     "folder": "CG",
     "tags": [
       "CG"
     ],
-    "sortKey": "cg/cg/cg03.png"
+    "sortKey": "cg/cg/cg03.webp"
   },
   {
     "id": "cg-cg-cg04",
     "title": "cg04",
-    "path": "/assets/CG/cg04.png",
+    "path": "/assets/CG/cg04.webp",
     "category": "cg",
     "mediaType": "image",
-    "ext": ".png",
-    "fileName": "cg04.png",
+    "ext": ".webp",
+    "fileName": "cg04.webp",
     "folder": "CG",
     "tags": [
       "CG"
     ],
-    "sortKey": "cg/cg/cg04.png"
+    "sortKey": "cg/cg/cg04.webp"
   },
   {
     "id": "cg-cg-cg05",
     "title": "cg05",
-    "path": "/assets/CG/cg05.png",
+    "path": "/assets/CG/cg05.webp",
     "category": "cg",
     "mediaType": "image",
-    "ext": ".png",
-    "fileName": "cg05.png",
+    "ext": ".webp",
+    "fileName": "cg05.webp",
     "folder": "CG",
     "tags": [
       "CG"
     ],
-    "sortKey": "cg/cg/cg05.png"
+    "sortKey": "cg/cg/cg05.webp"
   },
   {
     "id": "cg-cg-cg06",
     "title": "cg06",
-    "path": "/assets/CG/cg06.png",
+    "path": "/assets/CG/cg06.webp",
     "category": "cg",
     "mediaType": "image",
-    "ext": ".png",
-    "fileName": "cg06.png",
+    "ext": ".webp",
+    "fileName": "cg06.webp",
     "folder": "CG",
     "tags": [
       "CG"
     ],
-    "sortKey": "cg/cg/cg06.png"
+    "sortKey": "cg/cg/cg06.webp"
+  },
+  {
+    "id": "cg-cg-cg07",
+    "title": "cg07",
+    "path": "/assets/CG/cg07.webp",
+    "category": "cg",
+    "mediaType": "image",
+    "ext": ".webp",
+    "fileName": "cg07.webp",
+    "folder": "CG",
+    "tags": [
+      "CG"
+    ],
+    "sortKey": "cg/cg/cg07.webp"
   },
   {
     "id": "cg-cg-chatgpt-image-2026年6月19日-17-23-43",
     "title": "ChatGPT Image 2026年6月19日 17 23 43",
-    "path": "/assets/CG/ChatGPT Image 2026年6月19日 17_23_43.png",
+    "path": "/assets/CG/ChatGPT Image 2026年6月19日 17_23_43.webp",
     "category": "cg",
     "mediaType": "image",
-    "ext": ".png",
-    "fileName": "ChatGPT Image 2026年6月19日 17_23_43.png",
+    "ext": ".webp",
+    "fileName": "ChatGPT Image 2026年6月19日 17_23_43.webp",
     "folder": "CG",
     "tags": [
       "CG"
     ],
-    "sortKey": "cg/cg/chatgpt image 2026年6月19日 17_23_43.png"
+    "sortKey": "cg/cg/chatgpt image 2026年6月19日 17_23_43.webp"
   },
   {
     "id": "cg-cg-ending-wounded-through-gate",
@@ -310,20 +394,6 @@ export const galleryManifest: GalleryAsset[] = [
       "CG"
     ],
     "sortKey": "cg/cg/ending-wounded-through-gate.webp"
-  },
-  {
-    "id": "character-characters-1kaiya-blackmarket",
-    "title": "1kaiya blackmarket",
-    "path": "/assets/characters/1kaiya_blackmarket.webp",
-    "category": "character",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "1kaiya_blackmarket.webp",
-    "folder": "characters",
-    "tags": [
-      "characters"
-    ],
-    "sortKey": "character/characters/1kaiya_blackmarket.webp"
   },
   {
     "id": "character-characters-adventurer-adventurer-idle",
@@ -356,21 +426,6 @@ export const galleryManifest: GalleryAsset[] = [
     "sortKey": "character/characters/ailin/ailin_idle.png"
   },
   {
-    "id": "character-characters-ailin-ailin-prayer",
-    "title": "ailin prayer",
-    "path": "/assets/characters/ailin/ailin_prayer.webp",
-    "category": "character",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "ailin_prayer.webp",
-    "folder": "characters",
-    "tags": [
-      "characters",
-      "ailin"
-    ],
-    "sortKey": "character/characters/ailin/ailin_prayer.webp"
-  },
-  {
     "id": "character-characters-aolan-aolan-idle",
     "title": "aolan idle",
     "path": "/assets/characters/aolan/aolan_idle.png",
@@ -384,20 +439,6 @@ export const galleryManifest: GalleryAsset[] = [
       "aolan"
     ],
     "sortKey": "character/characters/aolan/aolan_idle.png"
-  },
-  {
-    "id": "character-characters-chatgpt-image-2026年6月11日-16-30-53-1-cutout",
-    "title": "ChatGPT Image 2026年6月11日 16 30 53 (1) cutout",
-    "path": "/assets/characters/ChatGPT Image 2026年6月11日 16_30_53 (1)_cutout.png",
-    "category": "character",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "ChatGPT Image 2026年6月11日 16_30_53 (1)_cutout.png",
-    "folder": "characters",
-    "tags": [
-      "characters"
-    ],
-    "sortKey": "character/characters/chatgpt image 2026年6月11日 16_30_53 (1)_cutout.png"
   },
   {
     "id": "character-characters-guard-guard-idle",
@@ -475,21 +516,6 @@ export const galleryManifest: GalleryAsset[] = [
     "sortKey": "character/characters/kelaiya/kelaiya_idle.png"
   },
   {
-    "id": "character-characters-leiduo-leiduo-idle",
-    "title": "leiduo idle",
-    "path": "/assets/characters/leiduo/leiduo_idle.png",
-    "category": "character",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "leiduo_idle.png",
-    "folder": "characters",
-    "tags": [
-      "characters",
-      "leiduo"
-    ],
-    "sortKey": "character/characters/leiduo/leiduo_idle.png"
-  },
-  {
     "id": "character-characters-lein-lein-idle",
     "title": "lein idle",
     "path": "/assets/characters/lein/lein_idle.png",
@@ -503,21 +529,6 @@ export const galleryManifest: GalleryAsset[] = [
       "lein"
     ],
     "sortKey": "character/characters/lein/lein_idle.png"
-  },
-  {
-    "id": "character-characters-liyase-liyase-idle",
-    "title": "liyase idle",
-    "path": "/assets/characters/liyase/liyase_idle.png",
-    "category": "character",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "liyase_idle.png",
-    "folder": "characters",
-    "tags": [
-      "characters",
-      "liyase"
-    ],
-    "sortKey": "character/characters/liyase/liyase_idle.png"
   },
   {
     "id": "character-characters-mina-chatgpt-image-2026年6月9日-21-06-15-cutout",
@@ -565,21 +576,6 @@ export const galleryManifest: GalleryAsset[] = [
     "sortKey": "character/characters/nibu/nibu_idle.png"
   },
   {
-    "id": "character-characters-npc-default",
-    "title": "default",
-    "path": "/assets/characters/npc/default.svg",
-    "category": "character",
-    "mediaType": "image",
-    "ext": ".svg",
-    "fileName": "default.svg",
-    "folder": "characters",
-    "tags": [
-      "characters",
-      "npc"
-    ],
-    "sortKey": "character/characters/npc/default.svg"
-  },
-  {
     "id": "character-characters-salo-salo-idle",
     "title": "salo idle",
     "path": "/assets/characters/salo/salo_idle.png",
@@ -623,21 +619,6 @@ export const galleryManifest: GalleryAsset[] = [
       "selin"
     ],
     "sortKey": "character/characters/selin/selin_idle.png"
-  },
-  {
-    "id": "character-characters-senluo-brock-tavern",
-    "title": "brock tavern",
-    "path": "/assets/characters/senluo/brock_tavern.webp",
-    "category": "character",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "brock_tavern.webp",
-    "folder": "characters",
-    "tags": [
-      "characters",
-      "senluo"
-    ],
-    "sortKey": "character/characters/senluo/brock_tavern.webp"
   },
   {
     "id": "character-characters-senluo-senluo-idle",
@@ -1749,6 +1730,150 @@ export const galleryManifest: GalleryAsset[] = [
     "sortKey": "item/icons/items/38.png"
   },
   {
+    "id": "item-icons-items-aolan-blindbox-blackmarket-chips",
+    "title": "blackmarket chips",
+    "path": "/assets/icons/items/aolan_blindbox/blackmarket_chips.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "blackmarket_chips.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/blackmarket_chips.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-cold-light-stick",
+    "title": "cold light stick",
+    "path": "/assets/icons/items/aolan_blindbox/cold_light_stick.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "cold_light_stick.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/cold_light_stick.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-copper-ring",
+    "title": "copper ring",
+    "path": "/assets/icons/items/aolan_blindbox/copper_ring.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "copper_ring.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/copper_ring.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-diamond",
+    "title": "diamond",
+    "path": "/assets/icons/items/aolan_blindbox/diamond.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "diamond.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/diamond.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-hemostatic-powder",
+    "title": "hemostatic powder",
+    "path": "/assets/icons/items/aolan_blindbox/hemostatic_powder.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "hemostatic_powder.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/hemostatic_powder.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-old-talisman-fragments",
+    "title": "old talisman fragments",
+    "path": "/assets/icons/items/aolan_blindbox/old_talisman_fragments.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "old_talisman_fragments.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/old_talisman_fragments.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-sealed-sample-bottle",
+    "title": "sealed sample bottle",
+    "path": "/assets/icons/items/aolan_blindbox/sealed_sample_bottle.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "sealed_sample_bottle.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/sealed_sample_bottle.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-small-bottle-therapeutic-solution",
+    "title": "small bottle therapeutic solution",
+    "path": "/assets/icons/items/aolan_blindbox/small_bottle_therapeutic_solution.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "small_bottle_therapeutic_solution.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/small_bottle_therapeutic_solution.png"
+  },
+  {
+    "id": "item-icons-items-aolan-blindbox-weakly-effective-detoxifying-agent",
+    "title": "weakly effective detoxifying agent",
+    "path": "/assets/icons/items/aolan_blindbox/weakly_effective_detoxifying_agent.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "weakly_effective_detoxifying_agent.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "aolan_blindbox"
+    ],
+    "sortKey": "item/icons/items/aolan_blindbox/weakly_effective_detoxifying_agent.png"
+  },
+  {
     "id": "item-icons-items-backpack",
     "title": "backpack",
     "path": "/assets/icons/items/backpack.png",
@@ -1780,18 +1905,18 @@ export const galleryManifest: GalleryAsset[] = [
   },
   {
     "id": "item-icons-items-book-open",
-    "title": "book open.",
-    "path": "/assets/icons/items/book-open..png",
+    "title": "book open",
+    "path": "/assets/icons/items/book-open.png",
     "category": "item",
     "mediaType": "image",
     "ext": ".png",
-    "fileName": "book-open..png",
+    "fileName": "book-open.png",
     "folder": "icons",
     "tags": [
       "icons",
       "items"
     ],
-    "sortKey": "item/icons/items/book-open..png"
+    "sortKey": "item/icons/items/book-open.png"
   },
   {
     "id": "item-icons-items-book-prayer",
@@ -2304,88 +2429,132 @@ export const galleryManifest: GalleryAsset[] = [
     "sortKey": "item/icons/items/xugou.png"
   },
   {
-    "id": "map-maps-icon-blackmarket",
-    "title": "icon blackmarket",
-    "path": "/assets/maps/icon-blackmarket.png",
-    "category": "map",
+    "id": "item-icons-items-yuling-shop-agile-potion",
+    "title": "agile potion",
+    "path": "/assets/icons/items/yuling_shop/agile_potion.png",
+    "category": "item",
     "mediaType": "image",
     "ext": ".png",
-    "fileName": "icon-blackmarket.png",
-    "folder": "maps",
+    "fileName": "agile_potion.png",
+    "folder": "icons",
     "tags": [
-      "maps"
+      "icons",
+      "items",
+      "yuling_shop"
     ],
-    "sortKey": "map/maps/icon-blackmarket.png"
+    "sortKey": "item/icons/items/yuling_shop/agile_potion.png"
   },
   {
-    "id": "map-maps-icon-cathedral",
-    "title": "icon cathedral",
-    "path": "/assets/maps/icon-cathedral.png",
-    "category": "map",
+    "id": "item-icons-items-yuling-shop-charm-potion",
+    "title": "charm potion",
+    "path": "/assets/icons/items/yuling_shop/charm_potion.png",
+    "category": "item",
     "mediaType": "image",
     "ext": ".png",
-    "fileName": "icon-cathedral.png",
-    "folder": "maps",
+    "fileName": "charm_potion.png",
+    "folder": "icons",
     "tags": [
-      "maps"
+      "icons",
+      "items",
+      "yuling_shop"
     ],
-    "sortKey": "map/maps/icon-cathedral.png"
+    "sortKey": "item/icons/items/yuling_shop/charm_potion.png"
   },
   {
-    "id": "map-maps-icon-elevator",
-    "title": "icon elevator",
-    "path": "/assets/maps/icon-elevator.png",
-    "category": "map",
+    "id": "item-icons-items-yuling-shop-constitution-potion",
+    "title": "constitution potion",
+    "path": "/assets/icons/items/yuling_shop/constitution_potion.png",
+    "category": "item",
     "mediaType": "image",
     "ext": ".png",
-    "fileName": "icon-elevator.png",
-    "folder": "maps",
+    "fileName": "constitution_potion.png",
+    "folder": "icons",
     "tags": [
-      "maps"
+      "icons",
+      "items",
+      "yuling_shop"
     ],
-    "sortKey": "map/maps/icon-elevator.png"
+    "sortKey": "item/icons/items/yuling_shop/constitution_potion.png"
   },
   {
-    "id": "map-maps-icon-guild",
-    "title": "icon guild",
-    "path": "/assets/maps/icon-guild.png",
-    "category": "map",
+    "id": "item-icons-items-yuling-shop-healing-potion",
+    "title": "healing potion",
+    "path": "/assets/icons/items/yuling_shop/healing_potion.png",
+    "category": "item",
     "mediaType": "image",
     "ext": ".png",
-    "fileName": "icon-guild.png",
-    "folder": "maps",
+    "fileName": "healing_potion.png",
+    "folder": "icons",
     "tags": [
-      "maps"
+      "icons",
+      "items",
+      "yuling_shop"
     ],
-    "sortKey": "map/maps/icon-guild.png"
+    "sortKey": "item/icons/items/yuling_shop/healing_potion.png"
   },
   {
-    "id": "map-maps-icon-tavern",
-    "title": "icon tavern",
-    "path": "/assets/maps/icon-tavern.png",
-    "category": "map",
+    "id": "item-icons-items-yuling-shop-perception-potion",
+    "title": "perception potion",
+    "path": "/assets/icons/items/yuling_shop/perception_potion.png",
+    "category": "item",
     "mediaType": "image",
     "ext": ".png",
-    "fileName": "icon-tavern.png",
-    "folder": "maps",
+    "fileName": "perception_potion.png",
+    "folder": "icons",
     "tags": [
-      "maps"
+      "icons",
+      "items",
+      "yuling_shop"
     ],
-    "sortKey": "map/maps/icon-tavern.png"
+    "sortKey": "item/icons/items/yuling_shop/perception_potion.png"
   },
   {
-    "id": "map-maps-inverse-city-map",
-    "title": "inverse city map",
-    "path": "/assets/maps/inverse-city-map.png",
-    "category": "map",
+    "id": "item-icons-items-yuling-shop-power-potion",
+    "title": "power potion",
+    "path": "/assets/icons/items/yuling_shop/power_potion.png",
+    "category": "item",
     "mediaType": "image",
     "ext": ".png",
-    "fileName": "inverse-city-map.png",
-    "folder": "maps",
+    "fileName": "power_potion.png",
+    "folder": "icons",
     "tags": [
-      "maps"
+      "icons",
+      "items",
+      "yuling_shop"
     ],
-    "sortKey": "map/maps/inverse-city-map.png"
+    "sortKey": "item/icons/items/yuling_shop/power_potion.png"
+  },
+  {
+    "id": "item-icons-items-yuling-shop-purifyingheart",
+    "title": "purifyingheart",
+    "path": "/assets/icons/items/yuling_shop/purifyingheart.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "purifyingheart.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "yuling_shop"
+    ],
+    "sortKey": "item/icons/items/yuling_shop/purifyingheart.png"
+  },
+  {
+    "id": "item-icons-items-yuling-shop-wisdom-potion",
+    "title": "wisdom potion",
+    "path": "/assets/icons/items/yuling_shop/wisdom_potion.png",
+    "category": "item",
+    "mediaType": "image",
+    "ext": ".png",
+    "fileName": "wisdom_potion.png",
+    "folder": "icons",
+    "tags": [
+      "icons",
+      "items",
+      "yuling_shop"
+    ],
+    "sortKey": "item/icons/items/yuling_shop/wisdom_potion.png"
   },
   {
     "id": "other-battle-b1-cablestreet-battle",
@@ -2400,20 +2569,6 @@ export const galleryManifest: GalleryAsset[] = [
       "battle"
     ],
     "sortKey": "other/battle/b1-cablestreet-battle.png"
-  },
-  {
-    "id": "other-battle-b1-sanctum-placeholder",
-    "title": "b1 sanctum placeholder",
-    "path": "/assets/battle/b1-sanctum-placeholder.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "b1-sanctum-placeholder.png",
-    "folder": "battle",
-    "tags": [
-      "battle"
-    ],
-    "sortKey": "other/battle/b1-sanctum-placeholder.png"
   },
   {
     "id": "other-battle-battle01",
@@ -2533,847 +2688,438 @@ export const galleryManifest: GalleryAsset[] = [
     "sortKey": "other/icons/style_selection/05.png"
   },
   {
-    "id": "other-prop-aolan-blindbox-blackmarket-chips",
-    "title": "blackmarket chips",
-    "path": "/assets/prop/aolan_blindbox/blackmarket_chips.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "blackmarket_chips.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/blackmarket_chips.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-cold-light-stick",
-    "title": "cold light stick",
-    "path": "/assets/prop/aolan_blindbox/cold_light_stick.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "cold_light_stick.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/cold_light_stick.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-copper-ring",
-    "title": "copper ring",
-    "path": "/assets/prop/aolan_blindbox/copper_ring.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "copper_ring.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/copper_ring.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-diamond",
-    "title": "diamond",
-    "path": "/assets/prop/aolan_blindbox/diamond.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "diamond.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/diamond.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-hemostatic-powder",
-    "title": "hemostatic powder",
-    "path": "/assets/prop/aolan_blindbox/hemostatic_powder.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "hemostatic_powder.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/hemostatic_powder.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-old-talisman-fragments",
-    "title": "old talisman fragments",
-    "path": "/assets/prop/aolan_blindbox/old_talisman_fragments.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "old_talisman_fragments.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/old_talisman_fragments.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-sealed-sample-bottle",
-    "title": "sealed sample bottle",
-    "path": "/assets/prop/aolan_blindbox/sealed_sample_bottle.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "sealed_sample_bottle.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/sealed_sample_bottle.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-small-bottle-therapeutic-solution",
-    "title": "small bottle therapeutic solution",
-    "path": "/assets/prop/aolan_blindbox/small_bottle_therapeutic_solution.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "small_bottle_therapeutic_solution.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/small_bottle_therapeutic_solution.png"
-  },
-  {
-    "id": "other-prop-aolan-blindbox-weakly-effective-detoxifying-agent",
-    "title": "weakly effective detoxifying agent",
-    "path": "/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "weakly_effective_detoxifying_agent.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "aolan_blindbox"
-    ],
-    "sortKey": "other/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-agile-potion",
-    "title": "agile potion",
-    "path": "/assets/prop/yuling_shop/agile_potion.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "agile_potion.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/agile_potion.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-charm-potion",
-    "title": "charm potion",
-    "path": "/assets/prop/yuling_shop/charm_potion.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "charm_potion.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/charm_potion.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-constitution-potion",
-    "title": "constitution potion",
-    "path": "/assets/prop/yuling_shop/constitution_potion.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "constitution_potion.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/constitution_potion.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-healing-potion",
-    "title": "healing potion",
-    "path": "/assets/prop/yuling_shop/healing_potion.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "healing_potion.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/healing_potion.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-perception-potion",
-    "title": "perception potion",
-    "path": "/assets/prop/yuling_shop/perception_potion.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "perception_potion.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/perception_potion.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-power-potion",
-    "title": "power potion",
-    "path": "/assets/prop/yuling_shop/power_potion.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "power_potion.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/power_potion.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-purifyingheart",
-    "title": "purifyingheart",
-    "path": "/assets/prop/yuling_shop/purifyingheart.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "purifyingheart.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/purifyingheart.png"
-  },
-  {
-    "id": "other-prop-yuling-shop-wisdom-potion",
-    "title": "wisdom potion",
-    "path": "/assets/prop/yuling_shop/wisdom_potion.png",
-    "category": "other",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "wisdom_potion.png",
-    "folder": "prop",
-    "tags": [
-      "prop",
-      "yuling_shop"
-    ],
-    "sortKey": "other/prop/yuling_shop/wisdom_potion.png"
-  },
-  {
-    "id": "scene-scenes-0101cable-street-walk",
-    "title": "0101cable street walk",
-    "path": "/assets/scenes/0101cable-street-walk.webp",
+    "id": "scene-scenes-01",
+    "title": "01",
+    "path": "/assets/scenes/01.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "0101cable-street-walk.webp",
+    "fileName": "01.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/0101cable-street-walk.webp"
+    "sortKey": "scene/scenes/01.webp"
   },
   {
-    "id": "scene-scenes-01city",
-    "title": "01city",
-    "path": "/assets/scenes/01city.webp",
+    "id": "scene-scenes-02",
+    "title": "02",
+    "path": "/assets/scenes/02.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "01city.webp",
+    "fileName": "02.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/01city.webp"
+    "sortKey": "scene/scenes/02.webp"
   },
   {
-    "id": "scene-scenes-01inverse-city-first-sight",
-    "title": "01inverse city first sight",
-    "path": "/assets/scenes/01inverse-city-first-sight.webp",
+    "id": "scene-scenes-03",
+    "title": "03",
+    "path": "/assets/scenes/03.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "01inverse-city-first-sight.webp",
+    "fileName": "03.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/01inverse-city-first-sight.webp"
+    "sortKey": "scene/scenes/03.webp"
   },
   {
-    "id": "scene-scenes-02tutorial-battle-trigger",
-    "title": "02tutorial battle trigger",
-    "path": "/assets/scenes/02tutorial-battle-trigger.webp",
+    "id": "scene-scenes-04",
+    "title": "04",
+    "path": "/assets/scenes/04.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "02tutorial-battle-trigger.webp",
+    "fileName": "04.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/02tutorial-battle-trigger.webp"
+    "sortKey": "scene/scenes/04.webp"
   },
   {
-    "id": "scene-scenes-03post-battle-street",
-    "title": "03post battle street",
-    "path": "/assets/scenes/03post-battle-street.webp",
+    "id": "scene-scenes-05",
+    "title": "05",
+    "path": "/assets/scenes/05.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "03post-battle-street.webp",
+    "fileName": "05.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/03post-battle-street.webp"
+    "sortKey": "scene/scenes/05.webp"
   },
   {
-    "id": "scene-scenes-04guild-interior",
-    "title": "04guild interior",
-    "path": "/assets/scenes/04guild-interior.webp",
+    "id": "scene-scenes-06",
+    "title": "06",
+    "path": "/assets/scenes/06.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "04guild-interior.webp",
+    "fileName": "06.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/04guild-interior.webp"
+    "sortKey": "scene/scenes/06.webp"
   },
   {
-    "id": "scene-scenes-05temple-interior",
-    "title": "05temple interior",
-    "path": "/assets/scenes/05temple-interior.png",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "05temple-interior.png",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/05temple-interior.png"
-  },
-  {
-    "id": "scene-scenes-06tavern-interior",
-    "title": "06tavern interior",
-    "path": "/assets/scenes/06tavern-interior.webp",
+    "id": "scene-scenes-07",
+    "title": "07",
+    "path": "/assets/scenes/07.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "06tavern-interior.webp",
+    "fileName": "07.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/06tavern-interior.webp"
+    "sortKey": "scene/scenes/07.webp"
   },
   {
-    "id": "scene-scenes-07blackmarket-stall",
-    "title": "07blackmarket stall",
-    "path": "/assets/scenes/07blackmarket-stall.webp",
+    "id": "scene-scenes-08",
+    "title": "08",
+    "path": "/assets/scenes/08.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "07blackmarket-stall.webp",
+    "fileName": "08.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/07blackmarket-stall.webp"
+    "sortKey": "scene/scenes/08.webp"
   },
   {
-    "id": "scene-scenes-08elevator-hub",
-    "title": "08elevator hub",
-    "path": "/assets/scenes/08elevator-hub.webp",
+    "id": "scene-scenes-09",
+    "title": "09",
+    "path": "/assets/scenes/09.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "08elevator-hub.webp",
+    "fileName": "09.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/08elevator-hub.webp"
+    "sortKey": "scene/scenes/09.webp"
   },
   {
-    "id": "scene-scenes-09brock-tavern-table",
-    "title": "09brock tavern table",
-    "path": "/assets/scenes/09brock-tavern-table.webp",
+    "id": "scene-scenes-10",
+    "title": "10",
+    "path": "/assets/scenes/10.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "09brock-tavern-table.webp",
+    "fileName": "10.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/09brock-tavern-table.webp"
+    "sortKey": "scene/scenes/10.webp"
   },
   {
-    "id": "scene-scenes-10blue-shoal-after-battle",
-    "title": "蓝伞浅滩战后",
-    "path": "/assets/scenes/10blue-shoal-after-battle.webp",
+    "id": "scene-scenes-11",
+    "title": "11",
+    "path": "/assets/scenes/11.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "10blue-shoal-after-battle.webp",
+    "fileName": "11.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/10blue-shoal-after-battle.webp"
+    "sortKey": "scene/scenes/11.webp"
   },
   {
-    "id": "scene-scenes-10orlan-lucky-box",
-    "title": "10orlan lucky box",
-    "path": "/assets/scenes/10orlan-lucky-box.webp",
+    "id": "scene-scenes-12",
+    "title": "12",
+    "path": "/assets/scenes/12.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "10orlan-lucky-box.webp",
+    "fileName": "12.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/10orlan-lucky-box.webp"
+    "sortKey": "scene/scenes/12.webp"
   },
   {
-    "id": "scene-scenes-11black-root-entrance",
-    "title": "11black root entrance",
-    "path": "/assets/scenes/11black-root-entrance.webp",
+    "id": "scene-scenes-13",
+    "title": "13",
+    "path": "/assets/scenes/13.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "11black-root-entrance.webp",
+    "fileName": "13.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/11black-root-entrance.webp"
+    "sortKey": "scene/scenes/13.webp"
   },
   {
-    "id": "scene-scenes-11temple-prayer",
-    "title": "11temple prayer",
-    "path": "/assets/scenes/11temple-prayer.webp",
+    "id": "scene-scenes-14",
+    "title": "14",
+    "path": "/assets/scenes/14.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "11temple-prayer.webp",
+    "fileName": "14.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/11temple-prayer.webp"
+    "sortKey": "scene/scenes/14.webp"
   },
   {
-    "id": "scene-scenes-123",
-    "title": "123",
-    "path": "/assets/scenes/123.webp",
+    "id": "scene-scenes-15",
+    "title": "15",
+    "path": "/assets/scenes/15.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "123.webp",
+    "fileName": "15.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/123.webp"
+    "sortKey": "scene/scenes/15.webp"
   },
   {
-    "id": "scene-scenes-12lain-survivor-site",
-    "title": "第三远征队遗弃营地",
-    "path": "/assets/scenes/12lain-survivor-site.webp",
+    "id": "scene-scenes-16",
+    "title": "16",
+    "path": "/assets/scenes/16.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "12lain-survivor-site.webp",
+    "fileName": "16.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/12lain-survivor-site.webp"
+    "sortKey": "scene/scenes/16.webp"
   },
   {
-    "id": "scene-scenes-12yunling-apothecary",
-    "title": "云苓药铺",
-    "path": "/assets/scenes/12yunling-apothecary.webp",
+    "id": "scene-scenes-17",
+    "title": "17",
+    "path": "/assets/scenes/17.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "12yunling-apothecary.webp",
+    "fileName": "17.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/12yunling-apothecary.webp"
+    "sortKey": "scene/scenes/17.webp"
   },
   {
-    "id": "scene-scenes-13black-root-rest-point",
-    "title": "13black root rest point",
-    "path": "/assets/scenes/13black-root-rest-point.webp",
+    "id": "scene-scenes-18",
+    "title": "18",
+    "path": "/assets/scenes/18.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "13black-root-rest-point.webp",
+    "fileName": "18.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/13black-root-rest-point.webp"
+    "sortKey": "scene/scenes/18.webp"
   },
   {
-    "id": "scene-scenes-14dark-gate-forecourt-battle",
-    "title": "14dark gate forecourt battle",
-    "path": "/assets/scenes/14dark-gate-forecourt-battle.webp",
+    "id": "scene-scenes-19",
+    "title": "19",
+    "path": "/assets/scenes/19.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "14dark-gate-forecourt-battle.webp",
+    "fileName": "19.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/14dark-gate-forecourt-battle.webp"
+    "sortKey": "scene/scenes/19.webp"
   },
   {
-    "id": "scene-scenes-15underground-ocean-reveal",
-    "title": "15underground ocean reveal",
-    "path": "/assets/scenes/15underground-ocean-reveal.webp",
+    "id": "scene-scenes-20",
+    "title": "20",
+    "path": "/assets/scenes/20.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "15underground-ocean-reveal.webp",
+    "fileName": "20.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/15underground-ocean-reveal.webp"
+    "sortKey": "scene/scenes/20.webp"
   },
   {
-    "id": "scene-scenes-16blue-umbrella-shoal",
-    "title": "16blue umbrella shoal",
-    "path": "/assets/scenes/16blue-umbrella-shoal.webp",
+    "id": "scene-scenes-21",
+    "title": "21",
+    "path": "/assets/scenes/21.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "16blue-umbrella-shoal.webp",
+    "fileName": "21.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/16blue-umbrella-shoal.webp"
+    "sortKey": "scene/scenes/21.webp"
   },
   {
-    "id": "scene-scenes-abandon-post",
-    "title": "abandon post",
-    "path": "/assets/scenes/abandon-post.webp",
+    "id": "scene-scenes-22",
+    "title": "22",
+    "path": "/assets/scenes/22.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "abandon-post.webp",
+    "fileName": "22.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/abandon-post.webp"
+    "sortKey": "scene/scenes/22.webp"
   },
   {
-    "id": "scene-scenes-ailin-side-tent-exterior",
-    "title": "ailin side tent exterior",
-    "path": "/assets/scenes/ailin_side_tent_exterior.webp",
+    "id": "scene-scenes-23",
+    "title": "23",
+    "path": "/assets/scenes/23.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "ailin_side_tent_exterior.webp",
+    "fileName": "23.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/ailin_side_tent_exterior.webp"
+    "sortKey": "scene/scenes/23.webp"
   },
   {
-    "id": "scene-scenes-ailin-side-tent-interior",
-    "title": "ailin side tent interior",
-    "path": "/assets/scenes/ailin_side_tent_interior.webp",
+    "id": "scene-scenes-24",
+    "title": "24",
+    "path": "/assets/scenes/24.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "ailin_side_tent_interior.webp",
+    "fileName": "24.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/ailin_side_tent_interior.webp"
+    "sortKey": "scene/scenes/24.webp"
   },
   {
-    "id": "scene-scenes-bg-04-inverse-city-observatory",
-    "title": "bg 04 inverse city observatory",
-    "path": "/assets/scenes/bg-04-inverse-city-observatory.webp",
+    "id": "scene-scenes-25",
+    "title": "25",
+    "path": "/assets/scenes/25.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "bg-04-inverse-city-observatory.webp",
+    "fileName": "25.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/bg-04-inverse-city-observatory.webp"
+    "sortKey": "scene/scenes/25.webp"
   },
   {
-    "id": "scene-scenes-bg-05-cable-elevator-platform",
-    "title": "bg 05 cable elevator platform",
-    "path": "/assets/scenes/bg-05-cable-elevator-platform.webp",
+    "id": "scene-scenes-26",
+    "title": "26",
+    "path": "/assets/scenes/26.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "bg-05-cable-elevator-platform.webp",
+    "fileName": "26.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/bg-05-cable-elevator-platform.webp"
+    "sortKey": "scene/scenes/26.webp"
   },
   {
-    "id": "scene-scenes-bg-06-cable-elevator-descent",
-    "title": "bg 06 cable elevator descent",
-    "path": "/assets/scenes/bg-06-cable-elevator-descent.webp",
+    "id": "scene-scenes-27",
+    "title": "27",
+    "path": "/assets/scenes/27.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "bg-06-cable-elevator-descent.webp",
+    "fileName": "27.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/bg-06-cable-elevator-descent.webp"
+    "sortKey": "scene/scenes/27.webp"
   },
   {
-    "id": "scene-scenes-bg-07-spore-outpost",
-    "title": "bg 07 spore outpost",
-    "path": "/assets/scenes/bg-07-spore-outpost.webp",
+    "id": "scene-scenes-28",
+    "title": "28",
+    "path": "/assets/scenes/28.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "bg-07-spore-outpost.webp",
+    "fileName": "28.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/bg-07-spore-outpost.webp"
+    "sortKey": "scene/scenes/28.webp"
   },
   {
-    "id": "scene-scenes-bg-08-blue-cap-shallows",
-    "title": "bg 08 blue cap shallows",
-    "path": "/assets/scenes/bg-08-blue-cap-shallows.webp",
+    "id": "scene-scenes-29",
+    "title": "29",
+    "path": "/assets/scenes/29.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "bg-08-blue-cap-shallows.webp",
+    "fileName": "29.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/bg-08-blue-cap-shallows.webp"
+    "sortKey": "scene/scenes/29.webp"
   },
   {
-    "id": "scene-scenes-bg-09-echo-fungus-forest",
-    "title": "bg 09 echo fungus forest",
-    "path": "/assets/scenes/bg-09-echo-fungus-forest.webp",
+    "id": "scene-scenes-30",
+    "title": "30",
+    "path": "/assets/scenes/30.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "bg-09-echo-fungus-forest.webp",
+    "fileName": "30.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/bg-09-echo-fungus-forest.webp"
+    "sortKey": "scene/scenes/30.webp"
   },
   {
-    "id": "scene-scenes-bg-10-bone-pillar-marsh",
-    "title": "bg 10 bone pillar marsh",
-    "path": "/assets/scenes/bg-10-bone-pillar-marsh.webp",
+    "id": "scene-scenes-31",
+    "title": "31",
+    "path": "/assets/scenes/31.webp",
     "category": "scene",
     "mediaType": "image",
     "ext": ".webp",
-    "fileName": "bg-10-bone-pillar-marsh.webp",
+    "fileName": "31.webp",
     "folder": "scenes",
     "tags": [
       "scenes"
     ],
-    "sortKey": "scene/scenes/bg-10-bone-pillar-marsh.webp"
-  },
-  {
-    "id": "scene-scenes-bg-11-blackstone-root",
-    "title": "bg 11 blackstone root",
-    "path": "/assets/scenes/bg-11-blackstone-root.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "bg-11-blackstone-root.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/bg-11-blackstone-root.webp"
-  },
-  {
-    "id": "scene-scenes-bg-12-dark-gate-vestibule",
-    "title": "bg 12 dark gate vestibule",
-    "path": "/assets/scenes/bg-12-dark-gate-vestibule.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "bg-12-dark-gate-vestibule.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/bg-12-dark-gate-vestibule.webp"
-  },
-  {
-    "id": "scene-scenes-cg-01-cable-descent",
-    "title": "cg 01 cable descent",
-    "path": "/assets/scenes/cg-01-cable-descent.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "cg-01-cable-descent.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/cg-01-cable-descent.webp"
-  },
-  {
-    "id": "scene-scenes-cg-03-dark-gate-open",
-    "title": "cg 03 dark gate open",
-    "path": "/assets/scenes/cg-03-dark-gate-open.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "cg-03-dark-gate-open.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/cg-03-dark-gate-open.webp"
-  },
-  {
-    "id": "scene-scenes-duplicate-of-img-20-chatgpt-image-2026年6月10日-20-45-55",
-    "title": "duplicate of img 20 ChatGPT Image 2026年6月10日 20 45 55",
-    "path": "/assets/scenes/duplicate-of-img-20-ChatGPT Image 2026年6月10日 20_45_55.png",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".png",
-    "fileName": "duplicate-of-img-20-ChatGPT Image 2026年6月10日 20_45_55.png",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/duplicate-of-img-20-chatgpt image 2026年6月10日 20_45_55.png"
-  },
-  {
-    "id": "scene-scenes-ele",
-    "title": "ele",
-    "path": "/assets/scenes/ele.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "ele.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/ele.webp"
-  },
-  {
-    "id": "scene-scenes-ele2",
-    "title": "ele2",
-    "path": "/assets/scenes/ele2.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "ele2.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/ele2.webp"
-  },
-  {
-    "id": "scene-scenes-elevator-hub",
-    "title": "elevator hub",
-    "path": "/assets/scenes/elevator-hub.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "elevator-hub.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/elevator-hub.webp"
-  },
-  {
-    "id": "scene-scenes-inverse-city1",
-    "title": "inverse city1",
-    "path": "/assets/scenes/inverse-city1.jpg",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".jpg",
-    "fileName": "inverse-city1.jpg",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/inverse-city1.jpg"
-  },
-  {
-    "id": "scene-scenes-jidi",
-    "title": "jidi",
-    "path": "/assets/scenes/jidi.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "jidi.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/jidi.webp"
+    "sortKey": "scene/scenes/31.webp"
   },
   {
     "id": "scene-scenes-opening-opening01",
@@ -3554,34 +3300,6 @@ export const galleryManifest: GalleryAsset[] = [
       "opening"
     ],
     "sortKey": "scene/scenes/opening/opening11.webp"
-  },
-  {
-    "id": "scene-scenes-title-bg",
-    "title": "title bg",
-    "path": "/assets/scenes/title-bg.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "title-bg.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/title-bg.webp"
-  },
-  {
-    "id": "scene-scenes-title-bg1",
-    "title": "title bg1",
-    "path": "/assets/scenes/title-bg1.webp",
-    "category": "scene",
-    "mediaType": "image",
-    "ext": ".webp",
-    "fileName": "title-bg1.webp",
-    "folder": "scenes",
-    "tags": [
-      "scenes"
-    ],
-    "sortKey": "scene/scenes/title-bg1.webp"
   },
   {
     "id": "video-scenes-title-bg",

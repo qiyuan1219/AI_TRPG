@@ -29,16 +29,7 @@ export function normalizeLoadedStoryLines(lines: StoryLine[]): StoryLine[] {
       }
       if (role === 'kp' && isDialogue && speaker !== '主持人') lastDialogueSpeaker = speaker;
 
-      normalized.push({
-        id,
-        role,
-        speaker,
-        text,
-        portrait: typeof line.portrait === 'string' ? line.portrait : undefined,
-        bgImage: typeof line.bgImage === 'string' ? line.bgImage : undefined,
-        bgm: typeof line.bgm === 'string' ? line.bgm : undefined,
-        scriptedSceneId: typeof line.scriptedSceneId === 'string' ? line.scriptedSceneId : undefined,
-      });
+      normalized.push({ id, role, speaker, text, portrait: typeof line.portrait === 'string' ? line.portrait : undefined, bgImage: typeof line.bgImage === 'string' ? line.bgImage : undefined, bgm: typeof line.bgm === 'string' ? line.bgm : undefined, scriptedSceneId: typeof line.scriptedSceneId === 'string' ? line.scriptedSceneId : undefined, });
     });
   return normalized;
 }

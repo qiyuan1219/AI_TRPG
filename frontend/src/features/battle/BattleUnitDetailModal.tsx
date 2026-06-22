@@ -146,16 +146,6 @@ export function BattleUnitDetailModal<
             })}
           </section>
 
-          <section className="battle-detail-block battle-traits">
-            <h2>规则画像</h2>
-            {unit.traits.map((trait) => (
-              <span key={trait}>{formatCombatText(trait)}</span>
-            ))}
-            {unit.resourceProfile.map((profile) => (
-              <span key={profile}>{formatCombatText(profile)}</span>
-            ))}
-          </section>
-
           <section className="battle-detail-block battle-skills">
             <h2>战斗技能</h2>
             {unit.skills.map((skill) => (

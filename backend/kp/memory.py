@@ -14,13 +14,32 @@ from engine.game_state import migrate_game_state
 # ============================================================
 # 数据库连接
 # ============================================================
+_db_connection: sqlite3.Connection | None = None
+
+
 def get_db():
-    """获取数据库连接"""
+    """获取数据库连接（单例复用，断开自动重连）"""
+    global _db_connection
+    if _db_connection is not None:
+        try:
+            _db_connection.execute("SELECT 1")
+            return _db_connection
+        except sqlite3.ProgrammingError:
+            _db_connection = None
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    _db_connection = conn
     return conn
+
+
+def close_db():
+    """关闭数据库连接"""
+    global _db_connection
+    if _db_connection is not None:
+        _db_connection.close()
+        _db_connection = None
 
 
 def init_db():

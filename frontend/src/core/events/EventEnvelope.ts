@@ -1,3 +1,5 @@
+import { randomUuid } from '../random/secureRandom';
+
 export const EVENT_SCHEMA_VERSION = 1 as const;
 
 export interface EventEnvelope<TPayload> {
@@ -21,7 +23,7 @@ export function createEventEnvelope<TPayload>(
 ): EventEnvelope<TPayload> {
   eventSequence += 1;
   return {
-    eventId: crypto.randomUUID(),
+    eventId: randomUuid(),
     schemaVersion: EVENT_SCHEMA_VERSION,
     sequence: eventSequence,
     correlationId,

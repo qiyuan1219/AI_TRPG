@@ -1,0 +1,43 @@
+.radar-chart {
+  display: block;
+  width: 100%;
+  max-width: 310px;
+  margin: 0 auto 4px;
+}
+
+.radar-chart text {
+  font-family: "Crimson Text", Georgia, "Noto Serif SC", serif;
+  pointer-events: none;
+  user-select: none;
+}
+
+.character-portrait {
+  position: fixed;
+  left: 50%;
+  bottom: 30px;
+  z-index: 3;
+  width: auto;
+  height: 105vh;
+  max-height: 1050px;
+  object-fit: cover;
+  object-position: center 100%;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 8px 28px rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+  user-select: none;
+}
+
+.character-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 37%;
+}
+
+@media (max-width: 900px) {
+  .character-portrait {
+    bottom: 50px;
+    height: 81vh;
+    max-height: 720px;
+  }
+}

@@ -29,11 +29,13 @@ export const COMPANION_ID_BY_EVENT_ID: Record<string, CompanionId | undefined> =
 };
 
 const INITIAL_TRUST: Record<CompanionId, number> = {
-  serin: 84,
-  ailin: 55,
+  serin: 50,
+  ailin: 50,
   brock: 50,
-  kaiya: 45,
+  kaiya: 50,
 };
+
+const TRUST_BASELINE_VERSION_KEY = 'companion_trust_baseline_v2';
 
 function clampTrust(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -56,10 +58,26 @@ export function getCompanionTrust(state: GameState, companionId: CompanionId) {
   return INITIAL_TRUST[companionId];
 }
 
+export function normalizeCompanionTrustBaseline(state: GameState): GameState {
+  if (state[TRUST_BASELINE_VERSION_KEY]) return state;
+  const next: GameState = {
+    ...state,
+    [TRUST_BASELINE_VERSION_KEY]: true,
+    companionTrust: { ...INITIAL_TRUST },
+  };
+  for (const companionId of Object.keys(INITIAL_TRUST) as CompanionId[]) {
+    for (const key of COMPANION_TRUST_ALIASES[companionId]) {
+      next[key] = INITIAL_TRUST[companionId];
+    }
+  }
+  return next;
+}
+
 export function withCompanionTrust(state: GameState, companionId: CompanionId, value: number): GameState {
   const trust = clampTrust(value);
   const next: GameState = {
     ...state,
+    [TRUST_BASELINE_VERSION_KEY]: true,
     companionTrust: {
       ...(state.companionTrust || {}),
       [companionId]: trust,
@@ -77,6 +95,7 @@ export function buildTrustPatch(state: GameState, changes: Partial<Record<Compan
     next = withCompanionTrust(next, companionId, value);
   }
   const patch: GameState = {
+    [TRUST_BASELINE_VERSION_KEY]: true,
     companionTrust: next.companionTrust,
   };
   for (const companionId of Object.keys(changes) as CompanionId[]) {

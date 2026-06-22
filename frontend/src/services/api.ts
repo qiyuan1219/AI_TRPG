@@ -9,6 +9,7 @@ import type {
   SaveSlotSummary,
 } from '../types/game';
 import type { EventEnvelope } from '../core/events/EventEnvelope';
+import { randomUuid } from '../core/random/secureRandom';
 
 const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '');
 const BASE = `${API_BASE}/dnd`;
@@ -207,7 +208,7 @@ export async function getState(gameId: string) {
 }
 
 export async function patchGameState(gameId: string, patch: Record<string, any>): Promise<{ game_id: string; state: GameState }> {
-  const patchId = crypto.randomUUID();
+  const patchId = randomUuid();
   const response = await apiFetch(`${BASE}/game/${gameId}/state/patch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -447,17 +448,24 @@ export async function fetchAdvantage(unitName: string, context: string): Promise
 }
 
 export async function fetchBattleNarration(payload: BattleNarratePayload): Promise<string> {
+  return (await fetchBattleNarrationResult(payload)).narration;
+}
+
+export async function fetchBattleNarrationResult(payload: BattleNarratePayload): Promise<{ narration: string; source: 'ai' | 'fallback' }> {
   try {
     const response = await apiFetch(`${BASE}/battle/narrate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }, '战斗叙述生成失败');
-    if (!response.ok) return '';
+    if (!response.ok) return { narration: '', source: 'fallback' };
     const data = await response.json();
-    return data.narration || '';
+    return {
+      narration: data.narration || '',
+      source: data.source === 'ai' ? 'ai' : 'fallback',
+    };
   } catch {
-    return '';
+    return { narration: '', source: 'fallback' };
   }
 }
 
@@ -508,6 +516,8 @@ export interface AuthoritativeBattleAction {
   actorId: string;
   skillId: string;
   targetIds: string[];
+  seed?: number;
+  fixed_rolls?: number[];
 }
 
 export interface AuthoritativeBattleCharacter {

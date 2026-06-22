@@ -8,6 +8,10 @@ const ABILITY_NAMES: Record<string, string> = {
   str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma',
 };
 
+const ABILITY_LABELS: Record<string, string> = {
+  str: '力量', dex: '敏捷', con: '体质', int: '智力', wis: '感知', cha: '魅力',
+};
+
 function abilityModifier(score: number) {
   return Math.floor((score - 10) / 2);
 }
@@ -20,24 +24,42 @@ function formulaDice(formula: string): string | undefined {
 }
 
 function targetType(skill: BattleSkill) {
-  const group = skill.tags.some((tag) => ['范围', '群体', '全体'].includes(tag)) || Boolean(skill.primaryTargetBonus);
+  if (/防御/.test(skill.name) || skill.tags.some((tag) => ['防御'].includes(tag))) return 'self';
+  const targetText = `${skill.name} ${skill.formula} ${skill.effect} ${skill.rule} ${skill.tags.join(' ')}`;
+  const group = /范围|群体|全体|全队|所有敌人|所有队友|我方全体|敌方全体|锥形/.test(targetText)
+    || Boolean(skill.primaryTargetBonus);
   const ally = skill.roll.kind === 'healing' || skill.tags.some((tag) => ['临时HP', '增益', '祝福', '护盾', '护卫', '抗性', '减伤'].includes(tag));
   if (group) return ally ? 'all_allies' : 'all_enemies';
   return ally ? 'single_ally' : 'single_enemy';
 }
 
+function isDefenseSkill(skill: BattleSkill) {
+  return /防御/.test(skill.name) || skill.tags.some((tag) => tag === '防御');
+}
+
 function toSkill(unit: BattleUnit, skill: BattleSkill): Record<string, unknown> {
   const dice = formulaDice(skill.formula);
   const hitAbility = skill.roll.ability ? abilityModifier(unit.abilities[skill.roll.ability]) : 0;
-  const hitBonus = hitAbility + unit.proficiency + Number((unit as BattleUnit & { openingHitBonus?: number }).openingHitBonus ?? 0);
+  const openingHitBonus = Number((unit as BattleUnit & { openingHitBonus?: number }).openingHitBonus ?? 0);
+  const hitBonus = hitAbility + unit.proficiency + openingHitBonus;
+  const skillTargetType = targetType(skill);
+  const targetsEnemy = skillTargetType === 'single_enemy' || skillTargetType === 'all_enemies';
+  const hasDamageDice = ['attack', 'save', 'damage'].includes(skill.roll.kind) && Boolean(dice);
+  const requiresSaveRoll = targetsEnemy && skill.roll.kind === 'save';
+  const requiresHitRoll = targetsEnemy && hasDamageDice && !requiresSaveRoll;
   return {
     id: skill.id,
     name: skill.name,
-    targetType: targetType(skill),
-    requiresHitRoll: skill.roll.kind === 'attack',
-    requiresSaveRoll: skill.roll.kind === 'save',
+    targetType: skillTargetType,
+    requiresHitRoll,
+    requiresSaveRoll,
     requiresAbilityCheck: skill.roll.kind === 'ability',
     hitBonus,
+    hitAbilityKey: skill.roll.ability ?? null,
+    hitAbilityLabel: skill.roll.ability ? ABILITY_LABELS[skill.roll.ability] : '',
+    hitAbilityBonus: hitAbility,
+    proficiencyBonus: unit.proficiency,
+    openingHitBonus,
     checkBonus: hitBonus,
     checkDC: skill.roll.dc ?? 10,
     saveDC: skill.roll.dc ?? 10,
@@ -50,7 +72,9 @@ function toSkill(unit: BattleUnit, skill: BattleSkill): Record<string, unknown> 
     armorPierce: 0,
     cost: {},
     cooldown: 0,
-    effects: [],
+    effects: isDefenseSkill(skill)
+      ? [{ type: 'damage_reduction_once', value: 0.5, duration: 99, name: '防御' }]
+      : [],
   };
 }
 
@@ -104,7 +128,7 @@ export function authoritativeAmountByTarget(result: AuthoritativeBattleResult) {
     result.events
       .filter((event) => event.type === 'damage' || event.type === 'healing')
       .filter((event) => typeof event.targetId === 'string')
-      .map((event) => [String(event.targetId), Number(event.rawDamage ?? event.total ?? 0)]),
+      .map((event) => [String(event.targetId), Number(event.hpDamage ?? event.rawDamage ?? event.total ?? 0)]),
   );
 }
 
@@ -178,12 +202,18 @@ export function authoritativeDice(result: AuthoritativeBattleResult, kind: 'atta
   const damage = result.events.find((event) => ['damage', 'healing', 'buff'].includes(event.type));
   if (kind === 'attack' && attack) {
     const event = canonicalEvent(result, attack, 'attack');
+    const skillRecord = (result.battleState.skills[attack.skillId] || {}) as Record<string, any>;
+    const abilityLabel = String(skillRecord.hitAbilityLabel || '');
+    const abilityBonus = Number(skillRecord.hitAbilityBonus ?? 0);
+    const proficiencyBonus = Number(skillRecord.proficiencyBonus ?? 0) + Number(skillRecord.openingHitBonus ?? 0);
     return {
       type: 'attack_roll',
       event,
       data: {
         骰子: 'D20', 掷骰: `D20=${event.rolls[0]}`, 攻击掷骰: `D20=${event.rolls[0]}`, 基础骰: event.rolls[0],
-        加值: event.modifier, 总计: event.total, AC: event.ac, 目标AC: event.ac, 命中: event.success,
+        加值: event.modifier, 属性加值: abilityBonus, 熟练加值: proficiencyBonus, 六维: abilityLabel,
+        属性: abilityLabel ? `${abilityLabel}命中` : '命中判定',
+        总计: event.total, AC: event.ac, 目标AC: event.ac, 命中: event.success,
       },
     };
   }
@@ -199,8 +229,10 @@ export function authoritativeDice(result: AuthoritativeBattleResult, kind: 'atta
     };
   }
   if (kind === 'damage' && damage) {
+    if (damage.type === 'buff' && !Array.isArray(damage.diceResult)) return null;
     const eventType: DiceEventType = damage.type === 'healing' ? 'healing' : 'damage';
     const event = canonicalEvent(result, damage, eventType);
+    const criticalMultiplier = Number((damage as any).criticalMultiplier ?? event.metadata?.criticalMultiplier ?? 1);
     return {
       type: eventType,
       event,
@@ -209,6 +241,8 @@ export function authoritativeDice(result: AuthoritativeBattleResult, kind: 'atta
         全部掷骰: event.rolls, 骰数: event.rolls.length, 骰面: `d${event.diceSides}`,
         加值: event.modifier, 总计: event.total, 点数: event.rolls.reduce((sum, value) => sum + value, 0),
         属性: eventType === 'healing' ? '治疗结算' : '伤害结算',
+        大成功效果翻倍: criticalMultiplier > 1,
+        大成功倍率: criticalMultiplier,
       },
     };
   }
@@ -229,14 +263,17 @@ export function authoritativeEffect(
   const missed = attack?.result === 'miss' || check?.result === 'failure' && check?.type === 'skill_check';
   const primaryDamage = damages.find((event) => event.targetId === target.id) ?? damages[0];
   const amount = Number(primaryDamage?.rawDamage ?? healing?.total ?? buff?.tempHp ?? 0);
-  const title = missed ? (attack ? '攻击未命中' : '检定失败') : healing ? '治疗生效' : buff ? '增益生效' : damages.length ? '攻击命中' : '技能生效';
+  const isDefense = isDefenseSkill(skill);
+  const title = missed ? (attack ? '攻击未命中' : '检定失败') : healing ? '治疗生效' : isDefense ? '防御就绪' : buff ? '增益生效' : damages.length ? '攻击命中' : '技能生效';
   const resultLine = attack
     ? `D20 ${attack.rawRoll} + ${attack.modifier} = ${attack.total} / AC ${attack.targetDefense}`
     : primaryDamage
       ? `${primaryDamage.dice}：${(primaryDamage.diceResult ?? []).join(' + ')} = ${primaryDamage.rawDamage}`
       : healing
         ? `${healing.dice}：${(healing.diceResult ?? []).join(' + ')} = ${healing.total}`
-        : '规则引擎已结算';
+        : isDefense
+          ? '下一次受到伤害降低50%'
+          : '规则引擎已结算';
   return {
     id: Date.now(),
     actorName: actor.name,
@@ -245,8 +282,8 @@ export function authoritativeEffect(
     title,
     formula: skill.formula,
     resultLine,
-    detail: missed ? '未命中，不造成伤害。' : `规则引擎最终结算：${amount}`,
-    narration: missed ? `${actor.name}的${skill.name}没有命中${target.name}。` : `${actor.name}对${target.name}使用${skill.name}，结算 ${amount} 点效果。`,
+    detail: missed ? '未命中，不造成伤害。' : isDefense ? '进入防御姿态，下一次受到伤害降低50%。' : `规则引擎最终结算：${amount}`,
+    narration: missed ? `${actor.name}的${skill.name}没有命中${target.name}。` : isDefense ? `${actor.name}进入防御姿态，护盾会抵消下一次伤害的一半。` : `${actor.name}对${target.name}使用${skill.name}，结算 ${amount} 点效果。`,
     amount,
     success: !missed,
   };

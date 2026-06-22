@@ -81,9 +81,9 @@ export function BattleActionBar<
             </strong>
           )}
           {tacticalAdvice && (
-            <small style={{ color: 'var(--teal)', fontWeight: 600 }}>
+            <strong className="battle-tactical-advice">
               瑟琳的建议：{tacticalAdvice.reason}
-            </small>
+            </strong>
           )}
           {!tacticalAdvice && <small>先选技能，再指定释放对象，随后进入骰子判定与效果结算。</small>}
         </div>

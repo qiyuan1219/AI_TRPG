@@ -35,7 +35,6 @@ export function SkillCard<TSkill extends SkillCardModel>({
         <em>{skill.cooldown}</em>
       </div>
       <small>{renderFormula(skill)}</small>
-      {!compact && <p>{renderEffect(skill)}</p>}
       <div className="battle-skill-meta">
         <i>{skillNeedsRoll(skill) ? '需掷骰' : '无掷骰'}</i>
         <i>{skill.rule}</i>

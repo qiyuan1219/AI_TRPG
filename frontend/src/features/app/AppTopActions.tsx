@@ -3,25 +3,23 @@ import InventoryPanel from '../../components/InventoryPanel';
 import type { GameState } from '../../types/game';
 
 export interface AppTopActionsProps {
-  canUseCityMap: boolean;
   gameState: GameState;
   characterInfoOpen: boolean;
   onOpenDialogueLog: () => void;
-  onOpenCityMap: () => void;
   onOpenReturnTitle: () => void;
   onOpenSaves: () => void;
+  onOpenSettings: () => void;
   onOpenCharacterInfo: () => void;
   onInventoryStatePatch: (patch: Partial<GameState>, message?: string) => void;
 }
 
 export function AppTopActions({
-  canUseCityMap,
   gameState,
   characterInfoOpen,
   onOpenDialogueLog,
-  onOpenCityMap,
   onOpenReturnTitle,
   onOpenSaves,
+  onOpenSettings,
   onOpenCharacterInfo,
   onInventoryStatePatch,
 }: AppTopActionsProps) {
@@ -43,16 +41,14 @@ export function AppTopActions({
         <button type="button" className="game-log-btn" onClick={onOpenDialogueLog} tabIndex={collapsed ? -1 : 0}>
           📜 对话日志
         </button>
-        {canUseCityMap && (
-          <button type="button" className="game-map-btn" onClick={onOpenCityMap} tabIndex={collapsed ? -1 : 0}>
-            🗺️ 城市地图
-          </button>
-        )}
         <button type="button" className="game-title-btn" onClick={onOpenReturnTitle} tabIndex={collapsed ? -1 : 0}>
           回到标题界面
         </button>
         <button type="button" className="game-save-btn" onClick={onOpenSaves} tabIndex={collapsed ? -1 : 0}>
           📂 冒险存档
+        </button>
+        <button type="button" className="game-save-btn" onClick={onOpenSettings} tabIndex={collapsed ? -1 : 0}>
+          🔊 音量设置
         </button>
         <div className="game-inventory-entry">
           <InventoryPanel state={gameState} onStatePatch={onInventoryStatePatch} />

@@ -25,14 +25,15 @@ class BattleEngineAiTests(unittest.TestCase):
 
         action = engine.choose_basic_enemy_action()
 
-        self.assertEqual(action["targetIds"], ["player_warrior"])
+        self.assertIn(action["targetIds"][0], {"player_warrior", "selin", "brock", "ailin", "kaiya"})
         self.assertIn("aiTactic", action)
 
         events = engine.submit_action(action, fixed_rolls=[10, 1])
 
         tactic_event = next((event for event in events if event.get("type") == "ai_tactic"), None)
         self.assertIsNotNone(tactic_event)
-        self.assertEqual(tactic_event["targetIds"], ["player_warrior"])
+        self.assertEqual(tactic_event["targetIds"], action["targetIds"])
+        self.assertIn("随机索敌", tactic_event["reason"])
         self.assertTrue(tactic_event["reason"])
 
 

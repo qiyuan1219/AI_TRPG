@@ -406,7 +406,7 @@ INVESTIGATION_ACTIONS: list[dict[str, Any]] = [
             "success": _rewards(["report_missing_expedition_01"], ["expedition_saw_spore_beasts", "glowing_rivets_warning"]),
             "partial": _rewards([], ["expedition_saw_spore_beasts"]),
             "fail": _rewards([], ["guild_files_were_removed"]),
-            "criticalFail": [{"type": "flag", "id": "guild_clerk_alerted", "value": True}],
+            "criticalFail": [{"type": "flag", "id": "guild_staff_alerted", "value": True}],
         },
         quest_update={
             "id": "quest_missing_expedition_report",
@@ -415,7 +415,7 @@ INVESTIGATION_ACTIONS: list[dict[str, Any]] = [
         },
     ),
     _action("ask_mila_missing_expedition", "向米娜打听远征队", ["guild_hall"], r"(米娜|文书员).*(打听|询问|追问).*(远征队|失踪|失联)", ["report_missing_expedition_01"], ["expedition_saw_spore_beasts"], {"attribute": "说服", "dc": 13, "dice": "1d20"}),
-    _action("ask_mila_archive_register", "说服米娜查看档案", ["guild_hall"], r"(米娜|文书员).*(查看|翻阅|申请|请求).*(失踪记录|登记册|档案)", ["register_missing_expeditions"], check={"attribute": "说服", "dc": 11, "dice": "1d20"}),
+    _action("ask_mila_archive_register", "请米娜查看档案", ["guild_hall"], r"(米娜|文书员).*(查看|翻阅|申请|请求).*(失踪记录|登记册|档案)", ["register_missing_expeditions"]),
     _action(
         "inspect_helman_desk",
         "检查赫尔曼办公桌",

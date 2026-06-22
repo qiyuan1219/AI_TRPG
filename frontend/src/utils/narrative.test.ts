@@ -17,7 +17,7 @@ describe('narrative protocol handling', () => {
   it('removes legacy phase limit notices from visible text', () => {
     const notice = '[系统提示：这是本阶段第3/3次选择行动。请在完成本次叙事后直接推进到下一段剧情，不要继续停留在当前选择阶段。]';
 
-    expect(stripAllMachineProtocolText(`追问书记员报告中的孢化地底兽\n${notice}`)).toBe('追问书记员报告中的孢化地底兽');
+    expect(stripAllMachineProtocolText(`追问米娜报告中的孢化地底兽\n${notice}`)).toBe('追问米娜报告中的孢化地底兽');
   });
 
   it('extracts action hints without leaking them into narration', () => {
@@ -66,12 +66,12 @@ describe('narrative protocol handling', () => {
   it('only treats explicit script dialogue as character speech', () => {
     const parsed = parseNarrativeSegments(
       '他啪地合上日志，镜片后投来歉意的目光。\n'
-      + '帕维：「萨洛·杯底当时也在远征队出发前的践行酒桌上。他记性比我好，而且——」\n'
+      + '米娜：「萨洛·杯底当时也在远征队出发前的践行酒桌上。他记性比我好，而且——」\n'
       + '他压低声音，"——他手里藏着第三远征队队长私下托付的东西。去回声酒馆找他吧。"',
     );
 
     expect(parsed.segments).toContainEqual({
-      speaker: '帕维',
+      speaker: '米娜',
       text: '"萨洛·杯底当时也在远征队出发前的践行酒桌上。他记性比我好，而且——"',
     });
     expect(parsed.segments.some((segment) => (
@@ -99,6 +99,20 @@ describe('narrative protocol handling', () => {
       lines: ['瑟琳：「走。」'],
       suggestions: [],
     });
+    expect(parser.flush().lines).toEqual([]);
+  });
+
+  it('keeps a delayed closing quote with the dialogue even when the model inserts blank lines', () => {
+    const parser = createNarrativeStreamParser();
+
+    expect(parser.push('艾琳\n「逆穹悬城拒绝了撤回伤员。\n\n怕已经被净化过的伤具体内残留着脉冲标记，顺着缆梯上去会把伪造信号也带进城。\n\n')).toEqual({
+      lines: [],
+      suggestions: [],
+    });
+    const next = parser.push('」');
+
+    expect(next.lines.some((line) => line.trim() === '」')).toBe(false);
+    expect(next.lines.join('\n')).toContain('」');
     expect(parser.flush().lines).toEqual([]);
   });
 

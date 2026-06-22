@@ -20,7 +20,7 @@ CONTEXT_POLICIES = {
     "battle_prep": ContextBudgetPolicy(960, 8, 4, 9000),
     "battle_resolution": ContextBudgetPolicy(1024, 8, 4, 10000),
     "short_judge": ContextBudgetPolicy(420, 5, 2, 5000),
-    "micro_copy": ContextBudgetPolicy(120, 3, 0, 2500),
+    "micro_copy": ContextBudgetPolicy(300, 3, 0, 2500),
     "continuation": ContextBudgetPolicy(520, 8, 2, 7000),
     "compact_judge": ContextBudgetPolicy(360, 5, 2, 4500),
     "answer_judge": ContextBudgetPolicy(460, 5, 2, 5500),

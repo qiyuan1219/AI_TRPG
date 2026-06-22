@@ -17,7 +17,7 @@ start "DND-Frontend" cmd /c "cd frontend && npm run dev"
 
 echo.
 echo ========================================
-echo   后端: http://localhost:8000
+echo   后端: http://localhost:8190
 echo   前端: http://localhost:5174
 echo ========================================
 echo.

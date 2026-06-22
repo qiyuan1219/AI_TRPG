@@ -124,8 +124,8 @@ export const DND_COMPANIONS: CompanionPreset[] = [
     name: '瑟琳',
     title: '“银杖”瑟琳',
     role: '时间魔法师 / 固定同行',
-    hp: 34,
-    ac: 14,
+    hp: 36,
+    ac: 12,
     trustKey: 'se_trust',
     hpKey: 'se_hp',
     skills: {
@@ -172,8 +172,8 @@ export const DND_COMPANIONS: CompanionPreset[] = [
     name: '布洛克',
     title: '布洛克·铁锅',
     role: '矮人战士 / 孢海向导',
-    hp: 46,
-    ac: 16,
+    hp: 45,
+    ac: 13,
     trustKey: 'sl_trust',
     hpKey: 'sl_hp',
     skills: {
@@ -268,8 +268,8 @@ export const DND_COMPANIONS: CompanionPreset[] = [
     name: '艾琳',
     title: '艾琳·白枝',
     role: '精灵修女 / 生命牧师',
-    hp: 32,
-    ac: 14,
+    hp: 36,
+    ac: 12,
     trustKey: 'al_trust',
     hpKey: 'al_hp',
     skills: {
@@ -322,8 +322,8 @@ export const DND_COMPANIONS: CompanionPreset[] = [
     name: '凯娅',
     title: '“软爪”凯娅',
     role: '兽族盗贼 / 怪物猎人',
-    hp: 36,
-    ac: 16,
+    hp: 30,
+    ac: 18,
     trustKey: 'kl_trust',
     hpKey: 'kl_hp',
     skills: {

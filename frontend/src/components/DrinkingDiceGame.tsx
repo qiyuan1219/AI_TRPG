@@ -46,6 +46,9 @@ interface DrinkingDiceGameProps {
   onBack: () => void;
   onComplete: (result: DrinkingDiceResult) => void;
   playerCon?: number;
+  fictionQuantity?: number;
+  omniQuantity?: number;
+  onConsumeRerollItem?: (itemId: 'fiction-dice' | 'omni-dice') => boolean;
 }
 
 export function getBrockTrustGain(totalRounds: number) {
@@ -81,15 +84,9 @@ export function getBrockFinalDialogue(totalRounds: number) {
   return '「啧，酒喝完是喝完了，可这速度……到了无光孢海，别指望菌雾等你慢慢适应。」';
 }
 
-export function playBrockDrinkingGame(conMod: number): DrinkingGameResult {
-  let alcohol = INITIAL_ALCOHOL;
-  let ac = INITIAL_AC;
-  let round = 1;
-  const logs: DrinkingRoundLog[] = [];
-
-  while (alcohol > 0) {
-    const alcoholBefore = alcohol;
-    const d20 = rollDie(20);
+function buildDrinkingRound(round: number, ac: number, alcoholBefore: number, conMod: number, forcedD20?: number): DrinkingRoundLog {
+    let alcohol = alcoholBefore;
+    const d20 = forcedD20 ?? rollDie(20);
     const total = d20 + conMod;
     const natural20 = d20 === 20;
     const success = natural20 || total >= ac;
@@ -107,7 +104,7 @@ export function playBrockDrinkingGame(conMod: number): DrinkingGameResult {
       message = `第${round}回合：体质豁免 D20=${d20}，体质加值=${conMod}，总值=${total}，未达到 AC ${ac}。你被浓烈酒气呛到，本回合没能喝下去，剩余酒量仍为 ${alcohol}。`;
     }
 
-    logs.push({
+    return {
       round,
       ac,
       d20,
@@ -119,19 +116,51 @@ export function playBrockDrinkingGame(conMod: number): DrinkingGameResult {
       alcoholBefore,
       alcoholAfter: alcohol,
       message,
-    });
+    };
+}
 
-    if (alcohol <= 0) break;
-    round += 1;
-    ac = Math.min(MAX_AC, ac + AC_STEP);
-  }
-
+function finishDrinkingResult(logs: DrinkingRoundLog[]): DrinkingGameResult {
+  const totalRounds = logs[logs.length - 1]?.round ?? 0;
   return {
-    totalRounds: round,
-    trustGain: getBrockTrustGain(round),
-    finalDialogue: getBrockFinalDialogue(round),
+    totalRounds,
+    trustGain: getBrockTrustGain(totalRounds),
+    finalDialogue: getBrockFinalDialogue(totalRounds),
     logs,
   };
+}
+
+function appendDrinkingRounds(logs: DrinkingRoundLog[], conMod: number, alcohol: number, round: number, ac: number) {
+  let currentAlcohol = alcohol;
+  let currentRound = round;
+  let currentAc = ac;
+  while (currentAlcohol > 0) {
+    const log = buildDrinkingRound(currentRound, currentAc, currentAlcohol, conMod);
+    logs.push(log);
+    currentAlcohol = log.alcoholAfter;
+
+    if (currentAlcohol <= 0) break;
+    currentRound += 1;
+    currentAc = Math.min(MAX_AC, currentAc + AC_STEP);
+  }
+}
+
+export function playBrockDrinkingGame(conMod: number): DrinkingGameResult {
+  const logs: DrinkingRoundLog[] = [];
+  appendDrinkingRounds(logs, conMod, INITIAL_ALCOHOL, 1, INITIAL_AC);
+  return finishDrinkingResult(logs);
+}
+
+export function replaceBrockDrinkingRoll(result: DrinkingGameResult, logIndex: number, d20: number, conMod: number) {
+  if (!Number.isInteger(d20) || d20 < 1 || d20 > 20) throw new Error('D20 点数必须在 1 到 20 之间');
+  const original = result.logs[logIndex];
+  if (!original) return result;
+  const logs = result.logs.slice(0, logIndex);
+  const replacement = buildDrinkingRound(original.round, original.ac, original.alcoholBefore, conMod, d20);
+  logs.push(replacement);
+  if (replacement.alcoholAfter > 0) {
+    appendDrinkingRounds(logs, conMod, replacement.alcoholAfter, replacement.round + 1, Math.min(MAX_AC, replacement.ac + AC_STEP));
+  }
+  return finishDrinkingResult(logs);
 }
 
 const DRINKING_TUTORIAL: TutorialStep[] = [
@@ -266,7 +295,14 @@ function GameTutorialPrompt({
   );
 }
 
-export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: DrinkingDiceGameProps) {
+export function DrinkingDiceGame({
+  onBack,
+  onComplete,
+  playerCon = 15,
+  fictionQuantity = 0,
+  omniQuantity = 0,
+  onConsumeRerollItem,
+}: DrinkingDiceGameProps) {
   const conMod = conModifier(playerCon);
   const [result, setResult] = useState<DrinkingGameResult | null>(null);
   const [visibleRounds, setVisibleRounds] = useState(0);
@@ -275,6 +311,8 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
   const pendingDrinkDiceRef = useRef<DiceResult | null>(null);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [brockComment, setBrockComment] = useState('「先说好，铁锅烈酒不讲礼貌。你要是倒了，我只笑三声。」');
+  const [rerolledRounds, setRerolledRounds] = useState<Set<number>>(() => new Set());
+  const [rerollComparison, setRerollComparison] = useState<{ initial: number; reroll: number; selected: 'initial' | 'reroll' } | undefined>();
 
   const visibleLogs = result?.logs.slice(0, visibleRounds) ?? [];
   const lastLog = visibleLogs[visibleLogs.length - 1] ?? null;
@@ -299,6 +337,8 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
     setRolling(false);
     setCurrentDice(null);
     pendingDrinkDiceRef.current = null;
+    setRerolledRounds(new Set());
+    setRerollComparison(undefined);
     setBrockComment('「杯子端稳。喝酒看起来简单，能不能站着下孢海才是正事。」');
   }
 
@@ -309,7 +349,31 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
     setRolling(true);
     // 阶段1：体质豁免 D20（关闭后自动展示 1D4 酒量骰）
     pendingDrinkDiceRef.current = log.success ? createDrinkDice(log) : null;
+    setRerollComparison(undefined);
     setCurrentDice(createSkillDice(log));
+  }
+
+  function applyReroll(itemId: 'fiction-dice' | 'omni-dice', chosenD20?: number) {
+    if (!result || currentDice?.type !== 'skill_check') return;
+    const logIndex = visibleRounds;
+    const original = result.logs[logIndex];
+    if (!original || rerolledRounds.has(original.round)) return;
+    const reroll = itemId === 'fiction-dice' ? rollDie(20) : Math.max(1, Math.min(20, Math.floor(chosenD20 ?? 20)));
+    const selectedRoll = itemId === 'fiction-dice' ? Math.max(original.d20, reroll) : reroll;
+    if (!onConsumeRerollItem?.(itemId)) return;
+
+    const nextResult = selectedRoll === original.d20
+      ? result
+      : replaceBrockDrinkingRoll(result, logIndex, selectedRoll, conMod);
+    const nextLog = nextResult.logs[logIndex];
+    setResult(nextResult);
+    setRerolledRounds((current) => new Set(current).add(original.round));
+    setRerollComparison({ initial: original.d20, reroll, selected: selectedRoll === original.d20 ? 'initial' : 'reroll' });
+    pendingDrinkDiceRef.current = nextLog.success ? createDrinkDice(nextLog) : null;
+    setCurrentDice(createSkillDice(nextLog));
+    setBrockComment(itemId === 'fiction-dice'
+      ? `「虚构骰子给了你 ${reroll} 点，规矩照旧——只认更高的那个。」`
+      : `「万能骰子定成 ${selectedRoll} 点？行，骰子认你，酒可不一定认。」`);
   }
 
   function finishRound(log: DrinkingRoundLog) {
@@ -461,7 +525,20 @@ export function DrinkingDiceGame({ onBack, onComplete, playerCon = 15 }: Drinkin
         </section>
       </motion.section>
 
-      <DiceRollOverlay dice={currentDice} dieType="d20" onClose={handleDiceClose} />
+      <DiceRollOverlay
+        dice={currentDice}
+        dieType={currentDice?.type === 'dice_test' ? 'd4' : 'd20'}
+        onClose={handleDiceClose}
+        rerollDecision={currentDice?.type === 'skill_check' ? {
+          fictionQuantity,
+          omniQuantity,
+          rerollUsed: Boolean(result?.logs[visibleRounds] && rerolledRounds.has(result.logs[visibleRounds].round)),
+          onConfirm: handleDiceClose,
+          onUseFiction: () => applyReroll('fiction-dice'),
+          onUseOmni: (value) => applyReroll('omni-dice', value),
+        } : undefined}
+        comparisonRolls={rerollComparison}
+      />
 
       <AnimatePresence>
         {tutorialStep >= 0 && (

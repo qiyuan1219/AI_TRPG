@@ -613,6 +613,7 @@ export function CompanionEventTestScreen({
         battleConfigOverride={BLOCK_ECHO_FOREST_BATTLE_CONFIG}
         onBack={() => setPhase('action')}
         onComplete={completeBattle}
+        onSkip={() => completeBattle({ outcome: 'win' })}
       />
     );
   }

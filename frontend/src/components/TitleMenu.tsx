@@ -4,8 +4,8 @@ interface TitleMenuProps {
   onNewGame: () => void;
   onLoadGame: () => void;
   onGallery: () => void;
+  onUpdates: () => void;
   onSettings: () => void;
-  onTest: () => void;
   onPrimeAudio?: () => void;
 }
 
@@ -13,13 +13,13 @@ const MENU_ITEMS = [
   { label: '新游戏', action: 'new' },
   { label: '载入游戏', action: 'load' },
   { label: '画廊', action: 'gallery' },
+  { label: '更新公告', action: 'updates' },
   { label: '设置', action: 'settings' },
-  { label: '测试', action: 'test' },
 ] as const;
 
 const TITLE_VIDEO = '/assets/scenes/title-bg.mp4';
 
-export function TitleMenu({ onNewGame, onLoadGame, onGallery, onSettings, onTest, onPrimeAudio }: TitleMenuProps) {
+export function TitleMenu({ onNewGame, onLoadGame, onGallery, onUpdates, onSettings, onPrimeAudio }: TitleMenuProps) {
   return (
     <main className="title-menu-screen" onPointerDownCapture={onPrimeAudio} onKeyDownCapture={onPrimeAudio}>
       <video
@@ -45,13 +45,16 @@ export function TitleMenu({ onNewGame, onLoadGame, onGallery, onSettings, onTest
           <p className="title-intro">
             新时代 TRPG · AI 跑团游戏。你将和 AI 主持人一起深入逆穹悬城，调查通向九层地狱的地心狱门。
           </p>
+          <p className="title-authors">
+            游戏作者：深圳大学 · 深龙战队 · 黄锦意 · 黄瑜 · 朱俊熹
+          </p>
           <div className="title-rule" />
         </div>
 
         <nav className="title-menu-actions" aria-label="主菜单">
           {MENU_ITEMS.map((item, index) => {
             const onClick =
-              item.action === 'new' ? onNewGame : item.action === 'load' ? onLoadGame : item.action === 'gallery' ? onGallery : item.action === 'settings' ? onSettings : item.action === 'test' ? onTest : undefined;
+              item.action === 'new' ? onNewGame : item.action === 'load' ? onLoadGame : item.action === 'gallery' ? onGallery : item.action === 'updates' ? onUpdates : onSettings;
             const disabled = Boolean('disabled' in item && item.disabled);
 
             return (

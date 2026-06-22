@@ -10,7 +10,7 @@ export type GameAction = VersionedAction & (
   | { id: string; type: 'shop.sell'; actorId: string; itemId: string; quantity: number; createdAt: number }
   | { id: string; type: 'battle.start'; actorId: string; encounterId: string; createdAt: number }
   | { id: string; type: 'battle.prep.confirm'; actorId: string; encounterId: string; createdAt: number }
-  | { id: string; type: 'battle.skill'; actorId: string; skillId: string; targetIds: string[]; createdAt: number }
+  | { id: string; type: 'battle.skill'; actorId: string; skillId: string; targetIds: string[]; fixed_rolls?: number[]; createdAt: number }
 );
 
 export type StatePatchOperation =

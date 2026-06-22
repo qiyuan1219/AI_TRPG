@@ -3,6 +3,7 @@ import type { DiceEvent } from '../dice/DiceEvent';
 import type { EventEnvelope } from '../events/EventEnvelope';
 import { DEBUG_TRACE_SCHEMA_VERSION, type DebugError, type DebugTrace } from './DebugTrace';
 import { createStateHash, diffState } from './stateDiff';
+import { randomUuid } from '../random/secureRandom';
 
 export interface CreateDebugTraceInput {
   action?: GameAction;
@@ -23,7 +24,7 @@ export function createDebugTrace(input: CreateDebugTraceInput): DebugTrace {
   const previousState = input.previousState;
   const nextState = input.nextState;
   return {
-    traceId: crypto.randomUUID(),
+    traceId: randomUuid(),
     schemaVersion: DEBUG_TRACE_SCHEMA_VERSION,
     createdAt: new Date().toISOString(),
     action: input.action,

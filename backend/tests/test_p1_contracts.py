@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from core.context import build_ai_context, update_scene_summary
@@ -28,6 +29,21 @@ class P1ContractTests(unittest.TestCase):
         next_state, validation = apply_state_patch(state, [PatchOperation("set", "inventory", "神秘药剂")], "ai")
         self.assertFalse(validation.valid)
         self.assertEqual(next_state, state)
+
+    def test_ui_patch_and_json_roundtrip_preserve_nested_camp_night_logs(self):
+        talk_logs = {
+            "serin": ["瑟琳把银杖横在膝前。", "明天别离我太远。"],
+            "brock": ["布洛克往火里添了一块干菌木。"],
+        }
+        next_state, validation = apply_state_patch(
+            {"currentNodeId": "camp-night-companion-scene-v2"},
+            [PatchOperation("set", "campNightTalkLogs", talk_logs)],
+            "ui",
+        )
+        restored = json.loads(json.dumps(next_state, ensure_ascii=False))
+
+        self.assertTrue(validation.valid)
+        self.assertEqual(restored["campNightTalkLogs"], talk_logs)
 
     def test_unknown_legacy_item_is_explicit(self):
         item = migrate_legacy_item("未登记神秘药剂")

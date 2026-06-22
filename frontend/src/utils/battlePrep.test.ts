@@ -76,6 +76,8 @@ describe('剧情检定重投', () => {
     const migrated = migrateRerollInventory({ inventory: '长剑' });
     expect(getRerollItemQuantity(migrated, 'fiction-dice')).toBe(3);
     expect(getRerollItemQuantity(migrateRerollInventory(migrated), 'omni-dice')).toBe(3);
+    const consumed = { ...migrated, inventory: '长剑' };
+    expect(getRerollItemQuantity(migrateRerollInventory(consumed), 'fiction-dice')).toBe(0);
   });
 
   it('虚构骰子取较高总值并只消耗一个', () => {

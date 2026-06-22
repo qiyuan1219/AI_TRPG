@@ -2,7 +2,8 @@
  * 第一幕后半段战斗配置文件
  */
 import type { BattleConfig } from '../components/BattleTestScreen';
-import { getSharedPartySkills } from '../features/battle/battleDebugConfig';
+import { getAc, getInitiativeModifier, getMaxHp, getPlayerStyleById } from './dndClasses';
+import { getSharedPartySkills } from './sharedPartyBattleSkills';
 
 // ============================================================
 // 普通战斗一：蓝伞浅滩遭遇战
@@ -86,7 +87,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       traits: ['HP28/AC14'],
       skills: [
         { id: 'mimic-a-lure', name: '拟声诱捕', resource: '战斗技能', source: '敌方技能', formula: 'WIS豁免DC12；1d8+3精神', effect: '精神攻击干扰', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 1, label: '拟声诱捕' }, tags: ['豁免'] },
-        { id: 'mimic-a-dust', name: '孢粉爆发', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC12；1d6+2毒素', effect: '范围毒素', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 2, label: '孢粉爆发' }, tags: ['豁免'] },
+        { id: 'mimic-a-dust', name: '孢粉爆发', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC12；1d6+2毒素', effect: '对我方全体造成范围毒素伤害', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 2, label: '孢粉爆发' }, tags: ['豁免', '群体', '全体', '毒素'] },
       ],
       nonCombatSkills: [],
     },
@@ -100,7 +101,7 @@ export const BLUE_SHOAL_BATTLE_CONFIG: BattleConfig = {
       traits: ['HP28/AC14'],
       skills: [
         { id: 'mimic-b-lure', name: '拟声诱捕', resource: '战斗技能', source: '敌方技能', formula: 'WIS豁免DC12；1d8+3精神', effect: '精神攻击干扰', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 1, label: '拟声诱捕' }, tags: ['豁免'] },
-        { id: 'mimic-b-dust', name: '孢粉爆发', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC12；1d6+2毒素', effect: '范围毒素', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 2, label: '孢粉爆发' }, tags: ['豁免'] },
+        { id: 'mimic-b-dust', name: '孢粉爆发', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC12；1d6+2毒素', effect: '对我方全体造成范围毒素伤害', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 12, targetSaveBonus: 2, label: '孢粉爆发' }, tags: ['豁免', '群体', '全体', '毒素'] },
       ],
       nonCombatSkills: [],
     },
@@ -345,14 +346,14 @@ export const BLACKSTONE_GATEKEEPER_BOSS_CONFIG: BattleConfig = {
     {
       id: 'boss-gatekeeper', name: '黑石门卫', faction: 'enemy', role: '第一幕关底Boss',
       portrait: 'Boss', model: 'gatekeeper',
-      hp: 80, maxHp: 80, ac: 17, speed: 20, proficiency: 3,
+      hp: 80, maxHp: 80, ac: 15, speed: 20, proficiency: 3,
       abilities: { str: 20, dex: 10, con: 18, int: 6, wis: 14, cha: 8 },
       resourceProfile: ['攻击', '脉冲', '污染'],
       statuses: ['大型', 'Boss'],
-      traits: ['HP80/AC17', '三阶段：苏醒→封锁→核心暴露'],
+      traits: ['HP80/AC15', '三阶段：苏醒→封锁→核心暴露'],
       skills: [
-        { id: 'boss-sweep', name: '根须横扫', resource: '战斗技能', source: '敌方技能', formula: 'STR+熟练 vs AC；2d6+5钝击', effect: '范围横扫攻击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 16, label: '根须横扫' }, tags: ['攻击'] },
-        { id: 'boss-pulse', name: '黑石脉冲', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC14；1d10+4力场', effect: '全队脉冲伤害', cooldown: '每2回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 14, targetSaveBonus: 2, label: '黑石脉冲' }, tags: ['豁免'] },
+        { id: 'boss-sweep', name: '根须横扫', resource: '战斗技能', source: '敌方技能', formula: 'STR+熟练 vs AC；2d4+4钝击', effect: '范围横扫攻击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack', ability: 'str', targetAc: 15, label: '根须横扫' }, tags: ['攻击'] },
+        { id: 'boss-pulse', name: '黑石脉冲', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC14；1d12力场', effect: '全队脉冲伤害', cooldown: '每2回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 14, targetSaveBonus: 2, label: '黑石脉冲' }, tags: ['豁免'] },
         { id: 'boss-dust', name: '孢粉污染', resource: '战斗技能', source: '敌方技能', formula: 'CON豁免DC13；1d8+3毒素', effect: '污染扩散', cooldown: '每回合1次', rule: '豁免技能', roll: { kind: 'save', dc: 13, targetSaveBonus: 2, label: '孢粉污染' }, tags: ['豁免'] },
       ],
       nonCombatSkills: [],
@@ -363,7 +364,7 @@ export const BLACKSTONE_GATEKEEPER_BOSS_CONFIG: BattleConfig = {
     { title: '黑石脉冲', text: '每两回合全队脉冲，瑟琳银杖会受影响，法术不稳定。' },
     { title: '核心暴露', text: 'HP降至25%以下核心暴露，战斗暂停，需在破坏和稳定核心之间选择。' },
   ],
-  backgroundUrl: '/assets/scenes/14dark-gate-forecourt-battle.webp',
+  backgroundUrl: '/assets/scenes/29.webp',
   eyebrow: 'Boss 战 · 第一幕关底',
   title: '黑石门卫',
   subtitle: '黑暗之门前庭的古老守卫',
@@ -379,16 +380,155 @@ export const BLACKSTONE_GATEKEEPER_BOSS_CONFIG: BattleConfig = {
 };
 
 // ============================================================
+// 教学战斗：正式遭遇配置（不再读取 Debug/测试阵容）
+// ============================================================
+
+export const TUTORIAL_CRAWLER_BATTLE_CONFIG: BattleConfig = {
+  units: [
+    {
+      id: 'adv', name: '冒险者', faction: 'ally', role: '流派冒险者 / 前排',
+      portrait: '冒', model: 'adventurer',
+      hp: 50, maxHp: 50, ac: 12, speed: 30, proficiency: 2,
+      abilities: { str: 12, dex: 12, con: 13, int: 12, wis: 12, cha: 12 },
+      resourceProfile: ['攻击检定', '技能检定', '治疗'],
+      statuses: ['前排', '教学保护'],
+      traits: ['数值由玩家流派决定'],
+      skills: getSharedPartySkills('adventurer') ?? [],
+      nonCombatSkills: [],
+    },
+    {
+      id: 'serin', name: '瑟琳', faction: 'ally', role: '时间法师 / 教学支援',
+      portrait: '瑟', model: 'selin',
+      hp: 36, maxHp: 36, ac: 12, speed: 30, proficiency: 2, initiativeBonus: 1,
+      abilities: { str: 9, dex: 14, con: 12, int: 16, wis: 14, cha: 13 },
+      resourceProfile: ['法术攻击', '范围法术', '治疗'],
+      statuses: ['后排', '奥术支援'],
+      traits: ['HP36/AC12'],
+      skills: getSharedPartySkills('selin') ?? [],
+      nonCombatSkills: [],
+    },
+    ...(['A', 'B', 'C'] as const).map((suffix, index) => ({
+      id: `crawler-${suffix.toLowerCase()}`,
+      name: `裂隙爬兽${suffix}`,
+      faction: 'enemy' as const,
+      role: '教学小怪',
+      portrait: `爬${suffix}`,
+      model: 'crawler' as const,
+        hp: 20,
+        maxHp: 20,
+      ac: 12,
+      speed: 25,
+      proficiency: 2,
+      abilities: { str: 8, dex: 14, con: 12, int: 4, wis: 10, cha: 5 },
+      resourceProfile: index === 1 ? ['群体伤害', '攻击'] : ['攻击', '群体伤害'],
+      statuses: ['畏光'],
+      traits: ['HP20/AC12', '教学保护：低伤害'],
+      skills: [
+        { id: `crawler-${suffix.toLowerCase()}-claw`, name: '畏光爪击', resource: '战斗技能' as const, source: '敌方技能' as const, formula: 'DEX+熟练 vs AC；1d4+2', effect: '低伤害近战攻击', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack' as const, ability: 'dex' as const, targetAc: 12, label: '畏光爪击' }, tags: ['攻击'] },
+        { id: `crawler-${suffix.toLowerCase()}-dust`, name: '孢尘喷吐', resource: '战斗技能' as const, source: '敌方技能' as const, formula: 'DEX+熟练 vs AC；1d4毒素', effect: '喷出孢尘，对我方全体进行一次命中检定，命中后造成毒素伤害。', cooldown: '每回合1次', rule: '攻击检定', roll: { kind: 'attack' as const, ability: 'dex' as const, targetAc: 12, label: '孢尘喷吐' }, tags: ['群体', '毒素', '攻击'] },
+      ],
+      nonCombatSkills: [],
+    })),
+  ],
+  quickRules: [
+    { title: '1 先攻', text: '战斗开始投1D20并加先攻修正，数值越高越早行动。' },
+    { title: '2 技能', text: '轮到我方时选择一个技能，再指定有效目标。' },
+    { title: '3 结算', text: '攻击命中后才投伤害骰；治疗技能选择我方目标。' },
+  ],
+  tutorialIntro: {
+    title: '教学战斗速览',
+    subtitle: '开始前先看六张提示卡，之后会进入先攻与回合流程。',
+    steps: [
+      { title: '1. 先投先攻', text: '每个单位投 1D20 加先攻修正，结果越高越早行动。' },
+      { title: '2. 选择技能', text: '我方回合先选一个技能，再指定合法目标。技能卡会显示主要效果。' },
+      { title: '3. 命中检定', text: '攻击类行动先投 D20 命中骰；命中后才会继续投伤害骰。' },
+      { title: '4. 伤害结算', text: '伤害、治疗和防御都会按前端显示的规则引擎结果结算。' },
+      { title: '5. 防御动作', text: '防御会让下一次受到的伤害降低 50%，触发一次后失效。' },
+      { title: '6. 回合结束', text: '行动完成后结束回合，轮到下一名单位继续行动。' },
+    ],
+    enemySkills: [
+      { name: '裂隙爬兽', skills: ['畏光爪击：单体命中后造成少量伤害', '孢尘喷吐：命中后对我方全体造成毒素伤害'] },
+    ],
+  },
+  backgroundUrl: '/assets/battle/b1-cablestreet-battle.png',
+  eyebrow: 'FIRST COMBAT TUTORIAL',
+  title: '补给平台教学战斗',
+  subtitle: '冒险者与瑟琳对抗三只裂隙爬兽',
+  backLabel: '返回剧情',
+  rerollLog: '教学战斗重置：重新投掷先攻并恢复全员状态。',
+  initialLog: '教学战斗开始：先投先攻，再选择技能与目标。冒险者的六维、HP和AC来自已选流派。',
+  initiativeNote: '全员投1D20并加各自先攻修正，结果最高者先行动。',
+  winTitle: '教学战斗胜利',
+  loseTitle: '教学战斗失败',
+  winText: '三只裂隙爬兽已经失去战斗能力，你掌握了战斗的基本流程。',
+  loseText: '可以重新进入教学战斗练习；冒险者流派数值会保持不变。',
+  completeLabel: '继续剧情',
+};
+
+// ============================================================
 // 战斗ID映射
 // ============================================================
 
 export const BATTLE_CONFIG_MAP: Record<string, BattleConfig> = {
+  'tutorial-crawler-battle': TUTORIAL_CRAWLER_BATTLE_CONFIG,
   enemy_pack_blue_shoal: BLUE_SHOAL_BATTLE_CONFIG,
   enemy_pack_bone_marsh: BONE_MARSH_BATTLE_CONFIG,
   boss_blackstone_gatekeeper: BLACKSTONE_GATEKEEPER_BOSS_CONFIG,
 };
 
-export function getBattleConfigById(battleId: string): BattleConfig | undefined {
+type BattlePlayerState = Record<string, any>;
+
+const PARTY_BATTLE_STATS: Record<string, { hp: number; ac: number }> = {
+  selin: { hp: 36, ac: 12 },
+  ailin: { hp: 36, ac: 12 },
+  kelaiya: { hp: 30, ac: 18 },
+  senluo: { hp: 45, ac: 13 },
+};
+
+function standardizePartyBattleUnit(unit: BattleConfig['units'][number]) {
+  const stats = PARTY_BATTLE_STATS[unit.model];
+  if (!stats) return unit;
+  return {
+    ...unit,
+    hp: stats.hp,
+    maxHp: stats.hp,
+    ac: stats.ac,
+    traits: [
+      ...(unit.traits || []).filter((trait) => !/^HP\s*\d+\s*[/／]\s*AC\s*\d+/i.test(trait)),
+      `HP${stats.hp}/AC${stats.ac}`,
+    ],
+  };
+}
+
+function resolvePlayerBattleUnit(unit: BattleConfig['units'][number], state?: BattlePlayerState, battleId?: string) {
+  if (unit.model !== 'adventurer' || !state) return unit;
+
+  const player = state.player || {};
+  const styleId = String(state.selectedStyleId || state.selected_style_id || player.styleId || 'balanced');
+  const style = getPlayerStyleById(styleId);
+  const attributes = player.attributes || style.attributes;
+  const maxHp = getMaxHp(attributes);
+  const rawHp = battleId === 'tutorial-crawler-battle' ? maxHp : Number(state.current_hp ?? player.hp ?? maxHp);
+  const hp = Number.isFinite(rawHp) ? Math.max(0, Math.min(rawHp, maxHp)) : maxHp;
+  const ac = getAc(attributes);
+
+  return {
+    ...unit,
+    role: `${style.name} / 冒险者`,
+    hp,
+    maxHp,
+    ac,
+    initiativeBonus: getInitiativeModifier(attributes),
+    abilities: { ...attributes },
+    traits: [
+      ...(unit.traits || []).filter((trait) => !/^HP\s*\d+\s*[/／]\s*AC\s*\d+/i.test(trait)),
+      `HP${hp}/${maxHp} / AC${ac}`,
+      `流派：${style.name}`,
+    ],
+  };
+}
+
+export function getBattleConfigById(battleId: string, playerState?: BattlePlayerState): BattleConfig | undefined {
   const config = BATTLE_CONFIG_MAP[battleId];
   if (!config) return undefined;
   return {
@@ -396,7 +536,8 @@ export function getBattleConfigById(battleId: string): BattleConfig | undefined 
     units: config.units.map((unit) => {
       if (unit.faction !== 'ally') return { ...unit };
       const sharedSkills = getSharedPartySkills(unit.model);
-      return sharedSkills ? { ...unit, skills: sharedSkills } : { ...unit };
+      const withSkills = standardizePartyBattleUnit(sharedSkills ? { ...unit, skills: sharedSkills } : { ...unit });
+      return resolvePlayerBattleUnit(withSkills, playerState, battleId);
     }),
   };
 }

@@ -4,6 +4,7 @@ import {
   type DiceEventSource,
   type DiceEventType,
 } from './DiceEvent';
+import { randomUuid } from '../random/secureRandom';
 
 export interface CreateDiceEventInput extends Omit<DiceEvent, 'schemaVersion' | 'rollId' | 'id' | 'createdAt'> {
   rollId?: string;
@@ -11,7 +12,7 @@ export interface CreateDiceEventInput extends Omit<DiceEvent, 'schemaVersion' | 
 }
 
 export function createDiceEvent(input: CreateDiceEventInput): DiceEvent {
-  const rollId = input.rollId || crypto.randomUUID();
+  const rollId = input.rollId || randomUuid();
   return {
     ...input,
     schemaVersion: DICE_EVENT_SCHEMA_VERSION,

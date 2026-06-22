@@ -72,7 +72,7 @@ LEVEL_CAP = 20
 # 服务器配置
 # ============================================================
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = _int_env("PORT", 8000)
+PORT = _int_env("PORT", 8190)
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5174",
     "http://127.0.0.1:5174",

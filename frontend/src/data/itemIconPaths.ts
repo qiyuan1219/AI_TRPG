@@ -1,8 +1,10 @@
+import { getItemDefinition } from '../core/items/ItemCatalog';
+
 const DEFAULT_ITEM_ICON = '/assets/icons/items/default.png';
 
 export const ITEM_ICON_PATHS: Record<string, string> = {
   'scroll-sealed': '/assets/icons/items/scroll-sealed.png',
-  'book-open': '/assets/icons/items/book-open..png',
+  'book-open': '/assets/icons/items/book-open.png',
   'note-pencil': '/assets/icons/items/note-pencil.png',
   'scroll-quill': '/assets/icons/items/scroll-quill.png',
   cards: '/assets/icons/items/cards.png',
@@ -78,29 +80,37 @@ export const ITEM_ICON_PATHS: Record<string, string> = {
   '37': '/assets/icons/items/37.png',
   '38': '/assets/icons/items/38.png',
 
-  'potion-red': '/assets/prop/yuling_shop/healing_potion.png',
-  healing_potion: '/assets/prop/yuling_shop/healing_potion.png',
-  powder: '/assets/prop/aolan_blindbox/hemostatic_powder.png',
-  hemostatic_powder: '/assets/prop/aolan_blindbox/hemostatic_powder.png',
-  'vial-green': '/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png',
-  weakly_effective_detoxifying_agent: '/assets/prop/aolan_blindbox/weakly_effective_detoxifying_agent.png',
-  'heart-vial': '/assets/prop/yuling_shop/purifyingheart.png',
-  purification_heart: '/assets/prop/yuling_shop/purifyingheart.png',
-  purifyingheart: '/assets/prop/yuling_shop/purifyingheart.png',
-  cold_light_stick: '/assets/prop/aolan_blindbox/cold_light_stick.png',
-  sealed_sample_bottle: '/assets/prop/aolan_blindbox/sealed_sample_bottle.png',
-  small_bottle_therapeutic_solution: '/assets/prop/aolan_blindbox/small_bottle_therapeutic_solution.png',
-  blackmarket_chips: '/assets/prop/aolan_blindbox/blackmarket_chips.png',
-  copper_ring: '/assets/prop/aolan_blindbox/copper_ring.png',
-  old_talisman_fragments: '/assets/prop/aolan_blindbox/old_talisman_fragments.png',
-  gem: '/assets/prop/aolan_blindbox/diamond.png',
-  diamond: '/assets/prop/aolan_blindbox/diamond.png',
-  strength_potion: '/assets/prop/yuling_shop/power_potion.png',
-  intelligence_potion: '/assets/prop/yuling_shop/wisdom_potion.png',
-  dexterity_potion: '/assets/prop/yuling_shop/agile_potion.png',
-  constitution_potion: '/assets/prop/yuling_shop/constitution_potion.png',
-  wisdom_potion: '/assets/prop/yuling_shop/perception_potion.png',
-  charisma_potion: '/assets/prop/yuling_shop/charm_potion.png',
+  'potion-red': '/assets/icons/items/yuling_shop/healing_potion.png',
+  healing_potion: '/assets/icons/items/yuling_shop/healing_potion.png',
+  powder: '/assets/icons/items/aolan_blindbox/hemostatic_powder.png',
+  hemostatic_powder: '/assets/icons/items/aolan_blindbox/hemostatic_powder.png',
+  'vial-green': '/assets/icons/items/aolan_blindbox/weakly_effective_detoxifying_agent.png',
+  weakly_effective_detoxifying_agent: '/assets/icons/items/aolan_blindbox/weakly_effective_detoxifying_agent.png',
+  'heart-vial': '/assets/icons/items/yuling_shop/purifyingheart.png',
+  purification_heart: '/assets/icons/items/yuling_shop/purifyingheart.png',
+  purifyingheart: '/assets/icons/items/yuling_shop/purifyingheart.png',
+  cold_light_stick: '/assets/icons/items/aolan_blindbox/cold_light_stick.png',
+  sealed_sample_bottle: '/assets/icons/items/aolan_blindbox/sealed_sample_bottle.png',
+  small_bottle_therapeutic_solution: '/assets/icons/items/aolan_blindbox/small_bottle_therapeutic_solution.png',
+  blackmarket_chips: '/assets/icons/items/aolan_blindbox/blackmarket_chips.png',
+  copper_ring: '/assets/icons/items/aolan_blindbox/copper_ring.png',
+  old_talisman_fragments: '/assets/icons/items/aolan_blindbox/old_talisman_fragments.png',
+  gem: '/assets/icons/items/aolan_blindbox/diamond.png',
+  diamond: '/assets/icons/items/aolan_blindbox/diamond.png',
+  strength_potion: '/assets/icons/items/yuling_shop/power_potion.png',
+  intelligence_potion: '/assets/icons/items/yuling_shop/wisdom_potion.png',
+  dexterity_potion: '/assets/icons/items/yuling_shop/agile_potion.png',
+  constitution_potion: '/assets/icons/items/yuling_shop/constitution_potion.png',
+  wisdom_potion: '/assets/icons/items/yuling_shop/perception_potion.png',
+  charisma_potion: '/assets/icons/items/yuling_shop/charm_potion.png',
+  // 缺失图标 → 使用最接近的已有资源兜底
+  badge: '/assets/icons/items/coin.png',
+  'map-folded': '/assets/icons/items/map.png',
+  'spore-powder': '/assets/icons/items/04.png',
+  'spore-sample': '/assets/icons/items/03.png',
+  'purification-heart': '/assets/icons/items/charm-leaf.png',
+  journal: '/assets/icons/items/journal-leaf.png',
+  clipboard: '/assets/icons/items/scroll-log.png',
 };
 
 const ITEM_NAME_ICON_TOKENS: Record<string, string> = {
@@ -183,6 +193,12 @@ const ITEM_NAME_ICON_TOKENS: Record<string, string> = {
   裂纹守门者核心: '36',
   逆钟锚点碎片: '37',
   寂静之门报告: '38',
+  赫尔曼的抽屉笔记: 'note-pencil',
+  指名委托书原件: 'scroll-quill',
+  萨洛的情报卡片: 'cards',
+  酒馆传闻便条: 'note-pin',
+  尼布的巡逻日志: 'journal',
+  远征队用药记录: 'scroll-medicine',
 };
 
 const ITEM_NAME_SUMMARIES: Record<string, string> = {
@@ -219,6 +235,12 @@ const ITEM_NAME_SUMMARIES: Record<string, string> = {
   莱因的身份牌: '受损的远征队身份牌，仍能辨认出莱因的姓名。',
   黑色方尖碑碎片: '从黑石根区入口取下的封印碎片，会随着脉冲发出微光。',
   银杖护符: '瑟琳从裂开的银杖上取下的小护符，只交给她真正信任的同伴。',
+  赫尔曼的抽屉笔记: '从赫尔曼私人抽屉夹层中找到的便签，字迹潦草而急促。',
+  指名委托书原件: '三个月前送达的指名委托书，羊皮纸边缘略微发黄。',
+  萨洛的情报卡片: '几张用细绳捆在一起的情报卡片，每条情报写在一张扑克牌大小的硬纸片上。',
+  酒馆传闻便条: '钉在酒馆布告栏角落的几张便条，写着矿工和守卫的零星见闻。',
+  尼布的巡逻日志: '孢海据点守夜人尼布的皮面日志，记录了据点周边巡逻情况。',
+  远征队用药记录: '云苓保存的用药记录，追踪了每一支远征队的药剂需求变化。',
 };
 
 export function resolveItemIconPath(iconOrPath?: string, itemName?: string) {
@@ -228,5 +250,5 @@ export function resolveItemIconPath(iconOrPath?: string, itemName?: string) {
 }
 
 export function getItemSummaryByName(itemName: string) {
-  return ITEM_NAME_SUMMARIES[itemName] || '尚未登记详细资料的物品。';
+  return ITEM_NAME_SUMMARIES[itemName] || getItemDefinition(itemName)?.description || '尚未登记详细资料的物品。';
 }

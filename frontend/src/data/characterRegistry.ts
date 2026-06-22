@@ -10,8 +10,6 @@ export interface CharacterProfile {
   testLine: string;
 }
 
-const NPC_PLACEHOLDER = '/assets/characters/npc/default.svg';
-
 export const CHARACTER_PROFILES: CharacterProfile[] = [
   {
     id: 'adventurer',
@@ -174,51 +172,6 @@ export const CHARACTER_PROFILES: CharacterProfile[] = [
     portrait: '/assets/characters/yunling/yunling_idle.png',
     aliases: ['龙族药师云苓', '龙女药师', '小药师'],
     testLine: '这瓶药不喜欢你。不是你的问题，它就这脾气。',
-  },
-  {
-    id: 'sein',
-    name: '赛因',
-    kind: 'npc',
-    subtitle: '赛因·镜页 / 黑石观测台研究员',
-    portrait: NPC_PLACEHOLDER,
-    aliases: ['赛因·镜页', '镜页'],
-    testLine: '黑石脉冲不是噪声，它像是在回应某个更深处的节律。',
-  },
-  {
-    id: 'marga',
-    name: '玛尔加',
-    kind: 'npc',
-    subtitle: '铁砧玛尔加 / 匠炉区武器店主',
-    portrait: NPC_PLACEHOLDER,
-    aliases: ['铁砧玛尔加'],
-    testLine: '想活着回来，就别让护甲带着裂口下缆梯。',
-  },
-  {
-    id: 'pavi',
-    name: '帕维',
-    kind: 'npc',
-    subtitle: '烛账帕维 / 公会档案员',
-    portrait: NPC_PLACEHOLDER,
-    aliases: ['烛账帕维'],
-    testLine: '失踪远征队的记录都在这里，只是有几页不该空白。',
-  },
-  {
-    id: 'ella',
-    name: '埃拉',
-    kind: 'npc',
-    subtitle: '静默修女埃拉',
-    portrait: NPC_PLACEHOLDER,
-    aliases: ['静默修女埃拉'],
-    testLine: '请低声些。这里保存的不只是遗物，还有最后的话。',
-  },
-  {
-    id: 'clerk',
-    name: '书记员',
-    kind: 'npc',
-    subtitle: '公会书记员',
-    portrait: NPC_PLACEHOLDER,
-    aliases: ['公会书记员', '书记员马文', '马文', '接待员', '公会接待员'],
-    testLine: '新来的？登记表在这里，悬赏令不等人，但规矩要先讲清楚。',
   },
 ];
 

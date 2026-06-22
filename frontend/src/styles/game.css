@@ -940,6 +940,7 @@
 }
 
 .character-modal .character-identity,
+.character-modal .character-vitals,
 .character-modal .panel-grid {
   grid-column: 1 / -1;
 }
@@ -982,6 +983,36 @@
   padding: 12px;
 }
 
+.character-vitals {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(92px, 0.32fr) minmax(140px, 0.42fr);
+  align-items: stretch;
+  gap: 10px;
+}
+
+.vital-hp,
+.vital-pill {
+  min-width: 0;
+}
+
+.vital-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px;
+  border: 1px solid rgba(231, 211, 161, 0.14);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.14);
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.vital-pill b {
+  color: var(--text);
+  font-family: Consolas, monospace;
+}
+
 .character-identity span {
   display: block;
   color: var(--muted);
@@ -1005,7 +1036,8 @@
 
 .trust-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px 42px;
+  grid-template-columns: minmax(0, 1fr) 40px 44px;
+  min-height: 28px;
 }
 
 .meter-label,
@@ -1030,12 +1062,12 @@
 
 .trust-row span small {
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
 }
 
 .trust-tier {
   color: var(--teal);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-style: normal;
   font-weight: 800;
   text-align: right;
@@ -1306,6 +1338,68 @@
 .document-reader-backdrop {
   z-index: 90;
 }
+
+.healing-target-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.healing-target-modal {
+  width: min(680px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(214, 168, 90, 0.55);
+  border-radius: 10px;
+  background: rgba(28, 22, 19, 0.98);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.58);
+  color: var(--text);
+}
+
+.healing-target-modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(214, 168, 90, 0.22);
+}
+
+.healing-target-modal header div { display: grid; gap: 3px; }
+.healing-target-modal header span { color: var(--gold-soft); font-weight: 900; }
+.healing-target-modal header small { color: var(--muted); }
+.healing-target-modal header button { width: 34px; height: 34px; border: 1px solid rgba(231, 211, 161, 0.2); border-radius: 50%; background: rgba(255,255,255,.04); color: var(--text); cursor: pointer; }
+
+.healing-target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  padding: 18px;
+}
+
+.healing-target-grid button {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-height: 156px;
+  padding: 12px;
+  border: 1px solid rgba(231, 211, 161, 0.2);
+  border-radius: 9px;
+  background: rgba(255,255,255,.035);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.healing-target-grid button.is-selected { border-color: #73d8c6; background: rgba(45, 126, 112, .18); box-shadow: 0 0 0 2px rgba(115, 216, 198, .12); }
+.healing-target-grid button:disabled { opacity: .42; cursor: not-allowed; }
+.healing-target-grid img { width: 78px; height: 78px; object-fit: contain; }
+.healing-target-grid span { font-weight: 900; }
+.healing-target-grid small { color: var(--muted); }
+.healing-target-modal footer { display: flex; justify-content: flex-end; gap: 10px; padding: 0 18px 18px; }
+.healing-target-modal footer button { min-width: 112px; padding: 9px 14px; border: 1px solid rgba(214, 168, 90, .38); border-radius: 7px; background: rgba(96, 68, 29, .44); color: var(--text); cursor: pointer; }
+.healing-target-modal footer button:disabled { opacity: .45; cursor: not-allowed; }
 
 .inventory-modal,
 .item-modal,
@@ -2201,6 +2295,7 @@
 
 .next-button {
   align-self: end;
+  min-width: 128px;
   min-height: 42px;
   border: 1px solid rgba(239, 213, 140, 0.42);
   border-radius: 6px;
@@ -2542,6 +2637,11 @@
 .vn-choice-btn.is-choice-disabled {
   border-color: rgba(231, 211, 161, 0.14);
   background: rgba(255, 255, 255, 0.025);
+}
+
+.opening-action-tutorial-card footer:has(> button:only-child) {
+  display: flex;
+  justify-content: center;
 }
 
 .vn-choice-btn small {

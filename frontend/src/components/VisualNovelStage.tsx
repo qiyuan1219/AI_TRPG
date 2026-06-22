@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SceneVisual, StoryLine } from '../types/game';
 import { resolvePortraitPath, resolveSpeakerName } from '../data/characterRegistry';
@@ -78,9 +78,6 @@ export function VisualNovelStage({
 }: VisualNovelStageProps) {
   const text = line?.text || '';
   const { visible, done, reveal } = useTypewriter(text, autoAdvance ? 0 : 20);
-  const [showActionPrompt, setShowActionPrompt] = useState(false);
-  const actionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const actionPromptShownRef = useRef(false);
 
   // 粘性背景：某行设置了 bgImage 后，后续无 bgImage 的行自动继承
   const [stickyBg, setStickyBg] = useState<string | null>(null);
@@ -88,22 +85,7 @@ export function VisualNovelStage({
     if (line?.bgImage) setStickyBg(line.bgImage);
   }, [line?.bgImage]);
 
-  // "选择行动"特效（暂时关闭，避免 bug）
-  // useEffect(() => {
-  //   if (!isActionPhase) {
-  //     actionPromptShownRef.current = false;
-  //     setShowActionPrompt(false);
-  //     return;
-  //   }
-  //   if (actionPanel && !actionPromptShownRef.current) {
-  //     actionPromptShownRef.current = true;
-  //     setShowActionPrompt(true);
-  //     actionPromptTimerRef.current = setTimeout(() => setShowActionPrompt(false), 1000);
-  //   }
-  //   return () => {
-  //     if (actionPromptTimerRef.current) clearTimeout(actionPromptTimerRef.current);
-  //   };
-  // }, [isActionPhase, Boolean(actionPanel)]);
+
   const speaker = useMemo(
     () => resolveSpeakerName(line?.speaker || (isStreaming ? '主持人' : '')),
     [isStreaming, line?.speaker],
@@ -171,11 +153,11 @@ export function VisualNovelStage({
     }
   }, [scriptedBgOverride]);
 
-  // 生效背景图：当前台词 > override(场景级) > 粘性继承 > stage > 主背景
+  // 生效背景图：当前台词 > 粘性继承 > override(场景级) > stage > 主背景
   const activeBgImage = useMemo(() => {
     if (line?.bgImage) return line.bgImage;
-    if (scriptedBgOverride) return scriptedBgOverride;
     if (stickyBg) return stickyBg;
+    if (scriptedBgOverride) return scriptedBgOverride;
     if (bgStageIndex > 0 && stages[bgStageIndex - 1]) return stages[bgStageIndex - 1].image;
     if (bgRevealed && scene.backgroundImage) return scene.backgroundImage;
     return null;
@@ -280,35 +262,6 @@ export function VisualNovelStage({
         </button>
       </motion.section>
 
-      {/* 行动阶段中央艺术字提示 + 屏幕变黑特效 */}
-      <AnimatePresence>
-        {showActionPrompt && (
-          <motion.div
-            className="action-prompt-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: 'easeInOut' }}
-          >
-            <motion.div
-              className="action-prompt-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.45 }}
-            />
-            <motion.span
-              className="action-prompt-text"
-              initial={{ opacity: 0, scale: 0.88 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.08 }}
-              transition={{ duration: 0.4, ease: 'easeOut' }}
-            >
-              选择行动
-            </motion.span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* 行动面板 —— 中心垂直排列，视觉小说风格 */}
       {actionPanel && (

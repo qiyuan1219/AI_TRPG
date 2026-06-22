@@ -28,7 +28,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   {
     title: '规则说明',
     badge: 'ORLAN BOX',
-    body: '20G 一次，D20 投出 19 或 20 获得钻石。连续 10 次未中会触发保底；每次抽取都会获得一个小道具或钻石。',
+    body: `${ORLAN_DRAW_COST}G 一次，D20 投出 18、19 或 20 获得钻石。连续 ${ORLAN_PITY_LIMIT} 次未中会触发保底；每次抽取都会获得一个小道具或钻石。`,
     placement: 'center',
   },
   {
@@ -168,7 +168,7 @@ export function OrlanBoxGame({ gold, onComplete }: OrlanBoxGameProps) {
   const [diceResult, setDiceResult] = useState<DiceResult | null>(null);
   const [pendingDraw, setPendingDraw] = useState<DrawRecord | null>(null);
   const [revealedDraw, setRevealedDraw] = useState<DrawRecord | null>(null);
-  const [orlanLine, setOrlanLine] = useState('「二十金币一次，买不了命运，但能买命运开口说话。」');
+  const [orlanLine, setOrlanLine] = useState('「五十金币一次，买不了命运，但能买命运开口说话。」');
   const [tutorialStep, setTutorialStep] = useState(0);
   const completedRef = useRef(false);
 
@@ -310,7 +310,7 @@ export function OrlanBoxGame({ gold, onComplete }: OrlanBoxGameProps) {
 
           <div className="orlan-box-status">
             <strong>当前金币 {currentGold}G</strong>
-            <p>20G 一次。D20 投出 19 或 20 获得钻石，第 10 次未中会触发保底。</p>
+            <p>{ORLAN_DRAW_COST}G 一次。D20 投出 {ORLAN_DIAMOND_MIN_ROLL}、19 或 20 获得钻石，第 {ORLAN_PITY_LIMIT} 次未中会触发保底。</p>
             {lastReward && (
               <div className="orlan-last-reward">
                 <img src={lastReward.icon} alt={lastReward.name} />
@@ -332,7 +332,7 @@ export function OrlanBoxGame({ gold, onComplete }: OrlanBoxGameProps) {
             </button>
           ) : (
             <button type="button" className="orlan-primary-button" onClick={doDraw} disabled={!canDraw || Boolean(diceResult) || Boolean(revealedDraw)}>
-              {currentGold < ORLAN_DRAW_COST ? '金币不足' : '抽一次 20G'}
+              {currentGold < ORLAN_DRAW_COST ? '金币不足' : `抽一次 ${ORLAN_DRAW_COST}G`}
             </button>
           )}
         </div>

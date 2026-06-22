@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { authoritativeAmountByTarget, authoritativeDice } from './authoritativeAdapter';
+import { authoritativeAmountByTarget, authoritativeDice, toAuthoritativeBattlePayload } from './authoritativeAdapter';
+import { getBattleConfigById } from '../../data/battleConfigs';
 import { formatResult, getFinalFace } from '../../components/DiceRollOverlay';
 
 function resultWith(event: Record<string, unknown>) {
@@ -23,7 +24,7 @@ describe('authoritative battle dice mapping', () => {
     const dice = authoritativeDice(result, 'damage');
 
     expect(dice?.event).toMatchObject({ type: 'damage', diceSides: 4, rolls: [2, 4], modifier: 2, total: 8 });
-    expect(formatResult(dice!, 'd20')).toMatchObject({ roll: '2', total: '8', dc: undefined, verdict: '造成 8 点伤害' });
+    expect(formatResult(dice!, 'd20')).toMatchObject({ roll: '2', total: '8', dc: undefined, verdict: '结果：8' });
     expect(getFinalFace(4, dice!.event!.rolls)).toBe(2);
     expect(getFinalFace(4, [8])).toBeNull();
   });
@@ -40,5 +41,19 @@ describe('authoritative battle dice mapping', () => {
     const result = resultWith({ type: 'damage', targetId: 'enemy', rawDamage: 7 });
     result.events.push({ type: 'damage', targetId: 'enemy-a', rawDamage: 5 });
     expect(authoritativeAmountByTarget(result)).toEqual({ enemy: 7, 'enemy-a': 5 });
+  });
+
+  it('拟声菌团孢粉爆发发送全体豁免而不是单体命中', () => {
+    const config = getBattleConfigById('enemy_pack_blue_shoal')!;
+    const payload = toAuthoritativeBattlePayload(config, config.units);
+    const skill = Object.values(payload.skills).find((entry: any) => entry.name === '孢粉爆发') as any;
+    expect(skill).toMatchObject({ targetType: 'all_enemies', requiresHitRoll: false, requiresSaveRoll: true });
+  });
+
+  it('黑石脉冲按“全队”语义发送全体豁免并逐人结算', () => {
+    const config = getBattleConfigById('boss_blackstone_gatekeeper')!;
+    const payload = toAuthoritativeBattlePayload(config, config.units);
+    const skill = Object.values(payload.skills).find((entry: any) => entry.name === '黑石脉冲') as any;
+    expect(skill).toMatchObject({ targetType: 'all_enemies', damageDice: '1d12', requiresHitRoll: false, requiresSaveRoll: true });
   });
 });

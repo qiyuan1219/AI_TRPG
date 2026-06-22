@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { getEncounterConfigById } from './encounterFlows';
 import { getScriptedScene } from './scriptedScenes';
+import { evaluateCondition } from '../utils/battlePrep';
 import {
+  areAllRequiredCampNightTalksDone,
+  getCampNightRequiredTalkTargets,
   getBoneMarshPrepActions,
   getGatekeeperPrepActions,
   getPostBlueShoalHintState,
@@ -21,6 +24,7 @@ describe('expanded post-blue-shoal story', () => {
     expect(getEncounterConfigById('boss-gatekeeper')?.introSceneId).toBe(POST_BLUE_SHOAL_IDS.bossPrebattle);
     expect(getEncounterConfigById('boss-gatekeeper')?.afterSceneId).toBe(POST_BLUE_SHOAL_IDS.afterBoss);
     expect(getScriptedScene('after-battle-blue-shoal')).toBeNull();
+    expect(getScriptedScene('act1-bad-ending-time-reset')?.bgm).toBe('/assets/bgm/bgm_13_candidate2_raw(1).mp3');
   });
 
   it('enforces investigation action limits without blocking the main route', () => {
@@ -165,7 +169,7 @@ describe('expanded post-blue-shoal story', () => {
     })?.join('\n')).toContain('净化一枚被污染的黑石核心');
   });
 
-  it('allows core stabilization only after saving Laine with purification heart', () => {
+  it('routes all four endings from Laine rescue and core choices', () => {
     const base = {
       currentNodeId: POST_BLUE_SHOAL_IDS.finalChoice,
       truthScore: 0,
@@ -175,8 +179,7 @@ describe('expanded post-blue-shoal story', () => {
     };
     expect(getPostBlueShoalHints(base)).toEqual(['稳定 Boss 核心', '破坏 Boss 核心']);
     expect(getPostBlueShoalHintState(base, '稳定 Boss 核心')).toEqual({
-      disabled: true,
-      reason: '必须先用净化之心救下莱因，并从证词中得知核心可以被净化',
+      disabled: false,
     });
 
     const endingA = resolvePostBlueShoalAction(
@@ -209,7 +212,7 @@ describe('expanded post-blue-shoal story', () => {
       },
       '破坏 Boss 核心',
     );
-    const blockedStabilize = resolvePostBlueShoalAction(
+    const endingC = resolvePostBlueShoalAction(
       { ...base, laine_alive: true, laine_left_behind: true },
       '稳定 Boss 核心',
     );
@@ -220,24 +223,141 @@ describe('expanded post-blue-shoal story', () => {
 
     expect(endingA).toMatchObject({ nextSceneId: POST_BLUE_SHOAL_IDS.endingA, skipAiNarration: true });
     expect(endingB).toMatchObject({ nextSceneId: POST_BLUE_SHOAL_IDS.endingB, skipAiNarration: true });
-    expect(blockedStabilize).toMatchObject({ nextSceneId: POST_BLUE_SHOAL_IDS.endingD, skipAiNarration: true });
+    expect(endingC).toMatchObject({ nextSceneId: POST_BLUE_SHOAL_IDS.endingC, skipAiNarration: true });
     expect(endingD).toMatchObject({ nextSceneId: POST_BLUE_SHOAL_IDS.endingD, skipAiNarration: true });
   });
 
+  it('routes the expanded no-Laine stabilization path to ending C without the legacy pending flag', () => {
+    const finalChoiceState = {
+      currentNodeId: POST_BLUE_SHOAL_IDS.finalChoice,
+      postBlueShoalExpandedStarted: true,
+      core_choice_pending: false,
+      laine_alive: true,
+      laine_left_behind: true,
+      lainHelped: false,
+      helpedRhein: false,
+    };
+
+    expect(getPostBlueShoalHints(finalChoiceState)).toEqual(['稳定 Boss 核心', '破坏 Boss 核心']);
+    const resolved = resolvePostBlueShoalAction(finalChoiceState, '稳定 Boss 核心');
+    expect(resolved).toMatchObject({
+      nextSceneId: POST_BLUE_SHOAL_IDS.endingC,
+      skipAiNarration: true,
+    });
+    expect(getScriptedScene(resolved!.nextSceneId!)?.statePatch).toMatchObject({
+      endingId: 'cold-expedition',
+      act1EndingCode: 'C',
+      bossCoreChoice: 'stabilize',
+    });
+  });
+
+  it('requires all four companion talks when Laine was not saved', () => {
+    let state: Record<string, any> = {
+      currentNodeId: POST_BLUE_SHOAL_IDS.campNight,
+      lainHelped: false,
+      helpedRhein: false,
+    };
+    expect(getCampNightRequiredTalkTargets(state)).toEqual(['serin', 'ailin', 'brock', 'kaiya']);
+    expect(getPostBlueShoalHints(state)).toEqual([
+      '和瑟琳聊聊',
+      '和艾琳聊聊',
+      '和布洛克聊聊',
+      '和凯娅聊聊',
+    ]);
+    expect(getPostBlueShoalHints(state)).not.toContain('和莱因聊聊');
+    expect(resolvePostBlueShoalAction(state, '和莱因聊聊')).toBeNull();
+
+    for (const action of ['和瑟琳聊聊', '和艾琳聊聊', '和布洛克聊聊', '和凯娅聊聊']) {
+      const resolved = resolvePostBlueShoalAction(state, action);
+      expect(resolved?.nextSceneId).toBeUndefined();
+      expect(resolved?.aiPrompt).toContain('campNight 强制夜谈');
+      state = { ...state, ...resolved?.patch };
+    }
+
+    expect(areAllRequiredCampNightTalksDone(state)).toBe(true);
+    expect(getPostBlueShoalHints(state)).toContain('前往地底堡垒外环');
+    expect(resolvePostBlueShoalAction(state, '前往地底堡垒外环')).toMatchObject({
+      nextSceneId: POST_BLUE_SHOAL_IDS.fortressOuter,
+      skipAiNarration: true,
+      patch: { campNightAllRequiredTalksDone: true },
+    });
+  });
+
+  it('requires Laine as the fifth talk only when he was saved', () => {
+    const fourTalksDone = {
+      currentNodeId: POST_BLUE_SHOAL_IDS.campNight,
+      lainHelped: true,
+      campNightTalkedToSerin: true,
+      campNightTalkedToAilin: true,
+      campNightTalkedToBrock: true,
+      campNightTalkedToKaiya: true,
+    };
+    expect(getCampNightRequiredTalkTargets(fourTalksDone)).toEqual([
+      'serin', 'ailin', 'brock', 'kaiya', 'laine',
+    ]);
+    expect(areAllRequiredCampNightTalksDone(fourTalksDone)).toBe(false);
+    expect(getPostBlueShoalHints(fourTalksDone)).toContain('和莱因聊聊');
+    expect(getPostBlueShoalHints(fourTalksDone)).not.toContain('前往地底堡垒外环');
+
+    const laineTalk = resolvePostBlueShoalAction(fourTalksDone, '和莱因聊聊');
+    expect(laineTalk?.campNightTalkTarget).toBe('laine');
+    expect(laineTalk?.lines.join('\n')).toContain('队长死在门前了');
+    const done = { ...fourTalksDone, ...laineTalk?.patch };
+    expect(areAllRequiredCampNightTalksDone(done)).toBe(true);
+    expect(getPostBlueShoalHints(done)).toContain('前往地底堡垒外环');
+  });
+
+  it('renders 10-12 campNight opening lines on both Laine routes', () => {
+    const scene = getScriptedScene(POST_BLUE_SHOAL_IDS.campNight);
+    const helpedLines = scene?.lines.filter((line) => evaluateCondition(line.condition, {
+      lainHelped: true,
+      helpedRhein: true,
+      purification_heart_used_on_laine: true,
+    })) || [];
+    const notHelpedLines = scene?.lines.filter((line) => evaluateCondition(line.condition, {
+      lainHelped: false,
+      helpedRhein: false,
+      purification_heart_used_on_laine: false,
+    })) || [];
+    expect(helpedLines).toHaveLength(11);
+    expect(notHelpedLines).toHaveLength(10);
+    expect(notHelpedLines.map((line) => line.text).join('\n')).not.toContain('莱因被安置在火光边缘');
+  });
+
+  it('does not reveal the underground ocean before the epilogue', () => {
+    const preRevealIds = Object.values(POST_BLUE_SHOAL_IDS).filter((id) => (
+      id !== POST_BLUE_SHOAL_IDS.epilogue && id !== POST_BLUE_SHOAL_IDS.complete
+    ));
+    preRevealIds.forEach((id) => {
+      const text = getScriptedScene(id)?.lines.map((line) => line.text).join('\n') || '';
+      expect(text, id).not.toMatch(/地下海洋|海声|海浪|海风|盐味|黑潮/);
+    });
+  });
+
   it('plays the core CG, ending CG, ocean reveal and final summary in order', () => {
-    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingA)?.lines.map((line) => line.bgImage)).toEqual([
-      '/assets/CG/cg05.png', '/assets/CG/cg01.png', '/assets/CG/cg01.png',
+    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingA)?.lines.flatMap((line) => line.bgImage ? [line.bgImage] : [])).toEqual([
+      '/assets/CG/cg05.webp', '/assets/CG/cg01.webp', '/assets/CG/cg01.webp',
     ]);
-    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingB)?.lines.map((line) => line.bgImage)).toEqual([
-      '/assets/CG/cg06.png', '/assets/CG/cg02.png', '/assets/CG/cg02.png',
+    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingB)?.lines.flatMap((line) => line.bgImage ? [line.bgImage] : [])).toEqual([
+      '/assets/CG/cg06.webp', '/assets/CG/cg02.webp', '/assets/CG/cg02.webp',
     ]);
-    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingC)?.lines.map((line) => line.bgImage)).toEqual([
-      '/assets/CG/cg05.png', '/assets/CG/cg03.png', '/assets/CG/cg03.png',
+    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingC)?.lines.flatMap((line) => line.bgImage ? [line.bgImage] : [])).toEqual([
+      '/assets/CG/cg05.webp', '/assets/CG/cg03.webp', '/assets/CG/cg03.webp',
     ]);
-    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingD)?.lines.map((line) => line.bgImage)).toEqual([
-      '/assets/CG/cg06.png', '/assets/CG/cg04.png', '/assets/CG/cg04.png',
+    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.endingD)?.lines.flatMap((line) => line.bgImage ? [line.bgImage] : [])).toEqual([
+      '/assets/CG/cg06.webp', '/assets/CG/cg04.webp', '/assets/CG/cg04.webp',
     ]);
-    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.epilogue)?.bgImage).toBe('/assets/scenes/15underground-ocean-reveal.webp');
+    [
+      POST_BLUE_SHOAL_IDS.endingA,
+      POST_BLUE_SHOAL_IDS.endingB,
+      POST_BLUE_SHOAL_IDS.endingC,
+      POST_BLUE_SHOAL_IDS.endingD,
+      POST_BLUE_SHOAL_IDS.epilogue,
+      POST_BLUE_SHOAL_IDS.complete,
+    ].forEach((sceneId) => {
+      expect(getScriptedScene(sceneId)?.bgm).toBe('/assets/bgm/bgm_13_candidate2_raw(1).mp3');
+    });
+    expect(getScriptedScene(POST_BLUE_SHOAL_IDS.epilogue)?.bgImage).toBe('/assets/scenes/31.webp');
 
     const ocean = resolvePostBlueShoalAction(
       { currentNodeId: POST_BLUE_SHOAL_IDS.endingA },

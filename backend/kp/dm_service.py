@@ -980,10 +980,14 @@ def _sanitize_battle_narration(text: str) -> str:
     sentence_end = max(cleaned.rfind(mark) for mark in "。！？.!?")
     if sentence_end >= 10 and sentence_end < len(cleaned) - 1:
         cleaned = cleaned[:sentence_end + 1].strip()
-    if not cleaned or cleaned[-1] not in "。！？.!?」”":
+    if not cleaned:
         return ""
+    # 句末若以逗号、顿号、破折号截断（token 限制），自动补句号
     if cleaned[-1] in "，、；：:-—":
-        return ""
+        cleaned = cleaned[:-1] + "。"
+    # 句末若不是句号/问号/叹号/引号等正常结尾，补句号
+    elif cleaned[-1] not in "。！？.!?」”'\"）)】〗":
+        cleaned += "。"
     return cleaned
 
 

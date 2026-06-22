@@ -15,6 +15,8 @@ import { resolveDndScene } from './data/dndScenes';
 import { getAc, getInitiativeModifier, getMaxHp, getPlayerStyleById, migrateClassToStyleState } from './data/dndClasses';
 import { getScriptedScene, matchScriptedScene, type ScriptedScene } from './data/scriptedScenes';
 import {
+  areAllRequiredCampNightTalksDone,
+  getCampNightRequiredTalkTargets,
   getBoneMarshPrepActions,
   getGatekeeperPrepActions,
   getPostBlueShoalHintState,
@@ -33,10 +35,11 @@ import {
 } from './data/encounterFlows';
 import { BATTLE_PREP_ACTION_LIMIT, createBattlePrepFlowState, evaluateCondition, applyBattlePrepEffect, finalizeBattlePrepResult, getBattlePrepLog, getRerollItemQuantity, lockBattlePrepForNarration, migrateRerollInventory, shouldShowBattlePrepPanel, shouldSuppressBattlePrepSuggestions, useFictionDice, useOmniDice, type BattlePrepChoice, type BattlePrepResolveResult, type RerollItemId } from './utils/battlePrep';
 import { getEndingFeedback } from './data/companionSideQuests';
-import type { StoryTestCheckpoint } from './data/storyTestCheckpoints';
+import { UPDATE_ANNOUNCEMENTS, type UpdateAnnouncement } from './data/updateAnnouncements';
 import { shopItems } from './data/shopItems';
 import { checkAiHealth, fetchStoryCheckNarration, getAiSettings, judgeAilinRecruitAnswer, judgeSerlinIntro, listSaves, loadGame, patchGameState, saveGame, updateAiSettings } from './services/api';
 import { dndRuntime } from './services/dndRuntime';
+import { sfx } from './utils/audio';
 import type {
   ActionSuggestion,
   CreateGamePayload,
@@ -47,7 +50,7 @@ import type {
   StoryLine,
 } from './types/game';
 import { createNarrativeStreamParser, extractHints, makeSuggestions, parseNarrativeSegments, splitNarrative, stripAllMachineProtocolText, stripMachineProtocolText } from './utils/narrative';
-import { buildTrustPatch, COMPANION_ID_BY_EVENT_ID, getCompanionTrust, getTrustTier } from './utils/trust';
+import { buildTrustPatch, COMPANION_ID_BY_EVENT_ID, getCompanionTrust, getTrustTier, normalizeCompanionTrustBaseline } from './utils/trust';
 import { SelectionActionCheck } from './utils/selectionAction';
 import './core/actions/battlePrepResolver';
 import { randomIntInclusive as secureRandomIntInclusive } from './core/random/secureRandom';
@@ -58,11 +61,14 @@ import { SaveLoadBinding } from './features/save/SaveLoadBinding';
 import { StoryRewardNotices } from './features/story/StoryRewardNotices';
 import { Act1EndingSummary } from './features/story/Act1EndingSummary';
 import { collectRewardNotices, type RewardNotice } from './features/story/storyRewardDiff';
-import { addInventoryQuantity, buildInventoryStatePatch } from './features/inventory/inventoryStatePatch';
+import { isContractSignatureValid } from './features/story/contractSignature';
+import { resolveElevatorMoraleCheck } from './features/story/elevatorMoraleCheck';
+import { addInventoryQuantity, buildInventoryStatePatch, changeInventoryQuantity, inventoryCounts } from './features/inventory/inventoryStatePatch';
 import { buildApothecaryFarewellInventory, buildApothecaryPurchasePatch, buildBargainPurchasePatch } from './features/shop/shopFlow';
 import { buildYunlingBonusInventory, resolveOrlanCompletion, type OrlanBoxResult } from './features/minigames/blackMarketDrawFlow';
 import { buildSaveSnapshot, normalizePersistedGameState } from './features/save/saveSnapshot';
 import { prepareSaveRestore } from './features/save/saveRestore';
+import { preloadImageAssets, preloadSceneVisualAssets, preloadScriptedSceneAssets, preloadStoryLineAssets } from './utils/assetPreloader';
 import {
   completeBattlePrepSelectionPatch,
   createBattlePrepSelectionPatch,
@@ -82,7 +88,6 @@ import {
 
 const TitleMenu = lazy(() => import('./components/TitleMenu').then((module) => ({ default: module.TitleMenu })));
 const LoadGameScreen = lazy(() => import('./components/LoadGameScreen').then((module) => ({ default: module.LoadGameScreen })));
-const TestScreen = lazy(() => import('./components/TestScreen').then((module) => ({ default: module.TestScreen })));
 const BattleTestScreen = lazy(() => import('./components/BattleTestScreen').then((module) => ({ default: module.BattleTestScreen })));
 const GalleryScreen = lazy(() => import('./features/gallery/GalleryScreen').then((module) => ({ default: module.GalleryScreen })));
 const CompanionEventTestScreen = lazy(() => import('./components/CompanionEventTestScreen').then((module) => ({ default: module.CompanionEventTestScreen })));
@@ -91,14 +96,14 @@ const DrinkingDiceGame = lazy(() => import('./components/DrinkingDiceGame').then
 const OrlanBoxGame = lazy(() => import('./components/OrlanBoxGame'));
 const ApothecaryShop = lazy(() => import('./components/ApothecaryShop'));
 const DicePokerGame = lazy(() => import('./components/DicePokerGame').then((module) => ({ default: module.DicePokerGame })));
-const CityMap = lazy(() => import('./components/CityMap').then((module) => ({ default: module.CityMap })));
+
 const TavernDicePoker = lazy(() => import('./components/TavernDicePoker').then((module) => ({ default: module.TavernDicePoker })));
 
 function LazyBoundary({ children }: { children: ReactNode }) {
   return <Suspense fallback={<LoadingScreen />}>{children}</Suspense>;
 }
 
-type Screen = 'main-menu' | 'load-game' | 'gallery' | 'test' | 'loading' | 'game' | 'tutorial-battle' | 'companion-event' | 'deep-battle';
+type Screen = 'main-menu' | 'load-game' | 'gallery' | 'loading' | 'game' | 'tutorial-battle' | 'companion-event' | 'deep-battle';
 type GamePhase = 'narrating' | 'action';
 
 function storyCheckDiceResult(roll: { d20: number; modifier: number; total: number; dc: number; skill: string }): DiceResult {
@@ -132,6 +137,7 @@ const BGM_TRACKS = {
   battleGeneral: '/assets/bgm/bgm_05_battle_general.mp3',
   blackMarket: '/assets/bgm/bgm_06_black_market.mp3',
   bossBattle: '/assets/bgm/bgm_07_blackstone_guardian_boss.mp3',
+  temple: '/assets/bgm/temple.mp3',
 };
 
 function readStoredVolume(key: string, fallback: number) {
@@ -160,32 +166,16 @@ function readStoredAiHealthMaxTokens() {
 
 function resolveBgmTrack(screen: Screen, currentLine: StoryLine | undefined, state: GameState) {
   if (screen === 'main-menu' || screen === 'gallery') return BGM_TRACKS.title;
-  if (screen === 'tutorial-battle') return BGM_TRACKS.battleGeneral;
+  if (screen === 'tutorial-battle' || screen === 'deep-battle' || screen === 'companion-event') return BGM_TRACKS.battleGeneral;
   if (currentLine?.bgm) return currentLine.bgm;
-
-  const text = currentLine?.text || '';
-  const area = String(state.current_area || '');
-
-  if (/boss|Boss|首领|黑石|守护者|黑暗之门/.test(`${area} ${text}`)) return BGM_TRACKS.bossBattle;
-  if (text.includes('黑市藏在补给市场背面的斜巷里')) return BGM_TRACKS.blackMarket;
-  if (text.includes('吊舱落在一座钉进岩壁的钢木平台上')) return BGM_TRACKS.fungalSea;
-  if (text.includes('降渊缆梯中枢悬在城市最下缘')) return BGM_TRACKS.elevatorDescent;
-  if (text.includes('双脚重新落地时，一座倒悬于洞穴穹顶之上的城市出现在你面前')) return BGM_TRACKS.inverseCity;
-  if (text.includes('你跟随守卫离开入城平台，沿着主缆街向公会方向前进')) return BGM_TRACKS.guildCompanions;
-
-  if (/黑市/.test(area)) return BGM_TRACKS.blackMarket;
-  if (/孢海/.test(area)) return BGM_TRACKS.fungalSea;
-  if (/降渊缆梯/.test(area)) return BGM_TRACKS.elevatorDescent;
-  if (/冒险者公会|回声酒馆|静默神殿/.test(area)) return BGM_TRACKS.guildCompanions;
-  if (/逆穹悬城/.test(area)) return BGM_TRACKS.inverseCity;
-
+  void state;
   return '';
 }
 
 const DEFAULT_OPENING = '双脚重新落地时，一座倒悬于洞穴穹顶之上的城市出现在你面前，蓝绿色荧光在远方深渊中明灭。你的冒险从这一刻开始。';
 const RETREAT_ACTION_RE = /逃跑|撤退|脱战|逃离|后撤|拉开距离|跑路|避战|不战斗/;
 const DC_CHECK_RE = /(?:DC|ＤＣ)\s*\d{1,2}/i;
-const CITY_MAP_ENABLED = false;
+
 
 interface TutorialBattleSetup {
   openingEffects: Array<{
@@ -219,24 +209,23 @@ const YUNLING_SHOP_HINTS = [
   '返回公会登记',
 ];
 
-// 普通剧情调查节点的上限，与战前选择行动无关。
-const STORY_NODE_CHOICE_LIMIT = 3;
-const ACTION_OPTION_LIMIT = 4;
+// 普通剧情调查节点不再限制总行动次数；仅保留战前准备、商店等特殊节点的一选即走规则。
+const STORY_NODE_CHOICE_LIMIT = Number.MAX_SAFE_INTEGER;
 const GUILD_INTEL_NODE_HINTS = [
   '前往回声酒馆找萨洛打听三名队友',
   '观察柜台旁的报告单【智力DC12】',
-  '说服米娜查看失踪远征队登记册【魅力DC11】',
+  '说服米娜查看失踪远征队登记册',
   '检查委托火漆与公会认证【智力DC10】',
 ];
 
 function getGuildIntelNodeHints(state: GameState) {
   return hasClue(state, 'expedition_saw_spore_beasts')
-    ? [GUILD_INTEL_NODE_HINTS[0], '追问书记员报告中的孢化地底兽', ...GUILD_INTEL_NODE_HINTS.slice(1)].slice(0, ACTION_OPTION_LIMIT)
+    ? [GUILD_INTEL_NODE_HINTS[0], '追问米娜报告中的孢化地底兽', ...GUILD_INTEL_NODE_HINTS.slice(1)]
     : GUILD_INTEL_NODE_HINTS;
 }
 
 const AUTO_SAVE_SLOT: SaveSlotKey = 'auto';
-const PHASE_LIMIT_DIRECTIVE = '阶段选择次数已用完。完成本次玩家行动的叙事后，必须立即承接到下一段主线推进，不要继续停留在当前选择阶段，也不要把这条规则写进叙事、任务目标、对话或存档。';
+const PHASE_LIMIT_DIRECTIVE = '玩家已经选择固定出口。完成本次玩家行动的叙事后，必须自然承接到下一段主线推进，不要继续停留在当前选择阶段，也不要把这条规则写进叙事、任务目标、对话或存档。';
 
 const SCRIPTED_PORTRAIT_OVERRIDES: Record<string, Record<string, string>> = {};
 
@@ -314,8 +303,8 @@ function buildAct1SummaryScene(state: GameState): ScriptedScene {
     triggers: ['结束'],
     setArea: '第一幕·远征记录',
     bgImage: endingId === 'time-reset'
-      ? '/assets/scenes/14dark-gate-forecourt-battle.webp'
-      : '/assets/scenes/15underground-ocean-reveal.webp',
+      ? '/assets/scenes/29.webp'
+      : '/assets/scenes/31.webp',
     statePatch: { act1SummarySeen: true, currentNodeId: ACT1_SCENE_IDS.summary },
     lastEvent: `第一幕总结：${endingTitle}`,
     lines: [
@@ -345,8 +334,7 @@ function getScriptedPortraitOverride(sceneId: string, speaker: string) {
 function isOpeningTutorialBattleNode(state: GameState) {
   return Boolean(
     state.tutorial_battle_pending
-    || state.currentNodeId === 'opening_tutorial_battle'
-    || state.story_test_checkpoint === 'first-choice',
+    || state.currentNodeId === 'opening_tutorial_battle',
   );
 }
 
@@ -513,21 +501,27 @@ function fallbackAilinRecruitAnswer(playerAnswer: string) {
   };
 }
 
+function isGenericAiFallbackBlock(lines: string[]) {
+  if (!lines.length) return false;
+  const text = lines.map((line) => stripAllMachineProtocolText(line).trim()).join('\n');
+  const markers = [
+    /你刚才选择了[:：]/,
+    /局势继续向前推进/,
+    /你可以保存进度、检查角色状态/,
+    /从眼前线索中选择下一步行动/,
+    /远处的荧光在黑暗中明灭/,
+    /空气中弥漫着潮湿的孢尘/,
+    /扫过周围的动静/,
+  ];
+  return markers.filter((marker) => marker.test(text)).length >= 2;
+}
+
 function hasDocument(state: GameState, documentId: string) {
   const documents = Array.isArray(state.documents) ? state.documents : [];
   return documents.some((document) => (typeof document === 'string' ? document === documentId : document?.id === documentId));
 }
 
 function getForcedCompanionEventId(state: GameState): string | null {
-  // [已停用/归档] 压缩主线不再参与同伴事件判断。
-  // if (state.compressedAct1EndingStarted) return null;
-  // Ailin's outpost event is offered as a staging action so the player sees the
-  // outpost setup before entering her companion event.
-  // [已停用/归档] 凯娅旧支线“少了两个封扣”不再强制触发。
-  // if (hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost')
-  //     && !hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest')) {
-  //   return 'kaiya_broken_seals';
-  // }
   if (state.pre_boss_rest_done && !hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3')) {
     return 'serin_cracked_silver_staff';
   }
@@ -626,6 +620,13 @@ function linearRecruitmentHints(state: GameState): string[] {
 
   // 远征队已登记完成：跳过所有招募阶段，直接进入后续流程
   if (state.expedition_registered) {
+    if (state.elevator_descent_started && !hasStateFlag(state, 'spore_outpost_reached', 'spore_outpost_arrived', 'arrivedSporeOutpost')) {
+      return [
+        '鼓舞队伍士气，让众人在垂降前重新集中精神【魅力DC10】',
+        '观察下方异常孢光带【感知DC13】',
+        '直接抵达孢海据点，确认当地情况',
+      ];
+    }
     // 统一由场景级 hints 接管（掉缆梯/孢海等）
     return [];
   }
@@ -642,8 +643,8 @@ function linearRecruitmentHints(state: GameState): string[] {
   if (state.tutorial_battle_done && !state.guild_registered) {
     return [
       '前往冒险者公会登记',
-      '查看吊箱封条【智力DC12】',
-      '询问瑟琳这些魔物为什么怕光【智力DC13】',
+      '查看吊箱封条',
+      '询问瑟琳这些魔物为什么怕光',
     ];
   }
 
@@ -701,12 +702,7 @@ function linearRecruitmentHints(state: GameState): string[] {
     return [
       '前往黑市寻找凯娅',
       '询问布洛克黑市附近的路况【感知DC12】',
-      '和瑟琳确认米娜给出的暗号',
     ];
-  }
-
-  if (state.kaiya_recruited && state.tavern_yunling_unlocked && !state.yunling_shop_unlocked && !state.yunling_met) {
-    return ['根据萨洛额外情报寻找云苓', '整理下孢海前的药剂需求', '询问凯娅黑市深处的药剂商【智力DC12】'];
   }
 
   // 云苓商店已开放，尚未完成购买 → 显示入口选项
@@ -728,11 +724,8 @@ function linearRecruitmentHints(state: GameState): string[] {
     return getPostBlueShoalHints(state) || [];
   }
 
-  /* [已停用/归档] 旧版压缩主线选项提示。
-  if (state.compressedAct1EndingStarted) {
-    ...
-  }
-  */
+
+
 
   if (state.expedition_registered && arrivedSporeOutpost && !ailinSideDone && !state.ailin_request_ignored) {
     return ['陪艾琳去伤员棚确认污染情况', '向尼布索要巡逻日志【魅力DC11】', '检查据点补给箱【智力DC12】', '整理阵亡者木牌与伤员名册【智力DC13】'];
@@ -745,10 +738,8 @@ function linearRecruitmentHints(state: GameState): string[] {
     return ['前往蓝伞浅滩', '留意浅滩边缘的巡逻队遗物【感知DC14】', '确认蓝伞浅滩安全路线【感知DC13】', '让艾琳评估队伍污染状态'];
   }
 
-  /* [已停用/归档] 凯娅旧支线及其后续骨柱湿地入口。
-  if (forwardPostReached && !kaiyaSideDone) { ... }
-  if (kaiyaSideDone && !boneMarshDone) { ... }
-  */
+
+
 
   if (state.rhein_encounter_started && typeof state.helpedRhein !== 'boolean') {
     return ['帮助莱因', '记录莱因断片证言【医疗DC12】', '无视莱因，继续前进'];
@@ -842,19 +833,15 @@ function isNodeMainAction(action: string, node: ActionNodeConfig, matchedHint: s
 
 function actionChoiceRouteKey(state: GameState) {
   const area = String(state.current_area || state.currentNodeId || 'unknown');
-  // [已停用/归档] if (state.compressedAct1EndingStarted) return String(state.currentNodeId || 'compressed_act1');
   if (state.guild_registered && !state.salo_intel_done) return area.includes('酒馆') ? 'salo_intel_tavern' : 'guild_intel';
   if (state.salo_intel_done && !state.al_recruited) return 'recruit_ailin';
   if (state.al_recruited && !state.brock_recruited) return 'recruit_brock';
   if (state.brock_recruited && !state.kaiya_recruited) return 'recruit_kaiya';
   if (state.kaiya_recruited && !state.expedition_registered) return 'register_expedition';
   const atSporeOutpost = hasStateFlag(state, 'spore_outpost_reached', 'spore_outpost_arrived', 'arrivedSporeOutpost');
+  if (state.expedition_registered && state.elevator_descent_started && !atSporeOutpost) return 'elevator_descent';
   if (state.expedition_registered && atSporeOutpost && !hasStateFlag(state, 'ailin_wounded_names_done', 'completedAilinSideQuest')) return 'spore_outpost_ailin';
   if (hasStateFlag(state, 'ailin_wounded_names_done', 'completedAilinSideQuest') && !hasStateFlag(state, 'blue_shoal_battle_done', 'completedBlueShoalBattle')) return 'blue_shoal_route';
-  // [已停用/归档] 布洛克/凯娅旧支线的路线键不再注册。
-  // if (hasStateFlag(state, 'block_echo_forest_done', 'completedBrockSideQuest') && ...) return 'frontline_outpost';
-  // if (hasStateFlag(state, 'frontline_abandoned_outpost_reached', 'reachedAbandonedForwardPost') && ...) return 'kaiya_seals';
-  // if (hasStateFlag(state, 'kaiya_broken_seals_done', 'completedKaiyaSideQuest') && ...) return 'bone_marsh_route';
   if (state.rhein_encounter_started && typeof state.helpedRhein !== 'boolean') return 'rhein_choice';
   if (state.pre_boss_rest_done && !hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3')) return 'serin_rest';
   if (hasStateFlag(state, 'serin_cracked_silver_staff_done', 'completedSerinSideQuest3') && !hasStateFlag(state, 'boss_defeated', 'bossDefeated')) return 'blackstone_root';
@@ -876,6 +863,7 @@ function uniqueHints(hints: string[]) {
 function getActionChoiceStage(state: GameState, hints: string[]): ActionNodeConfig | null {
   if (state.ailin_answer_pending) return null;
   if (state.kaiya_passphrase_pending) return null;
+  if (state.contract_signature_pending) return null;
   if (state.act1GameCompleted) return null;
   if (isBattlePrepReadyToEnter(state)) return null;
   if (isBattlePrepSelectionActive(state)) return null;
@@ -884,7 +872,7 @@ function getActionChoiceStage(state: GameState, hints: string[]): ActionNodeConf
   if (state.core_choice_pending && !state.bossCoreChoice) return null;
   if (!hints.length) return null;
   const mainHint = hints.find((hint) => (
-    /^(离开蓝伞浅滩|结束调查|结束营地调查|进入第三远征队营地|接近守门者|继续到最终处置选择|乘降渊缆梯|结束第一幕)/.test(hint)
+    /^(离开蓝伞浅滩|结束调查|结束营地调查|进入第三远征队营地|接近守门者|继续到最终处置选择|乘降渊缆梯|直接抵达孢海据点|结束第一幕)/.test(hint)
   )) || hints[0];
   return {
     id: `stage_${actionChoiceRouteKey(state)}`,
@@ -901,7 +889,7 @@ function isOpeningChoiceStage(stage: ActionNodeConfig | null) {
 function isUnlimitedPostBlueShoalStage(state: GameState, stage: ActionNodeConfig | null) {
   if (!state.postBlueShoalExpandedStarted || !stage) return false;
   // 这些节点会停留在原地反复调查，直到玩家主动选择固定出口。
-  // 路线选择、莱因处置、夜谈和战前准备等“一选即推进”的节点不在此列。
+  // 路线选择、莱因处置、夜谈和战前准备等"一选即推进"的节点不在此列。
   return stage.hints.some((hint) => (
     /^(离开蓝伞浅滩|结束调查|结束营地调查|进入第三远征队营地|接近守门者)/.test(hint)
   ));
@@ -936,7 +924,7 @@ function choiceLimitForStage(state: GameState, stage: ActionNodeConfig | null) {
 
 function forcedSceneForChoiceStage(stage: ActionNodeConfig | null) {
   // 公会初次调查不能因调查次数用完而自动跳酒馆；
-  // 玩家必须主动选择“前往回声酒馆找萨洛打听三名队友”，再由 tavern-intro 脚本接管。
+  // 玩家必须主动选择"前往回声酒馆找萨洛打听三名队友"，再由 tavern-intro 脚本接管。
   if (stage?.id === 'guild_intel') return null;
   // 蓝伞浅滩战斗前：选择次数用完后，自动播放旁白过渡剧情，然后进入战斗
   if (stage && stage.hints.some((h) => /前往蓝伞浅滩/.test(h)) && stage.hints.some((h) => /判断前方风向|确认旧巡逻路线/.test(h))) {
@@ -955,13 +943,10 @@ function filterNodeSuggestions(state: GameState, hints: string[]) {
 
   const sourceHints = uniqueHints(hints.length ? hints : node.hints);
   if (sourceHints.length) {
-    const isExpandedInvestigation = Boolean(getPostBlueShoalHints(state));
-    const optionLimit = isExpandedInvestigation ? 8 : ACTION_OPTION_LIMIT;
-    const visible = sourceHints.slice(0, optionLimit);
+    const visible = [...sourceHints];
     const mainKey = normalizeNodeAction(node.mainHint);
     if (!visible.some((hint) => normalizeNodeAction(hint) === mainKey)) {
-      if (visible.length >= optionLimit) visible[visible.length - 1] = node.mainHint;
-      else visible.push(node.mainHint);
+      visible.unshift(node.mainHint);
     }
     return uniqueHints(visible);
   }
@@ -974,8 +959,6 @@ function decorateActionSuggestions(state: GameState, items: ActionSuggestion[]) 
   if (!node) return items;
 
   const used = new Set(readChoiceStageUsedChoices(state, node));
-  const count = Number(state[choiceStageCountKey(node)] ?? used.size);
-  const choiceLimit = choiceLimitForStage(state, node);
   const mainKey = normalizeNodeAction(node.mainHint);
 
   return items.map((item) => {
@@ -983,8 +966,6 @@ function decorateActionSuggestions(state: GameState, items: ActionSuggestion[]) 
     let disabledReason = '';
     if (used.has(key) && key !== mainKey) {
       disabledReason = '已完成';
-    } else if (count >= choiceLimit && key !== mainKey) {
-      disabledReason = '本阶段行动次数已用完';
     }
 
     const postBlueState = getPostBlueShoalHintState(state, item.text || item.label);
@@ -1000,12 +981,13 @@ function constrainActionSuggestions(state: GameState, incoming: ActionSuggestion
   if (state.ailin_answer_pending) return [];
   if (state.serlin_intro_pending) return [];
   if (state.kaiya_passphrase_pending) return [];
+  if (state.contract_signature_pending) return [];
   if (isBattlePrepReadyToEnter(state)) return makeSuggestions(['进入战斗']);
   if (state.act1GameCompleted) {
     return state.currentNodeId === ACT1_SCENE_IDS.summary ? [] : makeSuggestions(['结束']);
   }
   // 蓝伞浅滩后的细化主线拥有完整、固定的节点选项。这里必须先于按区域名生成的
-  // 通用 fallback；否则一次不完整的 AI 快照就会让“骨柱湿地”串入下一地点的
+  // 通用 fallback；否则一次不完整的 AI 快照就会让"骨柱湿地"串入下一地点的
   // 怪物图鉴、莱因证言等旧选项。
   if (state.postBlueShoalExpandedStarted) {
     const expandedHints = getPostBlueShoalHints(state);
@@ -1020,7 +1002,7 @@ function constrainActionSuggestions(state: GameState, incoming: ActionSuggestion
   if (linearHints.length) {
     return decorateActionSuggestions(state, makeSuggestions(filterNodeSuggestions(state, linearHints)));
   }
-  const hints = incoming.length ? incoming.map((item) => item.text || item.label) : fallbackSuggestions(state).map((item) => item.text);
+  const hints = (incoming.length ? incoming.map((item) => item.text || item.label) : fallbackSuggestions(state).map((item) => item.text));
   return decorateActionSuggestions(state, makeSuggestions(filterNodeSuggestions(state, hints)));
 }
 
@@ -1034,6 +1016,28 @@ function actionChoiceStatusText(state: GameState, visibleSuggestions: ActionSugg
       return '暗号不对。请再次输入凯娅的暗号，输入正确才会推进剧情';
     }
     return '输入凯娅的暗号：本次只能通过自由输入行动';
+  }
+
+  if (state.currentNodeId === POST_BLUE_SHOAL_IDS.campNight) {
+    const required = getCampNightRequiredTalkTargets(state);
+    const completed = required.filter((target) =>
+      Boolean(
+        state[
+          target === 'serin'
+            ? 'campNightTalkedToSerin'
+            : target === 'ailin'
+              ? 'campNightTalkedToAilin'
+              : target === 'brock'
+                ? 'campNightTalkedToBrock'
+                : target === 'kaiya'
+                  ? 'campNightTalkedToKaiya'
+                  : 'campNightTalkedToLain'
+        ],
+      ),
+    ).length;
+    return areAllRequiredCampNightTalksDone(state)
+      ? `营地夜谈：已完成 ${completed}/${required.length}，现在可以继续前进`
+      : `营地夜谈：已完成 ${completed}/${required.length}，请逐一和每个人聊聊`;
   }
 
   const hints = visibleSuggestions.map((item) => item.text || item.label).filter(Boolean);
@@ -1050,16 +1054,7 @@ function actionChoiceStatusText(state: GameState, visibleSuggestions: ActionSugg
   if (isBattlePrepSelectionActive(state)) {
     return '战前准备：选择一个行动';
   }
-  const used = readChoiceStageUsedChoices(state, stage);
-  const count = Number(state[choiceStageCountKey(stage)] ?? used.length);
-  if (isUnlimitedPostBlueShoalStage(state, stage)) {
-    return `选择行动：已完成 ${count} 项；已选择的行动不可重复，选择推进主线的出口后进入下一段剧情`;
-  }
-  const choiceLimit = choiceLimitForStage(state, stage);
-  if (count >= choiceLimit) {
-    return `选择行动：已完成 ${choiceLimit}/${choiceLimit} 次，下一次将推进剧情`;
-  }
-  return `选择行动：第 ${count + 1}/${choiceLimit} 次，同一选项不可重复选择，自由输入也会计入次数`;
+  return '选择行动：已选择的行动不可重复；自由输入也会记录为本阶段行动，选择推进主线的出口后进入下一段剧情';
 }
 
 function getLinearRouteBlock(action: string, state: GameState): { message: string; hints: string[] } | null {
@@ -1136,15 +1131,19 @@ function fallbackSuggestions(state: GameState): ActionSuggestion[] {
     }
     return makeSuggestions(['接受游戏', '付100G购买萨洛的情报', '查看酒馆布告栏【智力DC10】']);
   }
+
+  if (area.includes('公会') && state.expedition_registered && !state.elevator_descent_started) {
+    return makeSuggestions(['前往降渊缆梯中枢', '检查公会补给箱【调查DC12】', '向赫尔曼确认黑暗之门记录【调查DC13】']);
+  }
   if (area.includes('公会')) {
-    const guildHints = ['观察柜台旁的报告单【智力DC12】', '说服米娜查看失踪远征队登记册【魅力DC11】', '检查委托火漆与公会认证【智力DC10】'];
+    const guildHints = ['观察柜台旁的报告单【智力DC12】', '说服米娜查看失踪远征队登记册', '检查委托火漆与公会认证【智力DC10】'];
     if (hasClue(state, 'expedition_saw_spore_beasts')) {
-      guildHints.unshift('追问书记员报告中的孢化地底兽');
+      guildHints.unshift('追问米娜报告中的孢化地底兽');
     }
     if (!hasDocument(state, 'helman_personal_note')) {
       guildHints.push('趁赫尔曼离开时检查办公桌【敏捷DC14】');
     }
-    return makeSuggestions(guildHints.slice(0, 4));
+    return makeSuggestions(guildHints);
   }
   if (area.includes('神殿') || area.includes('教堂')) {
     return makeSuggestions(['请求艾琳翻阅牺牲者遗录【感知DC12】', '请艾琳展示白枝修会巡礼经文', '为战士祈祷']);
@@ -1183,6 +1182,15 @@ const SERLIN_INTRO_TUTORIAL = [
     title: 'AI 互动教程：自我介绍',
     body: '接下来，你将用文字向瑟琳介绍自己。\n\nAI 会根据你的描述判断瑟琳对你的第一印象，并给予 0~10 点信任值提升。\n\n你可以写自己的经历、性格、行事方式，或接下委托的理由。\n瑟琳更认可成熟稳重、有责任感、重视团队和风险意识的人。\n\n你的介绍没有标准答案，但会被记录进角色档案，并影响后续部分对话与剧情反馈。',
     badge: '瑟琳',
+  },
+];
+
+const CONTRACT_SIGNATURE_LINE = '你在契约末尾签下名字。墨迹尚未干透，瑟琳便在旁边写下属于逆钟学派的细长签名。';
+const CONTRACT_SIGNATURE_TUTORIAL = [
+  {
+    title: '签署远征契约',
+    body: '请在下方输入框中完整签下你登记时使用的名字。\n\n签名必须与角色姓名一致；写错时米娜会退回契约，正确签署后才能继续任务。',
+    badge: 'SIGNATURE',
   },
 ];
 
@@ -1236,6 +1244,126 @@ function AiHealthModal({
               </button>
             )}
           </motion.section>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function UpdateAnnouncementsModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<UpdateAnnouncement | null>(null);
+  const closeAll = () => {
+    setSelectedAnnouncement(null);
+    onClose();
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="update-announcement-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={closeAll}
+        >
+          <motion.section
+            className="update-announcement-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="更新公告"
+            initial={{ opacity: 0, y: 18, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="update-announcement-header">
+              <div>
+                <span>UPDATE LOG</span>
+                <h2>更新公告</h2>
+              </div>
+              <button type="button" onClick={closeAll} aria-label="关闭更新公告">×</button>
+            </header>
+
+            <div className="update-announcement-list">
+              {UPDATE_ANNOUNCEMENTS.map((entry) => (
+                <article key={entry.version} className="update-announcement-entry">
+                  <div className="update-announcement-entry-title">
+                    <strong>版本 {entry.version}</strong>
+                    <time dateTime={entry.date}>{entry.date}</time>
+                  </div>
+                  <button
+                    type="button"
+                    className="update-announcement-open"
+                    onClick={() => setSelectedAnnouncement(entry)}
+                    aria-label={`查看${entry.title}详情`}
+                  >
+                    <span>{entry.title}</span>
+                    <small>查看详情</small>
+                    <b aria-hidden="true">›</b>
+                  </button>
+                </article>
+              ))}
+            </div>
+
+            <button type="button" className="update-announcement-close" onClick={closeAll}>
+              知道了
+            </button>
+          </motion.section>
+
+          <AnimatePresence>
+            {selectedAnnouncement && (
+              <motion.div
+                className="update-announcement-detail-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setSelectedAnnouncement(null);
+                }}
+              >
+                <motion.section
+                  className="update-announcement-modal update-announcement-detail-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label={`${selectedAnnouncement.title}更新详情`}
+                  initial={{ opacity: 0, y: 20, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 12, scale: 0.97 }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <header className="update-announcement-header">
+                    <div>
+                      <span>VERSION {selectedAnnouncement.version}</span>
+                      <h2>{selectedAnnouncement.title}</h2>
+                      <time dateTime={selectedAnnouncement.date}>{selectedAnnouncement.date}</time>
+                    </div>
+                    <button type="button" onClick={() => setSelectedAnnouncement(null)} aria-label="关闭更新详情">×</button>
+                  </header>
+                  <div className="update-announcement-detail-content">
+                    <div className="update-announcement-note-list">
+                      {selectedAnnouncement.notes.map((note) => (
+                        <section key={`${selectedAnnouncement.version}-${note.title}`} className="update-announcement-note">
+                          <h4>{note.title}</h4>
+                          <p>{note.body}</p>
+                        </section>
+                      ))}
+                    </div>
+                  </div>
+                  <button type="button" className="update-announcement-close" onClick={() => setSelectedAnnouncement(null)}>
+                    返回公告列表
+                  </button>
+                </motion.section>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>
@@ -1375,10 +1503,7 @@ function getPreDescentTrustLines(state: GameState): ScriptedLineLike[] {
   };
   const average = Math.round((trust.serin + trust.ailin + trust.brock + trust.kaiya) / 4);
   const lines: ScriptedLineLike[] = [
-    {
-      speaker: '主持人',
-      text: `缆梯铁门闭合前，队伍短暂安静下来。此刻的同伴信任：瑟琳${trust.serin}（${getTrustTier(trust.serin)}）、艾琳${trust.ailin}（${getTrustTier(trust.ailin)}）、布洛克${trust.brock}（${getTrustTier(trust.brock)}）、凯娅${trust.kaiya}（${getTrustTier(trust.kaiya)}）。`,
-    },
+    { speaker: '主持人', text: `缆梯铁门闭合前，队伍短暂安静下来。此刻的同伴信任：瑟琳${trust.serin}（${getTrustTier(trust.serin)}）、艾琳${trust.ailin}（${getTrustTier(trust.ailin)}）、布洛克${trust.brock}（${getTrustTier(trust.brock)}）、凯娅${trust.kaiya}（${getTrustTier(trust.kaiya)}）。`, },
   ];
 
   lines.push(
@@ -1453,7 +1578,7 @@ export default function App() {
   const [helpedRhein, setHelpedRhein] = useState<boolean | null>(null); // 莱因选择
   const [bossCoreChoice, setBossCoreChoice] = useState<string | null>(null); // Boss核心选择
   const [showDialogueLog, setShowDialogueLog] = useState(false);
-  const [showCityMap, setShowCityMap] = useState(false);
+
   const [showTavernDice, setShowTavernDice] = useState(false);
   const [showBattlePrepPanel, setShowBattlePrepPanel] = useState(false); // 战前行动面板
   const [battlePrepDice, setBattlePrepDice] = useState<DiceResult | null>(null); // 战前行动骰子
@@ -1468,17 +1593,17 @@ export default function App() {
   const [pendingTutorialBattleSetup, setPendingTutorialBattleSetup] = useState<TutorialBattleSetup | null>(null);
   const [pendingTutorialBattleSummary, setPendingTutorialBattleSummary] = useState<string[]>([]);
   const [openingFastForward, setOpeningFastForward] = useState(false);
-  const [fastForwardMode, setFastForwardMode] = useState(false);
-  const [ctrlKeyHeld, setCtrlKeyHeld] = useState(false);
   const [scriptedBgOverride, setScriptedBgOverride] = useState<string | null>(null);
   const [visualResetKey, setVisualResetKey] = useState(0);
   const [showActionPanel, setShowActionPanel] = useState(false); // 行动面板延迟显示
   const [openingActionTutorialDismissed, setOpeningActionTutorialDismissed] = useState(false);
   const [openingActionTutorialStep, setOpeningActionTutorialStep] = useState(0);
   const [serlinIntroTutorialDismissed, setSerlinIntroTutorialDismissed] = useState(false);
+  const [contractSignatureTutorialDismissed, setContractSignatureTutorialDismissed] = useState(false);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
-  const [bgmVolume, setBgmVolume] = useState(() => readStoredVolume(AUDIO_STORAGE_KEYS.bgmVolume, 0.65));
-  const [sfxVolume, setSfxVolume] = useState(() => readStoredVolume(AUDIO_STORAGE_KEYS.sfxVolume, 0.8));
+  const [showUpdateAnnouncements, setShowUpdateAnnouncements] = useState(false);
+  const [bgmVolume, setBgmVolume] = useState(() => readStoredVolume(AUDIO_STORAGE_KEYS.bgmVolume, 0.5));
+  const [sfxVolume, setSfxVolume] = useState(() => readStoredVolume(AUDIO_STORAGE_KEYS.sfxVolume, 1));
   const [externalBgmTrack, setExternalBgmTrack] = useState('');
   const [rewardNotices, setRewardNotices] = useState<RewardNotice[]>([]);
   const [aiHealthNotice, setAiHealthNotice] = useState<{ tone: 'checking' | 'ok' | 'error'; message: string } | null>(null);
@@ -1508,6 +1633,8 @@ export default function App() {
   const rewardBaselineRef = useRef<GameState | null>(null);
   const rewardNoticeDeferRef = useRef(false);
   const queuedRewardNoticesRef = useRef<RewardNotice[]>([]);
+  const rewardNoticeReleaseLineIdRef = useRef<StoryLine['id'] | null>(null);
+  const fullyVisibleLineIdRef = useRef<StoryLine['id'] | null>(null);
   const deferredSystemEventsRef = useRef<Array<{ message: string; tone: EventFeedItem['tone'] }>>([]);
   const diceFiredRef = useRef(false); // 防重复投骰
   const tutorialBattleIntentRef = useRef(false);
@@ -1528,6 +1655,7 @@ export default function App() {
   const clearRewardNotices = useCallback(() => {
     rewardNoticeDeferRef.current = false;
     queuedRewardNoticesRef.current = [];
+    rewardNoticeReleaseLineIdRef.current = null;
     deferredSystemEventsRef.current = [];
     setRewardNotices([]);
   }, []);
@@ -1544,8 +1672,22 @@ export default function App() {
   const flushDeferredRewardNotices = useCallback(() => {
     const pending = queuedRewardNoticesRef.current.splice(0);
     rewardNoticeDeferRef.current = false;
+    rewardNoticeReleaseLineIdRef.current = null;
     pushRewardNotices(pending);
   }, [pushRewardNotices]);
+
+  const isRewardReleaseLineReached = useCallback((lineId: StoryLine['id'] | null) => {
+    const releaseLineId = rewardNoticeReleaseLineIdRef.current;
+    return releaseLineId !== null && lineId !== null && lineId >= releaseLineId;
+  }, []);
+
+  const handleLineFullyVisible = useCallback((lineId: StoryLine['id']) => {
+    fullyVisibleLineIdRef.current = lineId;
+    setFullyVisibleLineId(lineId);
+    if (isRewardReleaseLineReached(lineId) && queuedRewardNoticesRef.current.length) {
+      flushDeferredRewardNotices();
+    }
+  }, [flushDeferredRewardNotices, isRewardReleaseLineReached]);
 
   useEffect(() => {
     const previous = rewardBaselineRef.current;
@@ -1554,15 +1696,19 @@ export default function App() {
       const notices = collectRewardNotices(previous, gameState, () => rewardNoticeIdRef.current++);
       if (rewardNoticeDeferRef.current && notices.length) {
         queuedRewardNoticesRef.current = [...queuedRewardNoticesRef.current, ...notices].slice(-10);
+        if (isRewardReleaseLineReached(fullyVisibleLineIdRef.current)) {
+          window.setTimeout(() => flushDeferredRewardNotices(), 0);
+        }
       } else {
         pushRewardNotices(notices);
       }
     }
     rewardBaselineRef.current = gameState;
-  }, [gameState, pushRewardNotices]);
+  }, [flushDeferredRewardNotices, gameState, isRewardReleaseLineReached, pushRewardNotices]);
 
   useEffect(() => {
     if (!rewardNoticeDeferRef.current) return;
+    if (rewardNoticeReleaseLineIdRef.current !== null) return;
     if (screen !== 'game' || streaming || diceRoll || phase !== 'action') return;
 
     if (!queuedRewardNoticesRef.current.length) {
@@ -1573,6 +1719,13 @@ export default function App() {
     const timer = window.setTimeout(() => flushDeferredRewardNotices(), 250);
     return () => window.clearTimeout(timer);
   }, [diceRoll, flushDeferredRewardNotices, phase, screen, streaming]);
+
+  useEffect(() => {
+    const releaseLineId = rewardNoticeReleaseLineIdRef.current;
+    if (releaseLineId === null || fullyVisibleLineId !== releaseLineId) return;
+    if (!queuedRewardNoticesRef.current.length) return;
+    flushDeferredRewardNotices();
+  }, [flushDeferredRewardNotices, fullyVisibleLineId]);
 
   useEffect(
     () => () => {
@@ -1617,6 +1770,7 @@ export default function App() {
 
   useEffect(() => {
     window.localStorage.setItem(AUDIO_STORAGE_KEYS.sfxVolume, String(sfxVolume));
+    sfx.setVolume(sfxVolume);
   }, [sfxVolume]);
 
   const applyAiSettings = useCallback(async (nextModel: string, nextHealthMaxTokens = aiHealthMaxTokens, silent = false) => {
@@ -1751,24 +1905,13 @@ export default function App() {
 
       const nextLines: StoryLine[] = cleanTexts.flatMap((text): StoryLine[] => {
         if (role !== 'kp') {
-          return [{
-            id: lineId.current++,
-            role,
-            speaker,
-            text,
-            portrait: role === 'player' ? '/assets/characters/adventurer/adventurer_idle.png' : undefined,
-          }];
+          return [{ id: lineId.current++, role, speaker, text, portrait: role === 'player' ? '/assets/characters/adventurer/adventurer_idle.png' : undefined, }];
         }
 
         const parsed = parseNarrativeSegments(text, speaker || '主持人', kpSpeakerRef.current);
         kpSpeakerRef.current = parsed.lastSpeaker;
 
-        return parsed.segments.map((segment) => ({
-          id: lineId.current++,
-          role: 'kp' as const,
-          speaker: segment.speaker,
-          text: segment.text,
-        }));
+        return parsed.segments.map((segment) => ({ id: lineId.current++, role: 'kp' as const, speaker: segment.speaker, text: segment.text, }));
       });
 
       setStory((prev) => {
@@ -1846,7 +1989,7 @@ export default function App() {
   const playScriptedScene = useCallback(
     (
       scene: ScriptedScene,
-      options: { playerAction?: string; extraStatePatch?: Partial<GameState>; focus?: boolean; dynamicHints?: string[] } = {},
+      options: { playerAction?: string; extraStatePatch?: Partial<GameState>; focus?: boolean; dynamicHints?: string[]; deferRewards?: boolean } = {},
     ) => {
       const playerAction = options.playerAction?.trim();
       if (playerAction) {
@@ -1869,11 +2012,13 @@ export default function App() {
       const statePatch: Partial<GameState> = Object.fromEntries(
         Object.entries(nextStateForScene).filter(([key, value]) => stateRef.current[key] !== value),
       );
+      const sceneHasRewards = collectRewardNotices(stateRef.current, nextStateForScene, () => 0).length > 0;
 
       if (Object.keys(statePatch).length) {
-        if (sceneClues.length) {
+        if (sceneHasRewards && options.deferRewards !== false) {
           rewardNoticeDeferRef.current = true;
           queuedRewardNoticesRef.current = [];
+          rewardNoticeReleaseLineIdRef.current = null;
         }
         const nextState = { ...stateRef.current, ...statePatch };
         stateRef.current = nextState;
@@ -1888,18 +2033,13 @@ export default function App() {
       // 条件行过滤（支持 !flags.xxx 、 flags.a || flags.b 、 flags.a && flags.b 等表达式）
       const checkFlag = (flag: string) => evaluateCondition(flag, stateRef.current);
       const filteredLines = scene.lines.filter((l) => !l.condition || checkFlag(l.condition));
+      preloadScriptedSceneAssets(scene, { lines: filteredLines });
 
       setStory((prev) => {
-        const newLines: StoryLine[] = [...injectedLines, ...filteredLines].map((line) => ({
-          id: lineId.current++,
-          role: 'kp' as const,
-          speaker: line.speaker,
-          text: line.text.replace(/\{name\}/g, gameState.player_name || '你'),
-          portrait: line.portrait || getScriptedPortraitOverride(scene.id, line.speaker),
-          bgImage: line.bgImage,
-          bgm: line.bgm || scene.bgm,
-          scriptedSceneId: scene.id,
-        }));
+        const newLines: StoryLine[] = [...injectedLines, ...filteredLines].map((line) => ({ id: lineId.current++, role: 'kp' as const, speaker: line.speaker, text: line.text.replace(/\{name\}/g, gameState.player_name || '你'), portrait: line.portrait || getScriptedPortraitOverride(scene.id, line.speaker), bgImage: line.bgImage, bgm: line.bgm || scene.bgm, scriptedSceneId: scene.id, }));
+        if (sceneHasRewards && options.deferRewards !== false && newLines.length) {
+          rewardNoticeReleaseLineIdRef.current = newLines[newLines.length - 1].id;
+        }
         const next = [...prev, ...newLines];
         if (options.focus !== false) {
           setActiveIndex(prev.length);
@@ -2059,7 +2199,7 @@ export default function App() {
         parserRef.current = createNarrativeStreamParser();
         const result = await loadGame(slotKey);
         const restored = prepareSaveRestore(result, synchronizeMainStoryState);
-        const restoredState = restored.state;
+        const restoredState = normalizeCompanionTrustBaseline(restored.state);
         const restoredStory = restored.story;
         const restoredActiveIndex = restored.activeIndex;
         const restoredLine = restored.activeLine;
@@ -2109,7 +2249,6 @@ export default function App() {
           setShowBattlePrepPanel(shouldShowBattlePrepPanel(restoredFlow));
         }
         setOpeningFastForward(false);
-        setFastForwardMode(false);
         setExternalBgmTrack('');
         setScriptedBgOverride(restoredBgImage);
         scriptedBgSceneRef.current = restoredBgImage ? String(restoredState.current_area || '') : '';
@@ -2117,13 +2256,13 @@ export default function App() {
         setOpeningActionTutorialDismissed(false);
         setOpeningActionTutorialStep(0);
         setSerlinIntroTutorialDismissed(false);
+        setContractSignatureTutorialDismissed(false);
         setShowDicePoker(false);
         setShowBargainGame(false);
         setShowDrinkingDiceGame(false);
         setShowLuckyBoxGame(false);
         setShowApothecaryShopUI(false);
         setShowTavernDice(false);
-        setShowCityMap(false);
         tutorialBattleIntentRef.current = false;
         tutorialBattleDiceRef.current = null;
         dicePokerAutoTriggeredRef.current = false;
@@ -2186,6 +2325,7 @@ export default function App() {
       setOpeningActionTutorialDismissed(false);
       setOpeningActionTutorialStep(0);
       setSerlinIntroTutorialDismissed(false);
+      setContractSignatureTutorialDismissed(false);
       tutorialBattleIntentRef.current = false;
       tutorialBattleDiceRef.current = null;
       dicePokerAutoTriggeredRef.current = false;
@@ -2204,7 +2344,7 @@ export default function App() {
               last_event: openingScene.lastEvent || result.state.last_event,
             }
           : {};
-        const nextState = migrateRerollInventory(migrateClassToStyleState({ ...result.state, ...openingStatePatch }));
+        const nextState = normalizeCompanionTrustBaseline(migrateRerollInventory(migrateClassToStyleState({ ...result.state, ...openingStatePatch })));
 
         setGameId(result.game_id);
         stateRef.current = nextState;
@@ -2213,16 +2353,7 @@ export default function App() {
         setSelectedOpeningStyleId(String(nextState.selectedStyleId || nextState.selected_style_id || 'balanced'));
 
         if (openingScene?.lines.length) {
-          const scriptLines: StoryLine[] = openingScene.lines.map((line) => ({
-            id: lineId.current++,
-            role: 'kp' as const,
-            speaker: line.speaker,
-            text: line.text.replace(/\{name\}/g, payload.player_name),
-            portrait: line.portrait,
-            bgImage: line.bgImage,
-            bgm: line.bgm || openingScene.bgm,
-            scriptedSceneId: openingScene.id,
-          }));
+          const scriptLines: StoryLine[] = openingScene.lines.map((line) => ({ id: lineId.current++, role: 'kp' as const, speaker: line.speaker, text: line.text.replace(/\{name\}/g, payload.player_name), portrait: line.portrait, bgImage: line.bgImage, bgm: line.bgm || openingScene.bgm, scriptedSceneId: openingScene.id, }));
           setStory(scriptLines);
           setActiveIndex(0);
           setSuggestions(constrainActionSuggestions(
@@ -2307,143 +2438,6 @@ export default function App() {
     }
   }, [aiHealthChecking, aiHealthMaxTokens, aiModel, applyAiSettings, startDefaultGame]);
 
-  const startStoryTest = useCallback(
-    async (checkpoint: StoryTestCheckpoint) => {
-      setScreen('loading');
-      setLoadError('');
-      setStory([]);
-      clearEventTimers();
-      clearRewardNotices();
-      setEvents([]);
-      setRewardNotices([]);
-      setSuggestions([]);
-      setActiveIndex(0);
-      setPhase('narrating');
-      setSaveMessage('');
-      setSaveMessageTone('neutral');
-      setShowStyleSelection(false);
-      setShowBattlePrepPanel(false);
-      setBattlePrepDice(null);
-      setSelectedOpeningStyleId('balanced');
-      setFullyVisibleLineId(null);
-      setPendingTutorialBattleSetup(null);
-      setPendingTutorialBattleSummary([]);
-      pendingBattlePrepRef.current = null;
-      battlePrepResultRef.current = null;
-      battlePrepStateRef.current = null;
-      pendingBattleRef.current = '';
-      currentEncounterConfigRef.current = null;
-      setOpeningFastForward(false);
-      setFastForwardMode(false);
-      setScriptedBgOverride(null);
-      setOpeningActionTutorialDismissed(false);
-      setOpeningActionTutorialStep(0);
-      setSerlinIntroTutorialDismissed(false);
-      setShowDicePoker(false);
-      setShowBargainGame(false);
-      setShowDrinkingDiceGame(false);
-      setShowLuckyBoxGame(false);
-      setShowApothecaryShopUI(false);
-      setShowTavernDice(false);
-      setShowCityMap(false);
-      tutorialBattleIntentRef.current = false;
-      tutorialBattleDiceRef.current = null;
-      dicePokerAutoTriggeredRef.current = false;
-      dicePokerPendingRef.current = '';
-      scriptedBgSceneRef.current = '';
-      lineId.current = 1;
-      eventId.current = 1;
-      kpSpeakerRef.current = '';
-
-      try {
-        const result = await runtime.createGame({
-          player_name: checkpoint.statePatch.player_name || '剧情测试员',
-          char_class: checkpoint.statePatch.char_class || '战士',
-          attr_str: 16,
-          attr_dex: 13,
-          attr_con: 14,
-          attr_int: 10,
-          attr_wis: 12,
-          attr_cha: 8,
-          level: Number(checkpoint.statePatch.level ?? 3),
-          skip_opening: true,
-        });
-
-        const scene = checkpoint.sceneId ? getScriptedScene(checkpoint.sceneId) : null;
-        const scenePatch: GameState = {
-          ...(scene?.statePatch ?? {}),
-          ...(scene?.setArea ? { current_area: scene.setArea, actions_in_area: 0 } : {}),
-        };
-        const isOpeningTutorialCheckpoint = checkpoint.id === 'first-choice';
-        const tutorialCheckpointDefaults: GameState = isOpeningTutorialCheckpoint
-          ? {
-              first_choice_resolved: false,
-              tutorial_battle_done: false,
-              tutorial_battle_pending: true,
-              currentNodeId: 'opening_tutorial_battle',
-            }
-          : {
-              first_choice_resolved: true,
-              tutorial_battle_done: true,
-              tutorial_battle_pending: false,
-            };
-        const statePatch: GameState = {
-          ...tutorialCheckpointDefaults,
-          ...checkpoint.statePatch,
-          ...scenePatch,
-          test_mode: true,
-          story_test_checkpoint: checkpoint.id,
-          tutorial_battle_pending: isOpeningTutorialCheckpoint,
-          last_event: checkpoint.statePatch.last_event || scene?.lastEvent || `剧情测试：${checkpoint.label}`,
-        };
-        const nextState = synchronizeMainStoryState(migrateClassToStyleState(
-          {
-            ...result.state,
-            ...statePatch,
-          },
-        ), scene?.id);
-        const scriptLines = checkpoint.lines ?? scene?.lines ?? [
-          {
-            speaker: '系统',
-            text: `已进入剧情测试节点：${checkpoint.label}`,
-          },
-        ];
-
-        setGameId(result.game_id);
-        stateRef.current = nextState;
-        rewardBaselineRef.current = nextState;
-        setGameState(nextState);
-        setSelectedOpeningStyleId(String(nextState.selectedStyleId || nextState.selected_style_id || 'balanced'));
-        setRewardNotices([]);
-        setStory(scriptLines.map((line) => ({
-          id: lineId.current++,
-          role: 'kp' as const,
-          speaker: line.speaker,
-          text: line.text,
-          portrait: ('portrait' in line && typeof line.portrait === 'string' ? line.portrait : undefined)
-            || (scene ? getScriptedPortraitOverride(scene.id, line.speaker) : undefined),
-          bgImage: 'bgImage' in line && typeof line.bgImage === 'string' ? line.bgImage : undefined,
-          bgm: ('bgm' in line && typeof line.bgm === 'string' ? line.bgm : undefined) || scene?.bgm,
-          scriptedSceneId: scene?.id || checkpoint.id,
-        })));
-        setSuggestions(constrainActionSuggestions(nextState, makeSuggestions(checkpoint.hints ?? scene?.hints ?? fallbackSuggestions(nextState).map((item) => item.text))));
-        setScriptedBgOverride(scene?.bgImage || null);
-        scriptedBgSceneRef.current = scene?.setArea || '';
-        setActiveIndex(0);
-        setPhase('narrating');
-        addEvent(`剧情测试：${checkpoint.label}`, 'state');
-
-        void patchGameState(result.game_id, nextState).catch((error: any) => {
-          addEvent(error.message || '剧情测试状态同步失败', 'error');
-        });
-        setScreen('game');
-      } catch (error: any) {
-        setLoadError(error.message || '剧情测试启动失败');
-      }
-    },
-    [addEvent, clearEventTimers, clearRewardNotices, runtime],
-  );
-
   const completeCompanionSideEvent = useCallback(
     (result: CompanionEventCompleteResult) => {
       const current = stateRef.current;
@@ -2467,10 +2461,6 @@ export default function App() {
             currentNodeId: 'battle_blue_shoal_01',
           },
         },
-        /* [已停用/归档]
-        block_echo_forest: { ... },
-        kaiya_broken_seals: { ... },
-        */
         serin_cracked_silver_staff: {
           trustKey: 'trust_sl',
           doneKey: 'serin_cracked_silver_staff_done',
@@ -2550,6 +2540,12 @@ export default function App() {
       appendStoryLines(['蓝伞浅滩的孢光将队伍逼退。你们退回据点边缘重新整队，确认路线后还可以再次进入浅滩。'], 'kp', '主持人', true);
       setSuggestions(makeSuggestions(['前往蓝伞浅滩']));
       setPhase('narrating');
+      return;
+    }
+    if (config.encounterId === 'bone-pillar-wetland') {
+      appendStoryLines(['骨柱湿地的泥沼将队伍困住。你们退回安全地带重新整队，确认路线后还可以再次进入湿地。'], 'kp', '主持人', true);
+      setSuggestions(makeSuggestions(['前往骨柱湿地']));
+      setPhase('narrating');
     }
   }, [addEvent, appendStoryLines, gameId, playScriptedScene]);
 
@@ -2605,6 +2601,37 @@ export default function App() {
       if (!action || !gameId || streaming) return;
 
       let currentState = stateRef.current;
+      if (currentState.contract_signature_pending) {
+        const expectedName = String(currentState.player_name || currentState.player?.name || '').trim();
+        if (!isContractSignatureValid(action, expectedName)) {
+          insertStoryLinesAfterActive([{ role: 'kp', speaker: '米娜', text: `「这份契约必须由本人好好签名。请完整写下“${expectedName || '你的登记姓名'}”，确认无误后才能开始任务。」`, scriptedSceneId: 'guild-final-registration', }], true);
+          setSuggestions([]);
+          setPhase('action');
+          setShowActionPanel(true);
+          addEvent('契约签名不一致，米娜要求重新签署', 'error');
+          return;
+        }
+
+        const signaturePatch: GameState = {
+          contract_signature_pending: false,
+          contract_signature_signed: true,
+          contract_signature_name: expectedName,
+          last_event: `${expectedName}签署远征契约`,
+        };
+        const signedState = { ...currentState, ...signaturePatch };
+        stateRef.current = signedState;
+        setGameState(signedState);
+        if (gameId) {
+          void patchGameState(gameId, signaturePatch).catch((error: any) => addEvent(error.message || '契约签名状态同步失败', 'error'));
+        }
+        insertStoryLinesAfterActive([{ role: 'player', speaker: expectedName || '你', text: `签名：${expectedName}`, portrait: '/assets/characters/adventurer/adventurer_idle.png', scriptedSceneId: 'guild-final-registration', }], true);
+        setContractSignatureTutorialDismissed(true);
+        setSuggestions([]);
+        setPhase('narrating');
+        addEvent('远征契约签署完成', 'state');
+        return;
+      }
+
       if (isBattlePrepReadyToEnter(currentState) && /进入战斗|正式开战|开始战斗/.test(action)) {
         const readyConfig = resolveBattlePrepSelectionConfig(currentState);
         if (!readyConfig) {
@@ -2626,7 +2653,7 @@ export default function App() {
         encounterBattleIntentRef.current = null;
         setSuggestions([]);
         setPhase('narrating');
-        if (gameId) void patchGameState(gameId, battleRunningState).catch(() => {});
+        if (gameId) void patchGameState(gameId, battleRunningState).catch((e) => { console.error("[patchGameState]", e); });
         if (readyConfig.encounterId === 'tutorial-crawler-ambush') {
           setScreen('tutorial-battle');
         } else {
@@ -2635,9 +2662,10 @@ export default function App() {
         return;
       }
       const resumedSelection = selectionActionResumeRef.current?.action === action ? selectionActionResumeRef.current : null;
+      const skipSelectionActionCheck = currentState.currentNodeId === POST_BLUE_SHOAL_IDS.campNight;
       if (resumedSelection) {
         selectionActionResumeRef.current = null;
-      } else {
+      } else if (!skipSelectionActionCheck) {
         const prepSelectionConfig = resolveBattlePrepSelectionConfig(currentState);
         const configuredChoices = prepSelectionConfig ? getEncounterPrepActions(prepSelectionConfig, currentState) : [];
         const configuredPrepChoice = prepSelectionConfig
@@ -2651,9 +2679,16 @@ export default function App() {
           pendingBattlePrepRef.current = configuredChoices;
           currentEncounterConfigRef.current = prepSelectionConfig;
         }
-        const selectionCheck = configuredPrepChoice
-          ? SelectionActionCheck.fromChoice(action, configuredPrepChoice, currentState)
-          : SelectionActionCheck.fromAction(action, currentState);
+        let selectionCheck: SelectionActionCheck | null;
+        try {
+          selectionCheck = configuredPrepChoice
+            ? SelectionActionCheck.fromChoice(action, configuredPrepChoice, currentState)
+            : SelectionActionCheck.fromAction(action, currentState);
+        } catch (error: any) {
+          console.error('[selectionActionCheck]', error);
+          addEvent(error?.message || '行动检定初始化失败，请刷新后重试', 'error');
+          return;
+        }
         if (selectionCheck) {
           setSelectionActionCheck(selectionCheck);
           setBattlePrepDice(selectionCheck.result.roll ? storyCheckDiceResult(selectionCheck.result.roll) : null);
@@ -2684,7 +2719,7 @@ export default function App() {
           blockRoute('瑟琳微微皱眉：「请认真介绍自己。至少说清楚你的身份和加入远征的理由。」', []);
           return;
         }
-        appendStoryLines([`“${submittedIntro.slice(0, 60)}${submittedIntro.length > 60 ? '…' : ''}”`], 'player', gameState.player_name || '你', true);
+        appendStoryLines([`"${submittedIntro.slice(0, 60)}${submittedIntro.length > 60 ? '…' : ''}"`], 'player', gameState.player_name || '你', true);
         setPhase('narrating');
         setStreaming(true);
         setSuggestions([]);
@@ -2871,26 +2906,14 @@ export default function App() {
         const usedChoices = readChoiceStageUsedChoices(currentState, activeNode);
         const usedSet = new Set(usedChoices);
         const currentCount = Number(currentState[choiceStageCountKey(activeNode)] ?? usedChoices.length);
-        const choiceLimit = choiceLimitForStage(currentState, activeNode);
 
-        if (usedSet.has(actionKey)) {
+        if (usedSet.has(actionKey) && !isMainAction) {
           blockRoute('瑟琳：「这件事刚刚已经处理过了。别在同一个选择上打转，换一个方向，或者直接推进下一段。」', filterNodeSuggestions(currentState, activeNode.hints));
           return;
         }
 
-        if (currentCount >= choiceLimit && !isMainAction) {
-          addEvent(`选择行动已达 ${choiceLimit}/${choiceLimit}，自动推进剧情`, 'state');
-          const forcedScene = forcedSceneForChoiceStage(activeNode);
-          if (forcedScene) {
-            appendStoryLines([action], 'player', gameState.player_name || '你', true);
-            playScriptedScene(forcedScene, { focus: false });
-            return;
-          }
-          action = activeNode.mainHint;
-        }
-
-        if (!isMainAction && currentCount < choiceLimit) {
-          const nextCount = Math.min(choiceLimit, currentCount + 1);
+        if (!isMainAction) {
+          const nextCount = currentCount + 1;
           const nextUsedChoices = [...usedChoices, actionKey];
           const nodePatch: GameState = {
             [choiceStageUsedKey(activeNode)]: nextUsedChoices.join('|'),
@@ -2901,12 +2924,27 @@ export default function App() {
           if (gameId) {
             void patchGameState(gameId, nodePatch).catch((error: any) => addEvent(error.message || '节点选择状态同步失败', 'error'));
           }
-          if (nextCount >= choiceLimit) {
-            forcedStageAdvanceScene = forcedSceneForChoiceStage(activeNode);
-            stageLimitNextAction = activeNode.mainHint;
-            if (forcedStageAdvanceScene?.bgImage) setScriptedBgOverride(forcedStageAdvanceScene.bgImage);
-          }
         }
+      }
+
+      if (/请艾琳展示白枝修会巡礼经文/.test(action) && currentState.al_recruited && !currentState.brock_recruited) {
+        const latest = stateRef.current;
+        const nextTrust = Math.min(100, getCompanionTrust(latest, 'ailin') + 2);
+        const trustPatch = buildTrustPatch(latest, { ailin: nextTrust });
+        appendStoryLines([action], 'player', gameState.player_name || '你', true);
+        appendStoryLines([
+          '艾琳从经袋里取出一本边角磨白的小册子，指尖停在几行被反复翻过的经文上。',
+          '「白枝修会不是把人当药箱训练的。巡礼经文第一条写得很清楚：先确认还活着的是人，再决定该怎样救。」艾琳信任 +2。',
+        ], 'kp', '艾琳', true);
+        patchStateNow({
+          ...trustPatch,
+          ailin_scripture_shown: true,
+          last_event: '艾琳展示白枝修会巡礼经文，艾琳信任+2',
+        }, '艾琳经文展示状态同步失败');
+        addEvent('艾琳信任 +2', 'state');
+        setSuggestions(constrainActionSuggestions(stateRef.current, makeSuggestions(linearRecruitmentHints(stateRef.current))));
+        setPhase('narrating');
+        return;
       }
 
       const linearRouteBlock = getLinearRouteBlock(action, currentState);
@@ -2966,21 +3004,6 @@ export default function App() {
       // ====== 同伴支线入口 ======
 
       // （废案）艾琳支线：白枝下的名字 —— 已完全由脚本场景接管
-      // const wantsAilinSideEvent = /陪艾琳.*伤员棚|停下协助艾琳|救治伤员|检查伤员|检查污染|确认污染|判断伤员污染|帮艾琳|艾琳.*伤员/.test(action);
-      // if (wantsAilinSideEvent && (currentState.spore_outpost_reached || currentState.spore_outpost_arrived) && !currentState.ailin_wounded_names_done) {
-      //   appendStoryLines([action], 'player', gameState.player_name || '你', true);
-      //   setCompanionEventId('ailin_wounded_names');
-      //   setSuggestions([]);
-      //   setPhase('narrating');
-      //   setScreen('companion-event');
-      //   return;
-      // }
-
-      /* [已停用/归档] 凯娅支线：少了两个封扣（废弃据点后）。
-      const wantsKaiyaSideEvent = ...;
-      if (wantsKaiyaSideEvent && ...) { ... }
-      */
-
       // 瑟琳支线：银杖的第一次裂痕（Boss 前必经）
       const wantsSerinSideEvent = /检查瑟琳银杖|银杖裂痕|瑟琳.*银杖|和瑟琳交谈|黑石脉冲规律/.test(action);
       if (wantsSerinSideEvent && currentState.pre_boss_rest_done && !currentState.serin_cracked_silver_staff_done) {
@@ -3001,11 +3024,6 @@ export default function App() {
         ]);
         return;
       }
-
-      /* [已停用/归档] 凯娅旧支线对骨柱湿地的前置拦截。
-      const wantsBoneMarsh = ...;
-      if (currentState.frontline_abandoned_outpost_reached && ...) { ... }
-      */
 
       const wantsBoss = /进入黑石根区|黑石根区|黑石深处|黑石门卫|黑石守门者|确认进入黑石根区深处/.test(action);
       if (currentState.pre_boss_rest_done && !currentState.serin_cracked_silver_staff_done && wantsBoss) {
@@ -3030,7 +3048,7 @@ export default function App() {
       if (currentState.ailin_wounded_pre_seen && /停下协助艾琳救治伤员/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
         const sqScene = getScriptedScene('ailin-sidequest');
-        if (sqScene) { const ct = getCompanionTrust(currentState,'ailin'); const tp = buildTrustPatch(currentState,{ailin:Math.min(100,ct+15)}); playScriptedScene(sqScene,{focus:false,extraStatePatch:tp}); addEvent('艾琳信任+15','state'); }
+        if (sqScene) { const ct = getCompanionTrust(currentState,'ailin'); const tp = buildTrustPatch(currentState,{ailin:Math.min(100,ct+10)}); playScriptedScene(sqScene,{focus:false,extraStatePatch:tp}); addEvent('艾琳信任+10','state'); }
         return;
       }
       // 艾琳支线内选择
@@ -3055,7 +3073,7 @@ export default function App() {
       }
 
       // 据点残缺名册只提供遗物层面的初步记录；艾琳认可玩家认真对待死者姓名。
-      // “罗德、伊芙、卡恩”的完整姓名记录仍只在后续艾琳支线收束时获得。
+      // "罗德、伊芙、卡恩"的完整姓名记录仍只在后续艾琳支线收束时获得。
       if (/整理阵亡者名册/.test(action) && !currentState.outpost_name_list_checked) {
         const rosterScene = getScriptedScene('outpost-name-list');
         if (rosterScene) {
@@ -3066,7 +3084,7 @@ export default function App() {
         return;
       }
 
-      // 结局已经落定后只允许进入本幕总结，避免旧“降渊缆梯”触发器
+      // 结局已经落定后只允许进入本幕总结，避免旧"降渊缆梯"触发器
       // 把玩家重新送回第一次下潜场景。
       if (currentState.act1GameCompleted && currentState.currentNodeId !== ACT1_SCENE_IDS.summary) {
         if (/^(?:\[.*\])?结束(?:第一幕)?(?:.*\])?$/.test(action.trim())) {
@@ -3078,7 +3096,19 @@ export default function App() {
       // 🔴 固定剧情脚本拦截：不需要AI生成，直接逐条显示
       const scripted = matchScriptedScene(action);
       if (scripted) {
-        playScriptedScene(scripted.scene, { playerAction: action });
+        if (scripted.scene.id === 'yunling-black-market') {
+          playScriptedScene(scripted.scene, {
+            playerAction: action,
+            extraStatePatch: {
+              inventory: buildYunlingBonusInventory(String(currentState.inventory || '')),
+              yunling_free_healing_potions: 3,
+              last_event: '根据萨洛额外情报找到云苓并获得三瓶治疗药水',
+            },
+            dynamicHints: YUNLING_SHOP_HINTS,
+          });
+        } else {
+          playScriptedScene(scripted.scene, { playerAction: action });
+        }
         return;
       }
 
@@ -3175,11 +3205,6 @@ export default function App() {
         return;
       }
 
-      /* [已停用/归档] 凯娅旧支线完成后进入骨柱湿地战斗的入口。
-      if (currentState.kaiya_broken_seals_done && ...) { ... }
-      新主线由 postBlueShoalStory 的固定场景直接推进到骨柱湿地。
-      */
-
       // ====== 深层主线触发：莱因选择 ======
       if (currentState.rhein_encounter_started && /帮助莱因|帮助.*莱因/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
@@ -3226,11 +3251,6 @@ export default function App() {
         return;
       }
 
-      /* [已停用/归档]
-       * 旧版压缩第一幕：蓝伞浅滩战后 → 黑石根区 → 简化莱因 → 瑟琳裂痕 → 四个旧结局。
-       * 完整实现保留在 features/story/act1CompressedEnding.ts 和对应历史场景中，
-       * 当前运行时只使用 postBlueShoalStory.ts 的细化主线与莱因补丁。
-       */
       // ====== 深层主线触发：Boss 战 ======
       if ((currentState.serin_cracked_silver_staff_done || currentState.serinStaffCrackSeen) && !currentState.boss_defeated && /进入黑石根区|黑石根区|黑石深处|黑石门卫/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
@@ -3255,14 +3275,14 @@ export default function App() {
       }
 
       // ====== 深层主线触发：Boss核心选择 ======
-      if (currentState.core_choice_pending && /破坏核心|强行开路|破坏.*核心/.test(action)) {
+      if (!currentState.postBlueShoalExpandedStarted && currentState.core_choice_pending && /破坏核心|强行开路|破坏.*核心/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
         setBossCoreChoice('destroy');
         patchStateNow({ bossCoreChoice: 'destroy' }, 'Boss核心选择状态同步失败');
         routeAct1Ending('destroy');
         return;
       }
-      if (currentState.core_choice_pending && /稳定核心|保留封印|稳定.*核心/.test(action)) {
+      if (!currentState.postBlueShoalExpandedStarted && currentState.core_choice_pending && /稳定核心|保留封印|稳定.*核心/.test(action)) {
         appendStoryLines([action], 'player', gameState.player_name || '你', true);
         setBossCoreChoice('stabilize');
         patchStateNow({ bossCoreChoice: 'stabilize' }, 'Boss核心选择状态同步失败');
@@ -3278,7 +3298,7 @@ export default function App() {
         if (postBlueShoalResolution.nextSceneId) {
           forcedStageAdvanceScene = getScriptedScene(postBlueShoalResolution.nextSceneId);
         }
-        // “离开 / 结束调查 / 继续”等固定出口只负责切换到下一段脚本，
+        // "离开 / 结束调查 / 继续"等固定出口只负责切换到下一段脚本，
         // 不掷骰、不请求 AI，也不生成额外过渡旁白。
         if (postBlueShoalResolution.skipAiNarration) {
           setOpeningActionTutorialDismissed(true);
@@ -3314,7 +3334,9 @@ export default function App() {
         ? withStageLimitDirective(baseResolvedAction, stageLimitNextAction || forcedStageAdvanceScene.triggers[0] || forcedStageAdvanceScene.id)
         : baseResolvedAction;
       const postBlueShoalNarrationDirective = postBlueShoalResolution
-        ? `\n【扩展剧情固定结算】骰子与状态已经由系统结算。请严格依据以下事实续写 2—4 段现场剧情，写出环境变化、行动过程和伙伴反应；不得改变成败、奖励、线索或信任结果，不要复述“检定成功/失败”等系统判定句，也不要输出下一步选项。\n${postBlueShoalResolution.lines.join('\n')}`
+        ? postBlueShoalResolution.aiPrompt
+          ? `\n${postBlueShoalResolution.aiPrompt}`
+          : `\n【扩展剧情固定结算】骰子与状态已经由系统结算。请严格依据以下事实续写 2—4 段现场剧情，写出环境变化、行动过程和伙伴反应；不得改变成败、奖励、线索或信任结果，不要复述"检定成功/失败"等系统判定句，也不要输出下一步选项。\n${postBlueShoalResolution.lines.join('\n')}`
         : '';
       const resolvedAction = `${resolvedActionBase}${resumedSelection?.lockedPrompt || ''}${postBlueShoalNarrationDirective}`;
 
@@ -3343,7 +3365,11 @@ export default function App() {
         : null;
       tutorialBattleActionRef.current = shouldPrepareTutorialBattle ? action : '';
       let streamedNarrativeLineCount = 0;
+      const streamedNarrativeLines: string[] = [];
       let streamNarrativeFocused = false;
+      // 固定剧情行动自带本地兜底：先缓存完整 AI 返回并验收，避免模板垃圾
+      // 被逐行追加后再删除，造成玩家看到“闪现后消失”。
+      const bufferNarrativeForValidation = Boolean(postBlueShoalResolution);
       setPhase('narrating');
       setStreaming(true);
       setSuggestions([]);
@@ -3357,13 +3383,16 @@ export default function App() {
           if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
           if (parsed.lines.length) {
             streamedNarrativeLineCount += parsed.lines.length;
-            appendStoryLines(parsed.lines, 'kp', '主持人', !streamNarrativeFocused);
-            streamNarrativeFocused = true;
+            streamedNarrativeLines.push(...parsed.lines);
+            if (!bufferNarrativeForValidation) {
+              appendStoryLines(parsed.lines, 'kp', '主持人', !streamNarrativeFocused);
+              streamNarrativeFocused = true;
+            }
           }
         },
         onSuggestions: (items) => {
           streamSuggestionsRef.current = items;
-          // 战前行动已锁定：AI 续写期间丢弃模型返回的下一轮选项，避免闪现“第 2/3 次行动”。
+          // 战前行动已锁定：AI 续写期间丢弃模型返回的下一轮选项，避免闪现"第 2/3 次行动"。
           if (!postBlueShoalResolution && !tutorialBattleIntentRef.current && !encounterBattleIntentRef.current && !shouldSuppressBattlePrepSuggestions(stateRef.current.battlePrep)) {
             setSuggestions(constrainActionSuggestions(stateRef.current, items));
           }
@@ -3388,20 +3417,63 @@ export default function App() {
           }
         },
         onStateUpdate: (change) => {
-          applyRuntimeStateChange(change);
+          const shouldPreserveSceneMedia = Boolean(
+            tutorialBattleIntentRef.current || encounterBattleIntentRef.current || postBlueShoalResolution,
+          );
+          if (!shouldPreserveSceneMedia) {
+            applyRuntimeStateChange(change);
+            return;
+          }
+          const safeChange = { ...change };
+          delete safeChange.current_area;
+          delete safeChange.currentArea;
+          delete safeChange.bgImage;
+          delete safeChange.background;
+          delete safeChange.bgm;
+          delete safeChange.bgmTrack;
+          applyRuntimeStateChange(safeChange);
         },
         onDone: () => {
           const parsed = parserRef.current.flush();
           if (parsed.suggestions.length) streamSuggestionsRef.current = parsed.suggestions;
           if (parsed.lines.length) {
             streamedNarrativeLineCount += parsed.lines.length;
-            appendStoryLines(parsed.lines, 'kp', '主持人', !streamNarrativeFocused);
-            streamNarrativeFocused = true;
+            streamedNarrativeLines.push(...parsed.lines);
+            if (!bufferNarrativeForValidation) {
+              appendStoryLines(parsed.lines, 'kp', '主持人', !streamNarrativeFocused);
+              streamNarrativeFocused = true;
+            }
+          }
+          const postBlueStreamWasGenericFallback = Boolean(
+            bufferNarrativeForValidation &&
+            streamedNarrativeLineCount > 0 &&
+            isGenericAiFallbackBlock(streamedNarrativeLines),
+          );
+          if (postBlueStreamWasGenericFallback) {
+            streamedNarrativeLineCount = 0;
+            streamedNarrativeLines.length = 0;
+            streamNarrativeFocused = false;
           }
           flushDeferredSystemEvents();
-          if (postBlueShoalResolution && streamedNarrativeLineCount === 0 && postBlueShoalResolution.lines.length) {
-            addEvent('AI续写未返回有效剧情，已启用扩展剧情本地兜底。', 'error');
+          if (bufferNarrativeForValidation && streamedNarrativeLineCount > 0) {
+            appendStoryLines(streamedNarrativeLines, 'kp', '主持人', true);
+            streamNarrativeFocused = true;
+          } else if (postBlueShoalResolution && postBlueShoalResolution.lines.length) {
+            addEvent(postBlueStreamWasGenericFallback ? 'AI续写返回模板兜底，已改用本地剧情兜底。' : 'AI续写未返回有效剧情，已启用扩展剧情本地兜底。', 'error');
             appendStoryLines(postBlueShoalResolution.lines, 'kp', '主持人', true);
+          }
+          if (postBlueShoalResolution?.campNightTalkTarget) {
+            const target = postBlueShoalResolution.campNightTalkTarget;
+            const savedLines = streamedNarrativeLines.length
+              ? streamedNarrativeLines
+              : postBlueShoalResolution.lines;
+            patchStateNow({
+              campNightTalkLogs: {
+                ...(stateRef.current.campNightTalkLogs || {}),
+                [target]: savedLines,
+              },
+              campNightActiveTalkTarget: null,
+            }, '营地夜谈文本保存失败');
           }
           if (tutorialBattleIntentRef.current) {
             if (streamedNarrativeLineCount === 0) {
@@ -3425,7 +3497,7 @@ export default function App() {
             };
             stateRef.current = battleReadyState;
             setGameState(battleReadyState);
-            if (gameId) void patchGameState(gameId, battleReadyState).catch(() => {});
+            if (gameId) void patchGameState(gameId, battleReadyState).catch((e) => { console.error("[patchGameState]", e); });
             addEvent('开局判定将影响战斗，等待玩家确认进入', 'state');
             setSuggestions([]);
             setPhase('narrating');
@@ -3433,6 +3505,12 @@ export default function App() {
             const config = getEncounterConfigById(encounterBattleIntentRef.current);
             encounterBattleIntentRef.current = null;
             if (config) {
+              const streamedText = streamedNarrativeLines.join('');
+              if (config.encounterId === 'blue-shoal' && !/战斗开始|扑出|逼近|袭来|迎战/.test(streamedText)) {
+                appendStoryLines([
+                  '艾琳收紧药箱背带，布洛克把铁锅横在队伍前方。灰烬下传来第一声爪刮，三道敌影同时从菌伞间扑出——战斗开始。',
+                ], 'kp', '主持人');
+              }
               if (streamedNarrativeLineCount === 0) {
                 addEvent('AI续写未返回有效剧情，已启用本地战前旁白。', 'error');
                 appendStoryLines(['【AI续写异常】主持人没有返回有效剧情，系统已启用本地战前旁白。'], 'system', '系统', true);
@@ -3451,7 +3529,7 @@ export default function App() {
               };
               stateRef.current = battleReadyState;
               setGameState(battleReadyState);
-              if (gameId) void patchGameState(gameId, battleReadyState).catch(() => {});
+              if (gameId) void patchGameState(gameId, battleReadyState).catch((e) => { console.error("[patchGameState]", e); });
               setSuggestions([]);
               setPhase('narrating');
             }
@@ -3487,7 +3565,7 @@ export default function App() {
           const reason = /connection\s*error|failed\s*to\s*fetch|network\s*error|networkerror|timeout|timed\s*out|econn|socket/i.test(rawMessage)
             ? 'AI连接超时或网络异常'
             : rawMessage || 'AI未返回有效响应';
-          const message = `【AI续写异常】${reason}。已启用本地兜底旁白，确认后仍可进入战斗。`;
+          const message = `【AI续写异常】${reason}。已启用本地兜底旁白，不会阻塞后续剧情。`;
           setStreaming(false);
           addEvent(message, 'error');
           flushDeferredSystemEvents();
@@ -3525,7 +3603,7 @@ export default function App() {
             };
             stateRef.current = fallbackBattleState;
             setGameState(fallbackBattleState);
-            if (gameId) void patchGameState(gameId, fallbackBattleState).catch(() => {});
+            if (gameId) void patchGameState(gameId, fallbackBattleState).catch((e) => { console.error("[patchGameState]", e); });
             setSuggestions([]);
             setPhase('narrating');
           } else if (encounterBattleIntentRef.current) {
@@ -3546,7 +3624,7 @@ export default function App() {
               };
               stateRef.current = fallbackBattleState;
               setGameState(fallbackBattleState);
-              if (gameId) void patchGameState(gameId, fallbackBattleState).catch(() => {});
+              if (gameId) void patchGameState(gameId, fallbackBattleState).catch((e) => { console.error("[patchGameState]", e); });
               setSuggestions([]);
               setPhase('narrating');
             }
@@ -3556,7 +3634,7 @@ export default function App() {
         },
       }, { visibleMessage: action });
     },
-    [addEvent, aiStreamController, appendStoryLines, applyRuntimeStateChange, flushDeferredSystemEvents, gameId, gameState.player_name, handleManagedEncounterLoss, pendingTutorialBattleSetup, playScriptedScene, runtime, story, streaming, suggestions],
+    [addEvent, aiStreamController, appendStoryLines, applyRuntimeStateChange, flushDeferredSystemEvents, gameId, gameState.player_name, handleManagedEncounterLoss, insertStoryLinesAfterActive, pendingTutorialBattleSetup, playScriptedScene, runtime, story, streaming, suggestions],
   );
 
   const handleSelectionActionReroll = useCallback((itemId: RerollItemId, chosenD20?: number) => {
@@ -3567,9 +3645,46 @@ export default function App() {
       setGameState(nextState);
       setSelectionActionCheckVersion((version) => version + 1);
       setBattlePrepDice(selectionActionCheck.result.roll ? storyCheckDiceResult(selectionActionCheck.result.roll) : null);
-      if (gameId) void patchGameState(gameId, { inventory: nextState.inventory }).catch(() => {});
+      if (gameId) void patchGameState(gameId, { inventory: nextState.inventory }).catch((e) => { console.error("[patchGameState]", e); });
     } catch (error: any) { addEvent(error.message || '重投失败', 'error'); }
   }, [addEvent, gameId, selectionActionCheck]);
+
+  const consumeBattleRerollItem = useCallback((itemId: RerollItemId) => {
+    const current = stateRef.current;
+    if (getRerollItemQuantity(current, itemId) <= 0) {
+      addEvent(itemId === 'fiction-dice' ? '虚构骰子不足' : '万能骰子不足', 'error');
+      return false;
+    }
+    const itemName = itemId === 'fiction-dice' ? '虚构骰子' : '万能骰子';
+    const patch: GameState = {
+      inventory: changeInventoryQuantity(String(current.inventory || ''), itemName, -1),
+      last_event: `战斗命中骰使用${itemName}`,
+    };
+    const nextState = { ...current, ...patch };
+    stateRef.current = nextState;
+    setGameState(nextState);
+    addEvent(`${itemName} -1`, 'state');
+    if (gameId) void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || '战斗重投道具同步失败', 'error'));
+    return true;
+  }, [addEvent, gameId]);
+
+  const consumeBattleHealingPotion = useCallback(() => {
+    const current = stateRef.current;
+    if ((inventoryCounts(String(current.inventory || '')).get('治疗药水') ?? 0) <= 0) {
+      addEvent('治疗药水不足', 'error');
+      return false;
+    }
+    const patch: GameState = {
+      inventory: changeInventoryQuantity(String(current.inventory || ''), '治疗药水', -1),
+      last_event: '战斗中使用治疗药水',
+    };
+    const nextState = { ...current, ...patch };
+    stateRef.current = nextState;
+    setGameState(nextState);
+    addEvent('治疗药水 -1', 'state');
+    if (gameId) void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || '战斗治疗药水同步失败', 'error'));
+    return true;
+  }, [addEvent, gameId]);
 
   const handleSelectionActionConfirm = useCallback(() => {
     if (!selectionActionCheck) return;
@@ -3588,23 +3703,79 @@ export default function App() {
     const selectionLockPatch = encounterConfig
       ? lockBattlePrepSelectionPatch(encounterConfig, selectionActionCheck.choice.id)
       : {};
-    const nextState = { ...stateWithPrepEffect, ...selectionLockPatch, lastStoryCheckResult: result.storyCheck, lastRerollUsed: Boolean(result.storyCheck?.rerollUsed),
+    const elevatorMorale = resolveElevatorMoraleCheck(
+      stateWithPrepEffect,
+      selectionActionCheck.actionText,
+      Boolean(result.storyCheck?.finalRoll.success),
+    );
+    const actionText = selectionActionCheck.actionText;
+    const actionSucceeded = Boolean(result.storyCheck?.finalRoll.success);
+    let ailinActionPatch: GameState = {};
+    const ailinActionEvents: string[] = [];
+    if (actionSucceeded && /让艾琳疗伤/.test(actionText)) {
+      const player = (stateWithPrepEffect.player || {}) as Record<string, any>;
+      const attributes = player.attributes || stateWithPrepEffect.attributes || stateWithPrepEffect;
+      const maxHp = Math.max(1, Number(stateWithPrepEffect.max_hp ?? player.maxHp ?? player.max_hp ?? getMaxHp(attributes)));
+      ailinActionPatch = {
+        ...ailinActionPatch,
+        current_hp: maxHp,
+        max_hp: maxHp,
+        player: {
+          ...player,
+          id: String(player.id || 'player'),
+          name: String(player.name || stateWithPrepEffect.player_name || '冒险者'),
+          level: Number(player.level ?? stateWithPrepEffect.level ?? 1),
+          gold: Number(player.gold ?? stateWithPrepEffect.gold ?? 0),
+          hp: maxHp,
+          maxHp,
+        },
+        ailin_healed_party: true,
+      };
+      ailinActionEvents.push('艾琳疗伤成功，我方生命值已恢复至上限');
+    }
+    if (actionSucceeded && /请求艾琳翻阅牺牲者遗录/.test(actionText)) {
+      const currentTrust = getCompanionTrust(stateWithPrepEffect, 'ailin');
+      ailinActionPatch = {
+        ...ailinActionPatch,
+        ...buildTrustPatch(stateWithPrepEffect, { ailin: Math.min(100, currentTrust + 2) }),
+        ailin_memorial_read: true,
+      };
+      ailinActionEvents.push('艾琳信任 +2');
+    }
+    const nextState = { ...stateWithPrepEffect, ...selectionLockPatch, ...(elevatorMorale?.patch || {}), ...ailinActionPatch, lastStoryCheckResult: result.storyCheck, lastRerollUsed: Boolean(result.storyCheck?.rerollUsed),
       lastRerollItemId: result.storyCheck?.reroll?.itemId || null,
       ...(isTutorialBattlePrep || isEncounterBattlePrep ? { encounterPhase: 'aiNarration', battlePrep: lockBattlePrepForNarration() } : {}) };
     stateRef.current = nextState;
     setGameState(nextState);
-    selectionActionResumeRef.current = { action: selectionActionCheck.actionText, lockedPrompt: selectionActionCheck.lockedPrompt };
-    const action = selectionActionCheck.actionText;
+    if (elevatorMorale) {
+      addEvent(
+        result.storyCheck?.finalRoll.success ? '全体队友信任值 +2' : '主角生命值 -1',
+        result.storyCheck?.finalRoll.success ? 'state' : 'error',
+      );
+    }
+    ailinActionEvents.forEach((message) => addEvent(message, 'state'));
+    selectionActionResumeRef.current = {
+      action: actionText,
+      lockedPrompt: `${selectionActionCheck.lockedPrompt}${elevatorMorale?.directive || ''}`,
+    };
+    const action = actionText;
     setSelectionActionCheck(null);
     setBattlePrepDice(null);
     if (isTutorialBattlePrep || isEncounterBattlePrep) setSuggestions([]);
-    if (gameId && (isTutorialBattlePrep || isEncounterBattlePrep)) {
-      void patchGameState(gameId, { ...nextState, lastStoryCheckResult: result.storyCheck, lastRerollUsed: Boolean(result.storyCheck?.rerollUsed),
-        lastRerollItemId: result.storyCheck?.reroll?.itemId || null, encounterPhase: 'aiNarration',
-        battlePrep: lockBattlePrepForNarration() }).catch(() => {});
+    if (gameId && (isTutorialBattlePrep || isEncounterBattlePrep || elevatorMorale || Object.keys(ailinActionPatch).length > 0)) {
+      const persistedSelectionPatch: GameState = {
+        ...ailinActionPatch,
+        ...(elevatorMorale?.patch || {}),
+        ...selectionLockPatch,
+        lastStoryCheckResult: result.storyCheck,
+        lastRerollUsed: Boolean(result.storyCheck?.rerollUsed),
+        lastRerollItemId: result.storyCheck?.reroll?.itemId || null,
+        ...(isTutorialBattlePrep || isEncounterBattlePrep ? { encounterPhase: 'aiNarration', battlePrep: lockBattlePrepForNarration() } : {}),
+      };
+      void patchGameState(gameId, persistedSelectionPatch).catch((e) => { console.error("[patchGameState]", e); });
     }
     window.setTimeout(() => submitAction(action), 0);
-  }, [gameId, selectionActionCheck, submitAction]);
+  }, [addEvent, gameId, selectionActionCheck, submitAction]);
 
   const handleBargainComplete = useCallback(
     (result: BargainCompleteResult) => {
@@ -3677,12 +3848,7 @@ export default function App() {
         { speaker: '主持人', text: `布洛克收起菌片，将铁锅挂在背包外侧。${trustNote}` },
       ];
 
-      const storyLines = lines.map((line) => ({
-        id: lineId.current++,
-        role: 'kp' as const,
-        speaker: line.speaker,
-        text: line.text,
-      }));
+      const storyLines = lines.map((line) => ({ id: lineId.current++, role: 'kp' as const, speaker: line.speaker, text: line.text, }));
       setStory((prev) => [...prev, ...storyLines]);
       setActiveIndex((prev) => prev);
       setSuggestions(makeSuggestions([
@@ -3704,28 +3870,13 @@ export default function App() {
       setShowLuckyBoxGame(false);
       const current = stateRef.current;
       const outcome = resolveOrlanCompletion(current, result);
-      const { patch, failedNoGoldNoDiamond, nextInventory } = outcome;
+      const { patch, failedNoGoldNoDiamond } = outcome;
       outcome.eventMessages.forEach((message) => addEvent(message, 'state'));
 
       if (failedNoGoldNoDiamond) {
         const debtScene = getScriptedScene('kaiya-recruited-with-debt');
         if (debtScene) {
-          playScriptedScene(debtScene, { extraStatePatch: patch });
-          if (current.tavern_yunling_unlocked) {
-            const yunlingScene = getScriptedScene('yunling-black-market');
-            if (yunlingScene) {
-              const yunlingInventory = buildYunlingBonusInventory(nextInventory);
-              playScriptedScene(yunlingScene, {
-                focus: false,
-                extraStatePatch: {
-                  inventory: yunlingInventory,
-                  yunling_free_healing_potions: 3,
-                  last_event: '根据萨洛额外情报找到云苓并获得三瓶治疗药水',
-                },
-                dynamicHints: YUNLING_SHOP_HINTS,
-              });
-            }
-          }
+          playScriptedScene(debtScene, { extraStatePatch: patch, deferRewards: false });
           return;
         }
 
@@ -3738,22 +3889,7 @@ export default function App() {
 
       const scene = getScriptedScene('kaiya-recruited');
       if (scene) {
-        playScriptedScene(scene, { extraStatePatch: patch });
-        if (current.tavern_yunling_unlocked) {
-          const yunlingScene = getScriptedScene('yunling-black-market');
-          if (yunlingScene) {
-            const yunlingInventory = buildYunlingBonusInventory(nextInventory);
-            playScriptedScene(yunlingScene, {
-              focus: false,
-              extraStatePatch: {
-                inventory: yunlingInventory,
-                yunling_free_healing_potions: 3,
-                last_event: '根据萨洛额外情报找到云苓并获得三瓶治疗药水',
-              },
-              dynamicHints: YUNLING_SHOP_HINTS,
-            });
-          }
-        }
+        playScriptedScene(scene, { extraStatePatch: patch, deferRewards: false });
         return;
       }
       setGameState((prev) => ({ ...prev, ...patch }));
@@ -3768,7 +3904,8 @@ export default function App() {
   const handleApothecaryPurchase = useCallback(
     (itemId: string, name: string, price: number, stat?: string) => {
       const current = stateRef.current;
-      const patch = buildApothecaryPurchasePatch(current, { itemId, name, price, stat });
+      const item = shopItems.find((entry) => entry.id === itemId);
+      const patch = buildApothecaryPurchasePatch(current, { itemId, name, price, stat, stock: item?.stock });
       if (!patch) return;
 
       setGameState((prev) => ({ ...prev, ...patch }));
@@ -3783,6 +3920,24 @@ export default function App() {
     },
     [addEvent, gameId],
   );
+
+  const handleConsumeMiniGameRerollItem = useCallback((itemId: RerollItemId) => {
+    const itemName = itemId === 'fiction-dice' ? '虚构骰子' : '万能骰子';
+    const current = stateRef.current;
+    if (getRerollItemQuantity(current, itemId) <= 0) return false;
+    const patch: GameState = {
+      inventory: changeInventoryQuantity(String(current.inventory || ''), itemName, -1),
+      last_event: `在骰子游戏中使用${itemName}`,
+    };
+    const nextState = { ...current, ...patch };
+    stateRef.current = nextState;
+    setGameState(nextState);
+    addEvent(`${itemName} -1`, 'dice');
+    if (gameId) {
+      void patchGameState(gameId, patch).catch((error: any) => addEvent(error.message || `${itemName}库存同步失败`, 'error'));
+    }
+    return true;
+  }, [addEvent, gameId]);
 
   // 云苓药铺：离开 → 播放云苓告别固定剧情 → 自动进入公会登记
   const handleApothecaryExit = useCallback(() => {
@@ -3828,6 +3983,7 @@ export default function App() {
       const config = currentEncounterConfigRef.current
         || getEncounterConfigById(stateRef.current.currentEncounterId)
         || getEncounterConfigByBattleId(currentBattleId);
+      if (config && stateRef.current.flags?.[config.battleDoneFlag]) return;
       setDeepBattleId('');
       if (result?.outcome === 'win') {
         if (!config) {
@@ -3923,7 +4079,7 @@ export default function App() {
           encounterPhase: nextState.encounterPhase,
           battlePrep: nextState.battlePrep,
           last_event: `战前行动初次判定：${choice.label} — 等待确认`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[patchGameState]", e); });
       }
       // 显示骰子结果
       if (result.roll) {
@@ -3950,7 +4106,7 @@ export default function App() {
       setGameState(nextState);
       if (outcome.result.roll) setBattlePrepDice(storyCheckDiceResult(outcome.result.roll));
       if (gameId) void patchGameState(gameId, { inventory: nextState.inventory, lastPrepResult: outcome.result,
-        lastStoryCheckResult: outcome.result.storyCheck, battlePrep: nextState.battlePrep }).catch(() => {});
+        lastStoryCheckResult: outcome.result.storyCheck, battlePrep: nextState.battlePrep }).catch((e) => { console.error("[patchGameState]", e); });
     } catch (error: any) { addEvent(error.message || '重投失败', 'error'); }
   }, [addEvent, gameId]);
 
@@ -3986,9 +4142,11 @@ export default function App() {
     if (gameId) void patchGameState(gameId, { flags: nextState.flags, battleEffects: nextState.battleEffects, lastPrepResult: result,
       lastStoryCheckResult: result.storyCheck || null, lastRerollUsed: nextState.lastRerollUsed, lastRerollItemId: nextState.lastRerollItemId,
       encounterPhase: nextState.encounterPhase, battlePrep: nextState.battlePrep,
-      selectedPrepActionId: choice.id, last_event: `战前行动：${choice.label} — ${result.result}` }).catch(() => {});
+      selectedPrepActionId: choice.id, last_event: `战前行动：${choice.label} — ${result.result}` }).catch((e) => { console.error("[patchGameState]", e); });
     const check = result.storyCheck;
-    void fetchStoryCheckNarration({
+    const NARRATION_TIMEOUT = 30_000;
+    void Promise.race([
+      fetchStoryCheckNarration({
       encounter_id: config.encounterId, action_id: choice.id, action_label: choice.label, action_desc: choice.desc,
       skill_name: check?.skillName || choice.check?.skill || '', dc: check?.dc || choice.check?.dc || 0,
       modifier: check?.modifier || 0, initial_roll: check?.initialRoll || {}, reroll: check?.reroll || null,
@@ -4006,7 +4164,7 @@ export default function App() {
       battlePrepStateRef.current = readyState;
       setGameState(readyState);
       if (gameId) void patchGameState(gameId, { encounterPhase: 'battlePending', lastPrepNarration: completeNarration,
-        lastPrepNarrationDone: true, battlePrep: readyState.battlePrep }).catch(() => {});
+        lastPrepNarrationDone: true, battlePrep: readyState.battlePrep }).catch((e) => { console.error("[patchGameState]", e); });
     }).catch((error: any) => {
       const fallback = result.text;
       setBattlePrepNarration(fallback);
@@ -4018,9 +4176,9 @@ export default function App() {
       battlePrepStateRef.current = readyState;
       setGameState(readyState);
       if (gameId) void patchGameState(gameId, { encounterPhase: 'battlePending', lastPrepNarration: fallback,
-        lastPrepNarrationDone: true, battlePrep: readyState.battlePrep }).catch(() => {});
+        lastPrepNarrationDone: true, battlePrep: readyState.battlePrep }).catch((e) => { console.error("[patchGameState]", e); });
       addEvent(error.message || 'AI续写失败，已使用兜底文本', 'state');
-    });
+    })]);
   }, [addEvent, battlePrepNarrating, battlePrepNarrationDone, gameId]);
 
   const handleBattlePrepEnterBattle = useCallback(() => {
@@ -4122,10 +4280,6 @@ export default function App() {
     const current = stateRef.current;
     const helpedRhein = current.lainHelped === true || current.helpedRhein === true;
 
-    /* [已停用/归档] 旧压缩主线的二选一结局分流。
-    if (current.compressedAct1EndingStarted && ...) { ... }
-    */
-
     let endingId = '';
     if (helpedRhein && coreChoice === 'stabilize') endingId = 'ending_guardian_still_stands';
     else if (helpedRhein && coreChoice === 'destroy') endingId = 'ending_carrying_the_wounded';
@@ -4192,34 +4346,35 @@ export default function App() {
   }, [gameState.current_area]);
 
   const currentLine = story[activeIndex];
-  const currentLineIsScripted = currentLine?.role === 'kp' && Boolean(currentLine.scriptedSceneId || currentLine.bgm || currentLine.bgImage);
-  const ctrlFastForwardActive = ctrlKeyHeld && currentLineIsScripted && screen === 'game' && phase === 'narrating' && !streaming;
-  const toggleFastForwardActive =
-    fastForwardMode &&
-    phase === 'narrating' &&
-    !streaming &&
-    (currentLineIsScripted || !story.some((line) => line.role === 'player'));
-  const autoAdvanceActive = openingFastForward || ctrlFastForwardActive || toggleFastForwardActive;
+  const autoAdvanceActive = openingFastForward;
   const styleSelectionBlocked = showStyleSelection && phase === 'narrating' && Boolean(gameState.style_selection_pending);
   const canAdvance = Boolean(currentLine) && (activeIndex < story.length - 1 || !streaming) && !styleSelectionBlocked;
   const requestedBgmTrack = useMemo(() => externalBgmTrack || resolveBgmTrack(screen, currentLine, gameState), [externalBgmTrack, screen, currentLine, gameState]);
 
+  useEffect(() => {
+    if (screen !== 'game') return;
+    preloadSceneVisualAssets(scene, 'normal');
+    preloadImageAssets([scriptedBgOverride], 'high');
+    preloadStoryLineAssets([currentLine, story[activeIndex + 1]], 'high');
+    preloadStoryLineAssets([story[activeIndex + 2], story[activeIndex + 3]], 'low');
+  }, [activeIndex, currentLine, scene, screen, scriptedBgOverride, story]);
+
   const visibleSuggestions = useMemo(() => {
     return constrainActionSuggestions(gameState, suggestions);
   }, [gameState, suggestions, bpTrigger]);
-  const choiceHelperText = actionChoiceStatusText(gameState, visibleSuggestions);
-  const actionInputPlaceholder = gameState.ailin_answer_pending
-    ? '回答艾琳：你们需要的是修女，还是随队药箱？'
-    : gameState.serlin_intro_pending
-      ? '向瑟琳介绍自己：用几句话描述你的身份和经历……'
-      : gameState.kaiya_passphrase_pending
-        ? '输入凯娅的暗号……'
-        : '输入你的行动……';
-  const areaText = String(gameState.current_area || '');
-  const showLuckyBoxEntry = /黑市|补给市场|市场|奥兰|凯娅/.test(areaText)
-    && Boolean(gameState.kaiya_intro_seen && !gameState.kaiya_passphrase_pending && !gameState.kaiya_recruited);
-  const cityAreaVisited = /冒险者公会|回声酒馆|酒馆|黑市|补给市场|市场|静默神殿|神殿|降渊缆梯|缆梯/.test(areaText);
-  const canUseCityMap = CITY_MAP_ENABLED && Boolean(gameState.city_map_unlocked || gameState.guild_registered || cityAreaVisited);
+  const registeredPlayerName = String(gameState.player_name || gameState.player?.name || '').trim();
+  const choiceHelperText = gameState.contract_signature_pending
+    ? `请完整输入登记姓名“${registeredPlayerName || '你的角色姓名'}”以签署契约。`
+    : actionChoiceStatusText(gameState, visibleSuggestions);
+  const actionInputPlaceholder = gameState.contract_signature_pending
+    ? '在远征契约上签下你的完整姓名……'
+    : gameState.ailin_answer_pending
+      ? '回答艾琳：你们需要的是修女，还是随队药箱？'
+      : gameState.serlin_intro_pending
+        ? '向瑟琳介绍自己：用几句话描述你的身份和经历……'
+        : gameState.kaiya_passphrase_pending
+          ? '输入凯娅的暗号……'
+          : '输入你的行动……';
   const showOpeningActionTutorial =
     screen === 'game' &&
     phase === 'action' &&
@@ -4234,19 +4389,44 @@ export default function App() {
     gameState.serlin_intro_pending &&
     !serlinIntroTutorialDismissed;
 
+  const showContractSignatureTutorial =
+    screen === 'game' &&
+    phase === 'action' &&
+    showActionPanel &&
+    Boolean(gameState.contract_signature_pending) &&
+    !contractSignatureTutorialDismissed;
+
+  useEffect(() => {
+    if (screen !== 'game' || !gameId || !currentLine) return;
+    if (fullyVisibleLineId !== currentLine.id || currentLine.text !== CONTRACT_SIGNATURE_LINE) return;
+
+    const currentState = stateRef.current;
+    if (currentState.contract_signature_pending || currentState.contract_signature_signed) return;
+
+    const signaturePatch: GameState = {
+      contract_signature_pending: true,
+      last_event: '等待玩家签署远征契约',
+    };
+    const nextState = { ...currentState, ...signaturePatch };
+    stateRef.current = nextState;
+    setGameState(nextState);
+    setSuggestions([]);
+    setOpeningFastForward(false);
+    setContractSignatureTutorialDismissed(false);
+    setPhase('action');
+    setShowActionPanel(true);
+    void patchGameState(gameId, signaturePatch).catch((error: any) => addEvent(error.message || '契约签名状态同步失败', 'error'));
+  }, [addEvent, currentLine, fullyVisibleLineId, gameId, screen]);
+
   useEffect(() => {
     if (requestedBgmTrack) {
       playBgmTrack(requestedBgmTrack);
       return;
     }
-    stopBgmTrack();
-  }, [requestedBgmTrack, playBgmTrack, stopBgmTrack]);
+    if (screen !== 'game') stopBgmTrack();
+  }, [requestedBgmTrack, playBgmTrack, screen, stopBgmTrack]);
 
-  useEffect(() => {
-    if (!canUseCityMap && showCityMap) {
-      setShowCityMap(false);
-    }
-  }, [canUseCityMap, showCityMap]);
+
 
   useEffect(() => {
     if (!openingFastForward) return;
@@ -4255,41 +4435,6 @@ export default function App() {
       setOpeningFastForward(false);
     }
   }, [openingFastForward, phase, screen, story]);
-
-  // Ctrl+L toggles test fast-forward; holding Ctrl temporarily fast-forwards fixed script scenes.
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (screen === 'game' && (e.key === 'Control' || e.ctrlKey)) {
-        setCtrlKeyHeld(true);
-      }
-      if (e.ctrlKey && e.key === 'l' && screen === 'game' && !streaming && phase === 'narrating') {
-        e.preventDefault();
-        setFastForwardMode((prev) => !prev);
-      }
-      if (fastForwardMode && phase === 'action') {
-        setFastForwardMode(false);
-      }
-    }
-
-    function onKeyUp(e: KeyboardEvent) {
-      if (e.key === 'Control' || !e.ctrlKey) {
-        setCtrlKeyHeld(false);
-      }
-    }
-
-    function onBlur() {
-      setCtrlKeyHeld(false);
-    }
-
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
-    };
-  }, [screen, streaming, phase, fastForwardMode]);
 
   // 行动面板延迟显示：底部文本全部输出完 1 秒后才可以显示
   useEffect(() => {
@@ -4330,7 +4475,6 @@ export default function App() {
     }
 
     setOpeningFastForward(false);
-    setFastForwardMode(false);
     setShowStyleSelection(true);
   }, [currentLine, fullyVisibleLineId, gameState.style_selection_pending, phase, screen, showStyleSelection]);
 
@@ -4384,7 +4528,7 @@ export default function App() {
     currentEncounterConfigRef.current = config;
     pendingBattlePrepRef.current = getEncounterPrepActions(config, nextState);
     setSuggestions(makeSuggestions(pendingBattlePrepRef.current.map((choice) => choice.label)));
-    if (gameId) void patchGameState(gameId, selectionPatch).catch(() => {});
+    if (gameId) void patchGameState(gameId, selectionPatch).catch((e) => { console.error("[patchGameState]", e); });
   }, [gameId, gameState, phase, screen, streaming]);
 
   const confirmOpeningStyle = useCallback(() => {
@@ -4429,14 +4573,7 @@ export default function App() {
     setGameState(nextState);
     setShowStyleSelection(false);
     insertStoryLinesAfterActive([
-      {
-        role: 'kp',
-        speaker: '主持人',
-        text: `你在登记页上写下姓名“${playerName}”与流派“${style.name}”。这不是头衔，只是危险真正降临时，你最熟悉的活法。`,
-        scriptedSceneId: 'opening',
-        bgm: currentLine?.bgm,
-        bgImage: currentLine?.bgImage,
-      },
+      { role: 'kp', speaker: '主持人', text: `你在登记页上写下姓名"${playerName}"与流派"${style.name}"。这不是头衔，只是危险真正降临时，你最熟悉的活法。`, scriptedSceneId: 'opening', bgm: currentLine?.bgm, bgImage: currentLine?.bgImage, },
     ], true);
     if (gameId) {
       void patchGameState(gameId, stylePatch).catch((error: any) => {
@@ -4446,13 +4583,36 @@ export default function App() {
   }, [addEvent, currentLine?.bgImage, currentLine?.bgm, gameId, insertStoryLinesAfterActive, openingPlayerName, selectedOpeningStyleId]);
 
   const advanceLine = useCallback(() => {
-    if (styleSelectionBlocked) return;
+    if (styleSelectionBlocked || stateRef.current.contract_signature_pending) return;
     if (activeIndex < story.length - 1) {
       setActiveIndex((index) => Math.min(index + 1, story.length - 1));
       return;
     }
 
     if (!streaming) {
+      const shouldAutoEnterYunling = Boolean(
+        currentLine?.scriptedSceneId
+        && ['kaiya-recruited', 'kaiya-recruited-with-debt'].includes(currentLine.scriptedSceneId)
+        && stateRef.current.kaiya_recruited
+        && stateRef.current.tavern_yunling_unlocked
+        && !stateRef.current.yunling_met
+        && !stateRef.current.yunling_shop_unlocked,
+      );
+      if (shouldAutoEnterYunling) {
+        const yunlingScene = getScriptedScene('yunling-black-market');
+        if (yunlingScene) {
+          playScriptedScene(yunlingScene, {
+            focus: false,
+            extraStatePatch: {
+              inventory: buildYunlingBonusInventory(String(stateRef.current.inventory || '')),
+              yunling_free_healing_potions: 3,
+              last_event: '凯娅入队后依照萨洛的两胜情报自动找到云苓，并获得三瓶治疗药水',
+            },
+            dynamicHints: YUNLING_SHOP_HINTS,
+          });
+          return;
+        }
+      }
       if (stateRef.current.currentNodeId === ACT1_SCENE_IDS.summary) {
         setSuggestions([]);
         setPhase('narrating');
@@ -4511,7 +4671,7 @@ export default function App() {
       setPhase('action');
       void saveCurrentGame(AUTO_SAVE_SLOT, { silent: true, phaseOverride: 'action' });
     }
-  }, [activeIndex, appendStoryLines, pendingTutorialBattleSetup, pendingTutorialBattleSummary, saveCurrentGame, story.length, streaming, styleSelectionBlocked]);
+  }, [activeIndex, appendStoryLines, currentLine?.scriptedSceneId, pendingTutorialBattleSetup, pendingTutorialBattleSummary, playScriptedScene, saveCurrentGame, story.length, streaming, styleSelectionBlocked]);
 
   const openLoadGame = useCallback(() => {
     setSaveMessage('');
@@ -4554,6 +4714,7 @@ export default function App() {
     setOpeningActionTutorialDismissed(false);
     setOpeningActionTutorialStep(0);
     setSerlinIntroTutorialDismissed(false);
+    setContractSignatureTutorialDismissed(false);
     tutorialBattleIntentRef.current = false;
     tutorialBattleDiceRef.current = null;
     setSaveMessage('');
@@ -4639,11 +4800,15 @@ export default function App() {
           onNewGame={startDefaultGameWithAiCheck}
           onLoadGame={openLoadGame}
           onGallery={() => setScreen('gallery')}
+          onUpdates={() => setShowUpdateAnnouncements(true)}
           onSettings={() => setShowAudioSettings(true)}
-          onTest={() => setScreen('test')}
           onPrimeAudio={() => playBgmTrack(BGM_TRACKS.title)}
         />
         <AiHealthModal notice={aiHealthNotice} onClose={() => !aiHealthChecking && setAiHealthNotice(null)} />
+        <UpdateAnnouncementsModal
+          open={showUpdateAnnouncements}
+          onClose={() => setShowUpdateAnnouncements(false)}
+        />
         <AudioSettingsModal
           open={showAudioSettings}
           bgmVolume={bgmVolume}
@@ -4685,13 +4850,18 @@ export default function App() {
     return <LazyBoundary><GalleryScreen onBack={() => setScreen('main-menu')} /></LazyBoundary>;
   }
 
-  if (screen === 'test') {
-    return <LazyBoundary><ErrorBoundary><TestScreen onBack={() => setScreen('main-menu')} onStoryTest={startStoryTest} /></ErrorBoundary></LazyBoundary>;
-  }
-
   if (screen === 'loading') return <LoadingScreen error={loadError} onRetry={startDefaultGame} />;
 
   if (screen === 'tutorial-battle') {
+    const tutorialBattleConfig = getBattleConfigById('tutorial-crawler-battle', {
+      ...gameState,
+      current_hp: Number.MAX_SAFE_INTEGER,
+      player: { ...(gameState.player || {}), hp: Number.MAX_SAFE_INTEGER },
+    });
+    if (!tutorialBattleConfig) {
+      setScreen('game');
+      return null;
+    }
     return (
       <LazyBoundary>
         <ErrorBoundary>
@@ -4699,7 +4869,13 @@ export default function App() {
             gameId={gameId}
             encounterId="tutorial-crawler-battle"
             mode="tutorial"
+            battleConfigOverride={tutorialBattleConfig}
             openingEffects={pendingTutorialBattleSetup?.openingEffects ?? []}
+            fictionQuantity={getRerollItemQuantity(gameState, 'fiction-dice')}
+            omniQuantity={getRerollItemQuantity(gameState, 'omni-dice')}
+            onConsumeRerollItem={consumeBattleRerollItem}
+            healingPotionQuantity={inventoryCounts(String(gameState.inventory || '')).get('治疗药水') ?? 0}
+            onConsumeHealingPotion={consumeBattleHealingPotion}
             onBack={() => {
               setPendingTutorialBattleSetup(null);
               setPendingTutorialBattleSummary([]);
@@ -4716,8 +4892,6 @@ export default function App() {
   if (screen === 'companion-event') {
     const eventTrustKeys: Record<string, string> = {
       ailin_wounded_names: 'trust_al',
-      // [已停用/归档] block_echo_forest: 'trust_block',
-      // [已停用/归档] kaiya_broken_seals: 'trust_kl',
       serin_cracked_silver_staff: 'trust_sl',
     };
     const trustKey = eventTrustKeys[companionEventId] || 'trust_sl';
@@ -4740,7 +4914,7 @@ export default function App() {
   }
 
   if (screen === 'deep-battle') {
-    const battleConfig = getBattleConfigById(deepBattleId);
+    const battleConfig = getBattleConfigById(deepBattleId, gameState);
     if (!battleConfig) {
       setScreen('game');
       return null;
@@ -4811,9 +4985,14 @@ export default function App() {
           <BattleTestScreen
             gameId={gameId}
             encounterId={deepBattleId}
-            mode="test"
+            mode="standard"
             battleConfigOverride={battleConfig}
             openingEffects={openingEffects}
+            fictionQuantity={getRerollItemQuantity(gameState, 'fiction-dice')}
+            omniQuantity={getRerollItemQuantity(gameState, 'omni-dice')}
+            onConsumeRerollItem={consumeBattleRerollItem}
+            healingPotionQuantity={inventoryCounts(String(gameState.inventory || '')).get('治疗药水') ?? 0}
+            onConsumeHealingPotion={consumeBattleHealingPotion}
             onBack={() => {}}
             onComplete={(result) => handleDeepBattleComplete(result)}
             onSkip={() => handleDeepBattleComplete({ outcome: 'win' })}
@@ -4845,12 +5024,16 @@ export default function App() {
       .filter((item) => !item.repeatable)
       .filter((item) => Boolean(gameState[`yunling_${item.id}_bought`] || (item.id === 'purification_heart' && gameState.purification_heart_owned)))
       .map((item) => item.id);
+    const shopPurchaseCounts = Object.fromEntries(
+      shopItems.map((item) => [item.id, Number(gameState[`yunling_${item.id}_purchase_count`] || 0)]),
+    );
     return (
       <LazyBoundary>
         <ApothecaryShop
           gold={Number(gameState.gold ?? 200)}
           inventoryText={String(gameState.inventory || '')}
           purchasedKeys={purchasedShopKeys}
+          purchaseCounts={shopPurchaseCounts}
           onPurchase={handleApothecaryPurchase}
           onExit={() => {
             setShowApothecaryShopUI(false);
@@ -4874,11 +5057,11 @@ export default function App() {
         isActionPhase={phase === 'action'}
         canAdvance={phase !== 'action' && canAdvance}
         autoAdvance={autoAdvanceActive}
-        autoAdvanceDelay={ctrlFastForwardActive ? 35 : toggleFastForwardActive ? 60 : 90}
+        autoAdvanceDelay={90}
         scriptedBgOverride={scriptedBgOverride}
         visualResetKey={visualResetKey}
         onAdvance={advanceLine}
-        onLineFullyVisible={setFullyVisibleLineId}
+        onLineFullyVisible={handleLineFullyVisible}
         actionPanel={
           showActionPanel ? (
             <ActionPanel
@@ -4887,7 +5070,7 @@ export default function App() {
               onSubmit={submitAction}
               placeholder={actionInputPlaceholder}
               helperText={choiceHelperText}
-              hideFreeInput={gameState.act1GameCompleted || gameState.currentNodeId === POST_BLUE_SHOAL_IDS.laineSurvivor || gameState.currentNodeId === POST_BLUE_SHOAL_IDS.finalChoice || isBattlePrepReadyToEnter(gameState) || visibleSuggestions.some((s) => /整理阵亡者名册|翻看旧巡逻记录|确认据点调查结果|停下协助艾琳|无视伤员继续前进|帮艾琳记录|优先追问第三巡逻队/.test(s.text))}
+              hideFreeInput={gameState.act1GameCompleted || gameState.currentNodeId === POST_BLUE_SHOAL_IDS.laineSurvivor || gameState.currentNodeId === POST_BLUE_SHOAL_IDS.campNight || gameState.currentNodeId === POST_BLUE_SHOAL_IDS.finalChoice || isBattlePrepReadyToEnter(gameState) || visibleSuggestions.some((s) => /整理阵亡者名册|翻看旧巡逻记录|确认据点调查结果|停下协助艾琳|无视伤员继续前进|帮艾琳记录|优先追问第三巡逻队/.test(s.text))}
             />
           ) : undefined
         }
@@ -4916,6 +5099,15 @@ export default function App() {
           <OpeningActionTutorial
             steps={SERLIN_INTRO_TUTORIAL}
             onClose={() => setSerlinIntroTutorialDismissed(true)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showContractSignatureTutorial && (
+          <OpeningActionTutorial
+            steps={CONTRACT_SIGNATURE_TUTORIAL}
+            onClose={() => setContractSignatureTutorialDismissed(true)}
           />
         )}
       </AnimatePresence>
@@ -4976,7 +5168,6 @@ export default function App() {
             <h2>说出暗号才能让凯娅现身</h2>
             <p>萨洛告诉你的暗号已经记录在档案中。{'\n\n'}可点击右上角的 「背包」，进入「档案」 查看暗号线索，然后在下方输入框说出暗号。</p>
             <footer>
-              <span />
               <button type="button" className="opening-action-tutorial-next" onClick={() => setShowPassphraseHint(false)}>
                 知道了
               </button>
@@ -5049,32 +5240,14 @@ export default function App() {
 
       <StoryRewardNotices notices={rewardNotices} onDismiss={dismissRewardNotice} />
 
-      {showLuckyBoxEntry && (
-        <button
-          type="button"
-          className="game-dice-poker-btn game-bargain-btn"
-          onClick={() => setShowLuckyBoxGame(true)}
-        >
-          幸运盲盒
-        </button>
-      )}
-
-      {/* 剧情加速状态指示器 */}
-      {(fastForwardMode || ctrlFastForwardActive) && (
-        <div className="fast-forward-indicator">
-          剧情加速中
-        </div>
-      )}
-
       <AppTopActions
-        canUseCityMap={canUseCityMap}
         gameState={gameState}
         characterInfoOpen={showCharacterInfo}
         onOpenDialogueLog={() => setShowDialogueLog(true)}
-        onOpenCityMap={() => setShowCityMap(true)}
         onOpenReturnTitle={() => setShowReturnTitleConfirm(true)}
         onOpenSaves={() => setShowGameSaves(true)}
         onOpenCharacterInfo={() => setShowCharacterInfo(true)}
+        onOpenSettings={() => setShowAudioSettings(true)}
         onInventoryStatePatch={patchStateFromPanel}
       />
 
@@ -5091,6 +5264,24 @@ export default function App() {
         onConfirmReturnTitle={returnToTitleMenu}
         onCloseCharacterInfo={() => setShowCharacterInfo(false)}
         onCloseDialogueLog={() => setShowDialogueLog(false)}
+      />
+
+      <AudioSettingsModal
+        open={showAudioSettings}
+        bgmVolume={bgmVolume}
+        sfxVolume={sfxVolume}
+        aiModel={aiModel}
+        aiHealthMaxTokens={aiHealthMaxTokens}
+        aiSettingsStatus={aiSettingsStatus}
+        onBgmVolumeChange={setBgmVolume}
+        onSfxVolumeChange={setSfxVolume}
+        onAiModelChange={(value) => {
+          void applyAiSettings(value, aiHealthMaxTokens).catch(() => undefined);
+        }}
+        onAiHealthMaxTokensChange={(value) => {
+          void applyAiSettings(aiModel, value).catch(() => undefined);
+        }}
+        onClose={() => setShowAudioSettings(false)}
       />
 
       {/* 快艇骰子游戏弹窗 */}
@@ -5195,21 +5386,16 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* 逆穹城地图 */}
-      <CityMap
-        visible={showCityMap && canUseCityMap}
-        onClose={() => setShowCityMap(false)}
-        onNavigate={(actionText) => {
-          setShowCityMap(false);
-          submitAction(actionText);
-        }}
-      />
+
 
       {/* 布洛克喝酒游戏弹窗 */}
       <AnimatePresence>
         {showDrinkingDiceGame && (
           <DrinkingDiceGame
             playerCon={Number(gameState.attr_con ?? gameState.con ?? 15)}
+            fictionQuantity={getRerollItemQuantity(gameState, 'fiction-dice')}
+            omniQuantity={getRerollItemQuantity(gameState, 'omni-dice')}
+            onConsumeRerollItem={handleConsumeMiniGameRerollItem}
             onBack={() => setShowDrinkingDiceGame(false)}
             onComplete={handleDrinkingDiceComplete}
           />
@@ -5221,6 +5407,9 @@ export default function App() {
         {showTavernDice && (
           <TavernDicePoker
             gold={Number(gameState.gold ?? 200)}
+            fictionQuantity={getRerollItemQuantity(gameState, 'fiction-dice')}
+            omniQuantity={getRerollItemQuantity(gameState, 'omni-dice')}
+            onConsumeRerollItem={handleConsumeMiniGameRerollItem}
             onClose={() => setShowTavernDice(false)}
             onComplete={(result: any) => {
               dicePokerPendingRef.current = '';
@@ -5292,23 +5481,14 @@ export default function App() {
                     { id: lineId.current++, role: 'kp' as const, speaker: '瑟琳', text: '「先听他讲完。队伍凑齐之前，我们不能急着下缆梯。」' },
                   ];
               const saloLines: StoryLine[] = saloIntel
-                ? saloIntel.lines.map((line) => ({
-                    id: lineId.current++,
-                    role: 'kp' as const,
-                    speaker: line.speaker,
-                    text: line.text,
-                    portrait: line.portrait || getScriptedPortraitOverride(saloIntel.id, line.speaker),
-                    bgImage: line.bgImage,
-                    bgm: line.bgm || saloIntel.bgm,
-                    scriptedSceneId: saloIntel.id,
-                  }))
+                ? saloIntel.lines.map((line) => ({ id: lineId.current++, role: 'kp' as const, speaker: line.speaker, text: line.text, portrait: line.portrait || getScriptedPortraitOverride(saloIntel.id, line.speaker), bgImage: line.bgImage, bgm: line.bgm || saloIntel.bgm, scriptedSceneId: saloIntel.id, }))
                 : [];
               setStory((prev) => {
                 setActiveIndex(prev.length);
                 return [...prev, ...postDiceLines, ...saloLines];
               });
 
-              setScriptedBgOverride(saloIntel?.bgImage || '/assets/scenes/06tavern-interior.webp');
+              setScriptedBgOverride(saloIntel?.bgImage || '/assets/scenes/06.webp');
               scriptedBgSceneRef.current = saloIntel?.setArea || '逆穹悬城·回声酒馆';
               setSuggestions(saloIntel
                 ? constrainActionSuggestions(nextState, makeSuggestions(saloIntel.hints))

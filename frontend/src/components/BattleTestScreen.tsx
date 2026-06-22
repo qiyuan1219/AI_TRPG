@@ -2,7 +2,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Dice3DView, type DieType } from "./DiceRollOverlay";
 import type { DiceResult } from "../types/game";
-import { fetchBattleNarration, type AuthoritativeBattleResult } from "../services/api";
+import { checkAiHealth, fetchBattleNarrationResult, type AuthoritativeBattleResult } from "../services/api";
 import { authoritativeAmountByTarget, authoritativeDice, authoritativeEffect, authoritativeHp, authoritativeInitiative, toAuthoritativeBattlePayload } from "../core/battle/authoritativeAdapter";
 import { dispatchGameAction } from "../core/actions/registry";
 import "../core/actions/battleResolver";
@@ -10,7 +10,6 @@ import { rollDiceEvent } from "../core/dice/createDiceEvent";
 import { BattleActionBar } from "../features/battle/BattleActionBar";
 import { battleController } from "../features/battle/BattleController";
 import { BattleDiceBinding } from "../features/battle/BattleDiceBinding";
-import { BACKGROUND_URL, getBattleConfig, SIMPLE_BATTLE_UNITS } from "../features/battle/battleDebugConfig";
 import { BattleEffectPanel } from "../features/battle/BattleEffectPanel";
 import { BattleField } from "../features/battle/BattleField";
 import { BattleLogPanel } from "../features/battle/BattleLogPanel";
@@ -61,11 +60,16 @@ interface BattleTestScreenProps {
   gameId?: string;
   encounterId?: string;
   onBack?: () => void;
-  mode?: "test" | "tutorial" | "side-event";
+  mode?: "standard" | "tutorial" | "side-event";
   onComplete?: (result?: BattleResult) => void;
   onSkip?: () => void;
   openingEffects?: BattleOpeningEffect[];
-  battleConfigOverride?: BattleConfig;
+  battleConfigOverride: BattleConfig;
+  fictionQuantity?: number;
+  omniQuantity?: number;
+  onConsumeRerollItem?: (itemId: "fiction-dice" | "omni-dice") => boolean;
+  healingPotionQuantity?: number;
+  onConsumeHealingPotion?: () => boolean;
 }
 
 export type Faction = "ally" | "enemy";
@@ -181,6 +185,22 @@ interface PendingSettlement {
   skill: BattleSkill;
   effect: BattleEffect;
   isEnemy?: boolean;
+}
+
+interface LocalHitDecision {
+  unit: BattleUnit;
+  target: BattleUnit;
+  skill: BattleSkill;
+  isEnemy: boolean;
+  initialRoll: number;
+  finalRoll: number;
+  rerollRoll?: number;
+  rerollUsed: boolean;
+  modifier: number;
+  abilityLabel: string;
+  abilityBonus: number;
+  proficiencyBonus: number;
+  targetAc: number;
 }
 
 interface AiTactic {
@@ -342,8 +362,18 @@ function formatCombatTextForPlayer(text: string) {
 }
 
 function formatSkillFormulaForPlayer(skill: BattleSkill) {
+  if (isDefenseSkill(skill)) return "防御姿态：下一次受到伤害降低50%";
   const concise = formatDamageFormulaForPlayer(skill.formula);
-  return concise && /\d+D\d+/i.test(concise) ? concise : "无伤害";
+  if (skill.roll.kind === "healing" && /\d+D\d+/i.test(concise)) {
+    const targetText = isGroupDamageSkill(skill) ? "我方全体" : skill.name === "回气" ? "自己" : "单体队友";
+    return `为${targetText}恢复 ${concise}点生命`;
+  }
+  if (/\d+D\d+/i.test(concise)) {
+    const targetText = isGroupDamageSkill(skill) ? "所有敌人" : "单体敌人";
+    return `对${targetText}造成 ${concise}点伤害`;
+  }
+  const effect = formatSkillEffectForPlayer(skill);
+  return effect || "无需掷骰";
 }
 
 function formatSkillEffectForPlayer(skill: BattleSkill) {
@@ -374,6 +404,49 @@ function rollD20() {
   return rollDie(20);
 }
 
+function abilityLabel(key?: AbilityKey) {
+  return ABILITY_LABELS.find(([abilityKey]) => abilityKey === key)?.[1] ?? "属性";
+}
+
+function attackBreakdown(unit: BattleUnit, skill: BattleSkill) {
+  const abilityKey = skill.roll.ability;
+  const abilityBonus = abilityKey ? abilityModifier(unit.abilities[abilityKey]) : 0;
+  const proficiencyBonus = unit.proficiency + Number((unit as BattleUnit & { openingHitBonus?: number }).openingHitBonus ?? 0);
+  return {
+    abilityLabel: abilityLabel(abilityKey),
+    abilityBonus,
+    proficiencyBonus,
+    modifier: abilityBonus + proficiencyBonus,
+  };
+}
+
+function localHitSucceeded(roll: number, total: number, targetAc: number) {
+  return roll === 20 || (roll !== 1 && total >= targetAc);
+}
+
+function createLocalHitDice(decision: LocalHitDecision): DiceResult {
+  const total = decision.finalRoll + decision.modifier;
+  const hit = localHitSucceeded(decision.finalRoll, total, decision.targetAc);
+  return {
+    type: "attack_roll",
+    data: {
+      骰子: "D20",
+      掷骰: `D20=${decision.finalRoll}`,
+      攻击掷骰: `D20=${decision.finalRoll}`,
+      基础骰: decision.finalRoll,
+      加值: decision.modifier,
+      属性加值: decision.abilityBonus,
+      熟练加值: decision.proficiencyBonus,
+      六维: decision.abilityLabel,
+      属性: `${decision.abilityLabel}命中`,
+      总计: total,
+      AC: decision.targetAc,
+      目标AC: decision.targetAc,
+      命中: hit,
+    },
+  };
+}
+
 function sidesFromDieType(dieType: DieType) {
   return Number(dieType.replace("d", ""));
 }
@@ -394,7 +467,7 @@ function buildInitiative(units: BattleUnit[]): InitiativeEntry[] {
   });
 }
 
-function sortInitiative(entries: InitiativeEntry[], unitMap: Map<string, BattleUnit>, unitOrder: BattleUnit[] = SIMPLE_BATTLE_UNITS) {
+function sortInitiative(entries: InitiativeEntry[], unitMap: Map<string, BattleUnit>, unitOrder: BattleUnit[]) {
   return [...entries].sort((a, b) => {
     if (b.total !== a.total) return b.total - a.total;
     if (b.dexMod !== a.dexMod) return b.dexMod - a.dexMod;
@@ -421,6 +494,7 @@ function resourceIsSpent(resource: BattleResource, usedResources: Partial<Record
 }
 
 function skillTargetHint(skill: BattleSkill) {
+  if (isDefenseSkill(skill)) return "选择自己，进入防御姿态";
   if (skill.roll.kind === "healing") return "选择恢复对象";
   if (skill.tags.some((tag) => ["临时HP", "隐形", "抗性"].includes(tag))) return "选择自身或受益者";
   if (skill.tags.some((tag) => ["范围", "群体"].includes(tag))) return "选择范围中心或主要目标";
@@ -432,6 +506,7 @@ function getTargetCandidates(unit: BattleUnit, skill: BattleSkill, allies: Battl
   const livingAllies = allies.filter((target) => target.hp > 0);
   const livingEnemies = enemies.filter((target) => target.hp > 0);
 
+  if (isDefenseSkill(skill)) return [unit];
   if (skill.name === "回气" || skill.name === "烟中恶鬼") return [unit];
   if (skill.tags.some((tag) => ["临时HP", "增益", "祝福", "护盾"].includes(tag))) return livingAllies.length ? livingAllies : allies;
   if (skill.roll.kind === "healing") return livingAllies.length ? livingAllies : allies;
@@ -445,17 +520,117 @@ function isHealingSkill(skill: BattleSkill) {
   return skill.roll.kind === "healing" || /治疗|恢复/.test(skill.name + skill.formula);
 }
 
+function isDefenseSkill(skill: BattleSkill) {
+  return skill.name === "防御" || skill.tags.includes("防御");
+}
+
 function isDamagingAction(actor: BattleUnit, target: BattleUnit, skill: BattleSkill) {
-  return actor.faction !== target.faction && !isHealingSkill(skill) && !skill.tags.includes("临时HP");
+  return actor.faction !== target.faction && !isHealingSkill(skill) && !isDefenseSkill(skill) && !skill.tags.includes("临时HP");
 }
 
 function isGroupDamageSkill(skill: BattleSkill) {
   const text = `${skill.name} ${skill.formula} ${skill.effect} ${skill.rule} ${skill.tags.join(" ")}`;
-  return /范围|群体|全体|锥形/.test(text);
+  return /范围|群体|全体|全队|所有敌人|所有队友|我方全体|敌方全体|锥形/.test(text);
 }
+
+const BATTLE_HEALING_POTION_SKILL: BattleSkill = {
+  id: "battle-healing-potion",
+  name: "使用治疗药水",
+  resource: "自由互动",
+  source: "基础动作",
+  formula: "1D12",
+  effect: "为单体我方单位恢复1D12点生命",
+  cooldown: "消耗1瓶治疗药水",
+  rule: "选择一名未满生命的我方单位并投掷D12",
+  roll: { kind: "healing", dieType: "d12", diceCount: 1, bonus: 0, label: "治疗药水" },
+  tags: ["治疗", "消耗品"],
+};
 
 function hpRatio(unit: BattleUnit) {
   return unit.hp / Math.max(unit.maxHp, 1);
+}
+
+function formatAuthoritativeStatus(status: unknown) {
+  if (typeof status === "string") return status;
+  if (!status || typeof status !== "object") return "";
+  const record = status as Record<string, unknown>;
+  if (record.type === "damage_reduction_once") return String(record.name || "防御");
+  if (typeof record.name === "string") return record.name;
+  return "";
+}
+
+function buildAuthoritativeStatusMap(result: AuthoritativeBattleResult | null) {
+  const characters = result?.updatedBattleState?.characters ?? result?.battleState.characters ?? [];
+  return new Map(
+    characters.map((unit) => [
+      unit.id,
+      unit.statuses.map(formatAuthoritativeStatus).filter(Boolean),
+    ]),
+  );
+}
+
+function getNarrationAmountEntries(targets: BattleUnit[], result: AuthoritativeBattleResult | null, fallbackAmount?: number) {
+  const amountByTarget = result ? authoritativeAmountByTarget(result) : {};
+  return targets
+    .map((target) => {
+      const raw = amountByTarget[target.id];
+      const amount = Number.isFinite(raw) ? raw : targets.length === 1 ? fallbackAmount : undefined;
+      return typeof amount === "number" && Number.isFinite(amount)
+        ? { id: target.id, name: target.name, amount }
+        : null;
+    })
+    .filter((entry): entry is { id: string; name: string; amount: number } => Boolean(entry));
+}
+
+function buildSettlementNarration(
+  actor: BattleUnit,
+  target: BattleUnit,
+  skill: BattleSkill,
+  effect: BattleEffect,
+  impactedTargets: BattleUnit[],
+  result: AuthoritativeBattleResult | null,
+) {
+  if (effect.success === false) return effect.narration;
+  if (!isDamagingAction(actor, target, skill) && !isHealingSkill(skill)) return effect.narration;
+
+  const entries = getNarrationAmountEntries(impactedTargets, result, effect.amount);
+  if (entries.length > 1) {
+    const verb = isHealingSkill(skill) ? "恢复" : "受到";
+    const sameAmount = entries.every((entry) => entry.amount === entries[0].amount);
+    const groupLabel = actor.faction === "enemy" ? "我方全体" : "敌方全体";
+    const opening = isHealingSkill(skill)
+      ? `${actor.name}稳住呼吸，${skill.name}的光芒沿队伍铺开。`
+      : `${actor.name}猛然发动${skill.name}，冲击同时扫过整条战线。`;
+    if (sameAmount) return `${opening}${groupLabel}${verb} ${entries[0].amount} 点${isHealingSkill(skill) ? "生命" : "伤害"}。`;
+    return `${opening}${entries.map((entry) => `${entry.name}${verb} ${entry.amount} 点${isHealingSkill(skill) ? "生命" : "伤害"}`).join("，")}。`;
+  }
+  if (entries.length === 1 && isHealingSkill(skill)) {
+    return `${actor.name}迅速靠近${entries[0].name}，${skill.name}的力量压住伤势。${entries[0].name}恢复 ${entries[0].amount} 点生命。`;
+  }
+  if (entries.length === 1 && isDamagingAction(actor, target, skill)) {
+    return `${actor.name}抓住空隙发动${skill.name}，攻势结结实实落在${entries[0].name}身上，造成 ${entries[0].amount} 点伤害。`;
+  }
+  return effect.narration;
+}
+
+function narrationMismatchesAmounts(text: string, entries: Array<{ name: string; amount: number }>) {
+  if (!entries.length) return false;
+  const uniqueAmounts = Array.from(new Set(entries.map((entry) => entry.amount)));
+  const groupMatch = text.match(/全体(?:受到|承受|损失|恢复)\s*(\d+)\s*点/);
+  if (groupMatch && entries.length > 1) {
+    return uniqueAmounts.length > 1 || Number(groupMatch[1]) !== uniqueAmounts[0];
+  }
+  if (entries.length === 1) {
+    const numberMatch = text.match(/(?:受到|承受|损失|造成|恢复)\s*(\d+)\s*点/);
+    return Boolean(numberMatch && Number(numberMatch[1]) !== entries[0].amount);
+  }
+  return entries.some((entry) => {
+    const index = text.indexOf(entry.name);
+    if (index < 0) return false;
+    const slice = text.slice(index, index + 48);
+    const match = slice.match(/(?:受到|承受|损失|恢复)\s*(\d+)\s*点/);
+    return Boolean(match && Number(match[1]) !== entry.amount);
+  });
 }
 
 function estimateSkillAmount(skill: BattleSkill) {
@@ -653,23 +828,23 @@ function getBattleFxKind(unit: BattleUnit, skill: BattleSkill): BattleFxKind {
     EB2: "shadow",
     EB3: "poison",
     TA1: "slash",
-    TA2: "shield",
-    TA3: "heal",
+    TA2: "heal",
+    TA3: "shield",
     SE1: "radiant",
     SE2: "arcane",
-    SE3: "heal",
+    SE3: "shield",
     S1: "radiant",
     S2: "arcane",
     S3: "heal",
     SN1: "bash",
     SN2: "heal",
-    SN3: "fire",
+    SN3: "shield",
     AL1: "heal",
     AL2: "buff",
     AL3: "shield",
     KL1: "shadow",
     KL2: "debuff",
-    KL3: "shadow",
+    KL3: "shield",
     CA1: "slash",
     CA2: "poison",
     CA3: "fail",
@@ -726,14 +901,23 @@ export function BattleTestScreen({
   gameId,
   encounterId,
   onBack,
-  mode = "test",
+  mode = "standard",
   onComplete,
   onSkip,
   openingEffects = [],
   battleConfigOverride,
+  fictionQuantity = 0,
+  omniQuantity = 0,
+  onConsumeRerollItem,
+  healingPotionQuantity = 0,
+  onConsumeHealingPotion,
 }: BattleTestScreenProps) {
-  const config = useMemo(() => battleConfigOverride ?? getBattleConfig(mode), [battleConfigOverride, mode]);
-  const battleBaseUnits = useMemo(() => applyOpeningEffectsToUnits(config.units, openingEffects), [config.units, openingEffects]);
+  const config = battleConfigOverride;
+  const battleBaseUnits = useMemo(() => applyOpeningEffectsToUnits(config.units, openingEffects).map((unit) => (
+    unit.faction === "ally" && !unit.skills.some((skill) => skill.id === BATTLE_HEALING_POTION_SKILL.id)
+      ? { ...unit, skills: [...unit.skills, BATTLE_HEALING_POTION_SKILL] }
+      : unit
+  )), [config.units, openingEffects]);
   const openingLogLines = useMemo(() => openingEffects.map((effect) => effect.log), [openingEffects]);
 
   useEffect(() => {
@@ -754,6 +938,8 @@ export function BattleTestScreen({
   const [activeDice, setActiveDice] = useState<DiceResult | null>(null);
   const [attackPhase, setAttackPhase] = useState<"d20" | "save" | "damage" | null>(null);
   const pendingAttackRef = useRef<{ unit: BattleUnit; target: BattleUnit; skill: BattleSkill; hit: boolean; isEnemy?: boolean } | null>(null);
+  const pendingLocalHitRef = useRef<LocalHitDecision | null>(null);
+  const [localHitVersion, setLocalHitVersion] = useState(0);
   const [advantage, setAdvantage] = useState<{ type: "advantage" | "disadvantage"; reason: string } | null>(null);
   const [lastEffect, setLastEffect] = useState<BattleEffect | null>(null);
   const [kpReportPending, setKpReportPending] = useState(false);
@@ -766,7 +952,8 @@ export function BattleTestScreen({
   const [tacticalAdvice, setTacticalAdvice] = useState<AiTactic | null>(null);
   const battleAnimationTimerRef = useRef<number | null>(null);
   const [usedResources, setUsedResources] = useState<Record<string, Partial<Record<BattleResource, boolean>>>>({});
-  const [battleLog, setBattleLog] = useState<string[]>([...openingLogLines, config.initialLog].slice(0, 4));
+  const [battleLog, setBattleLog] = useState<string[]>([...openingLogLines, config.initialLog].slice(0, 80));
+  const [aiNarrationStatus, setAiNarrationStatus] = useState<'checking' | 'online' | 'generating' | 'fallback'>('checking');
   const [showTutorialIntro, setShowTutorialIntro] = useState(() => Boolean(config.tutorialIntro));
   const [tutorialIntroStep, setTutorialIntroStep] = useState(0);
   const [initiativeAutoStartToken, setInitiativeAutoStartToken] = useState(0);
@@ -793,13 +980,29 @@ export function BattleTestScreen({
     setTutorialStep((current) => (step > current ? step : current));
   }, [mode]);
 
+  const authoritativeStatusById = useMemo(
+    () => buildAuthoritativeStatusMap(authoritativeBattle),
+    [authoritativeBattle],
+  );
+
   const battleUnits = useMemo(
     () =>
-      battleBaseUnits.map((unit) => ({
-        ...unit,
-        hp: Math.max(0, Math.min(unit.maxHp, unitHp[unit.id] ?? unit.hp)),
-      })),
-    [battleBaseUnits, unitHp],
+      battleBaseUnits.map((unit) => {
+        const dynamicStatuses = authoritativeStatusById.get(unit.id) ?? [];
+        return {
+          ...unit,
+          hp: Math.max(0, Math.min(unit.maxHp, unitHp[unit.id] ?? unit.hp)),
+          statuses: Array.from(new Set([...unit.statuses, ...dynamicStatuses])),
+          skills: unit.skills.map((skill) => skill.id === BATTLE_HEALING_POTION_SKILL.id
+            ? {
+                ...skill,
+                locked: healingPotionQuantity <= 0,
+                cooldown: healingPotionQuantity > 0 ? `剩余 ${healingPotionQuantity} 瓶` : "治疗药水不足",
+              }
+            : skill),
+        };
+      }),
+    [authoritativeStatusById, battleBaseUnits, healingPotionQuantity, unitHp],
   );
   const unitMap = useMemo(() => new Map(battleUnits.map((unit) => [unit.id, unit])), [battleUnits]);
   const orderedInitiative = initiative;
@@ -855,6 +1058,29 @@ export function BattleTestScreen({
   }, [beginAuthoritativeBattle]);
 
   useEffect(() => {
+    let cancelled = false;
+    checkAiHealth()
+      .then((result) => {
+        if (cancelled) return;
+        if (result.ok) {
+          setAiNarrationStatus('online');
+          pushBattleLog(`AI战场播报已连接：${result.model || "当前模型"}`);
+        } else {
+          setAiNarrationStatus('fallback');
+          pushBattleLog(`AI战场播报连接异常：${result.message || "未通过健康检查"}，本场将优先使用本地规则播报。`);
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setAiNarrationStatus('fallback');
+        pushBattleLog(`AI战场播报连接异常：${error instanceof Error ? error.message : "检查失败"}，本场将优先使用本地规则播报。`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (phase !== "battle" || battleWon || battleLost || activeUnit?.faction !== "ally" || !activeUnitId || activeUnit.hp <= 0) return;
     setActionUnitId(activeUnitId);
     setTargetSelection(null);
@@ -874,7 +1100,7 @@ export function BattleTestScreen({
   }, [advanceTutorialStep, showTutorialHint]);
 
   function pushBattleLog(line: string) {
-    setBattleLog((current) => [line, ...current].slice(0, 4));
+    setBattleLog((current) => [line, ...current].slice(0, 80));
   }
 
   function clearBattleAnimation() {
@@ -889,6 +1115,7 @@ export function BattleTestScreen({
     if (effect.success === false || /未命中|失败/.test(effect.title)) {
       return { text: "MISS", tone: "miss" };
     }
+    if (isDefenseSkill(skill)) return { text: "防御", tone: "effect" };
     if (typeof effect.amount !== "number") return undefined;
     if (skill.roll.kind === "healing" || actor.faction === target.faction) {
       return { text: `+${effect.amount}`, tone: "heal" };
@@ -905,8 +1132,6 @@ export function BattleTestScreen({
     }
 
     const id = Date.now();
-    const feedback = buildBattleFeedback(unit, target, skill, effect);
-    const effectKind = feedback?.tone === "miss" ? "fail" : getBattleFxKind(unit, skill);
     const targetIds = impactedTargets.length ? impactedTargets.map((item) => item.id) : [target.id];
     const amounts = authorityPendingRef.current ? authoritativeAmountByTarget(authorityPendingRef.current) : {};
     const feedbackByTargetId = Object.fromEntries(impactedTargets.flatMap((item) => {
@@ -915,6 +1140,10 @@ export function BattleTestScreen({
       const healing = skill.roll.kind === "healing" || unit.faction === item.faction;
       return [[item.id, { text: `${healing ? "+" : "-"}${amount}`, tone: healing ? "heal" as const : "damage" as const }]];
     }));
+    const feedback = impactedTargets.length > 1 && Object.keys(feedbackByTargetId).length
+      ? undefined
+      : buildBattleFeedback(unit, target, skill, effect);
+    const effectKind = feedback?.tone === "miss" ? "fail" : getBattleFxKind(unit, skill);
     setBattleAnimation({ id, actorId: unit.id, targetId: target.id, targetIds, skillId: skill.id, effectKind, feedback,
       feedbackByTargetId: Object.keys(feedbackByTargetId).length ? feedbackByTargetId : undefined });
     battleAnimationTimerRef.current = window.setTimeout(() => {
@@ -1011,6 +1240,9 @@ export function BattleTestScreen({
   }
 
   function getResolvedDamageTargets(actor: BattleUnit, target: BattleUnit, skill: BattleSkill) {
+    if (isGroupDamageSkill(skill) && isHealingSkill(skill)) {
+      return (actor.faction === 'ally' ? livingAllies : livingEnemies).filter((unit) => unit.hp > 0);
+    }
     if (!isGroupDamageSkill(skill) || !isDamagingAction(actor, target, skill)) return [target];
     const candidates = actor.faction === "ally" ? livingEnemies : livingAllies;
     return candidates.filter((unit) => unit.hp > 0);
@@ -1030,30 +1262,33 @@ export function BattleTestScreen({
       setUnitHp(authoritativeHp(authorityPendingRef.current));
       setAuthoritativeBattle(authorityPendingRef.current);
     }
-    // 群体伤害：本地兜底描述我方全体或敌方全体
-    const aoeLabel = impactedTargets.length > 1
-      ? (unit.faction === "enemy" ? "我方全体" : "敌方全体")
-      : target.name;
-    const localNarration = attackMissed
-      ? effect.narration
-      : impactedTargets.length > 1
-      ? skill.primaryTargetBonus
-        ? `${unit.name}释放${skill.name}，${aoeLabel}受到 ${(effect.amount ?? 0) - skill.primaryTargetBonus} 点伤害，主目标${target.name}额外受到 ${skill.primaryTargetBonus} 点伤害。`
-        : `${unit.name}释放${skill.name}，${aoeLabel}受到 ${effect.amount} 点伤害。`
-      : effect.narration;
+    if (skill.id === BATTLE_HEALING_POTION_SKILL.id) {
+      if (onConsumeHealingPotion?.()) pushBattleLog("治疗药水 -1");
+      else pushBattleLog("治疗药水数量同步失败，请检查背包状态。");
+    }
+    const authoritativeResult = authorityPendingRef.current;
+    const amountEntries = getNarrationAmountEntries(impactedTargets, authoritativeResult, effect.amount);
+    const localNarration = buildSettlementNarration(unit, target, skill, effect, impactedTargets, authoritativeResult);
     const placeholderEffect = { ...effect, narration: "KP记录中…" };
     kpReportEffectIdRef.current = placeholderEffect.id;
     setKpReportPending(true);
     setLastEffect(placeholderEffect);
     triggerBattleAnimation(unit, skill, target, effect, impactedTargets);
     pushBattleLog(`${unit.name} 对 ${targetLabel} 使用 ${skill.name}：${effect.title}`);
+    authoritativeResult?.events
+      .filter((event) => event.type === 'damage' && Array.isArray(event.consumedStatuses) && event.consumedStatuses.length > 0)
+      .forEach((event) => {
+        const guardedUnit = unitMap.get(String(event.targetId));
+        if (guardedUnit) pushBattleLog(`${guardedUnit.name}的防御生效：本次实际伤害降低50%，护盾随即消散。`);
+      });
     pushBattleLog("KP记录中…");
 
     // 异步请求 LLM 播报
     const outcome = inferOutcome(effect.title);
     const diceInfo = parseResultLine(effect.resultLine);
     const isAoe = impactedTargets.length > 1;
-    fetchBattleNarration({
+    setAiNarrationStatus('generating');
+    fetchBattleNarrationResult({
       actor_name: unit.name,
       target_name: targetLabel,
       skill_name: skill.name,
@@ -1065,14 +1300,19 @@ export function BattleTestScreen({
       tags: visibleSkillTags(skill),
       ac_dc: diceInfo.acDc,
       is_aoe: isAoe,
-    }).then(llmNarration => {
-      const finalNarration = sanitizeBattleNarration(llmNarration, localNarration);
+    }).then(({ narration: llmNarration, source }) => {
+      const sanitizedNarration = sanitizeBattleNarration(llmNarration, localNarration);
+      const finalNarration = narrationMismatchesAmounts(sanitizedNarration, amountEntries)
+        ? localNarration
+        : sanitizedNarration;
+      setAiNarrationStatus(source === 'ai' && finalNarration !== localNarration ? 'online' : 'fallback');
       if (kpReportEffectIdRef.current !== placeholderEffect.id) return;
       setLastEffect(prev => prev?.id === placeholderEffect.id ? { ...prev, narration: finalNarration } : prev);
       pushBattleLog(finalNarration);
       setKpReportPending(false);
       kpReportEffectIdRef.current = null;
     }).catch(() => {
+      setAiNarrationStatus('fallback');
       if (kpReportEffectIdRef.current !== placeholderEffect.id) return;
       setLastEffect(prev => prev?.id === placeholderEffect.id ? { ...prev, narration: localNarration } : prev);
       pushBattleLog(localNarration);
@@ -1115,26 +1355,47 @@ export function BattleTestScreen({
     };
   }, []);
 
-  async function resolveAction(unit: BattleUnit, skill: BattleSkill, target: BattleUnit, isEnemy = false) {
-    if (authorityBusyRef.current || battleWon || battleLost || unit.hp <= 0 || target.hp <= 0 || skill.locked || resourceIsSpent(skill.resource, usedResources[unit.id] ?? {})) return;
+  function stageLocalHitRoll(unit: BattleUnit, skill: BattleSkill, target: BattleUnit, isEnemy: boolean) {
+    const roll = rollD20();
+    const breakdown = attackBreakdown(unit, skill);
+    const targetAc = Number(
+      authoritativeBattle?.battleState.characters.find((character) => character.id === target.id)?.combatStats.defense ?? target.ac,
+    );
+    const decision: LocalHitDecision = {
+      unit,
+      target,
+      skill,
+      isEnemy,
+      initialRoll: roll,
+      finalRoll: roll,
+      rerollUsed: false,
+      modifier: breakdown.modifier,
+      abilityLabel: breakdown.abilityLabel,
+      abilityBonus: breakdown.abilityBonus,
+      proficiencyBonus: breakdown.proficiencyBonus,
+      targetAc,
+    };
+    pendingLocalHitRef.current = decision;
+    pendingAttackRef.current = {
+      unit,
+      target,
+      skill,
+      hit: localHitSucceeded(roll, roll + breakdown.modifier, targetAc),
+      isEnemy,
+    };
+    setAttackPhase("d20");
+    setActiveDice(createLocalHitDice(decision));
+    setLocalHitVersion((value) => value + 1);
+    advanceTutorialStep(3);
+    showTutorialHint("⚔️ 先投 D20 命中骰：确认前可以使用虚构骰子或万能骰子；命中后才会投伤害骰", 6000);
+  }
 
+  async function submitAuthoritativeSkillAction(unit: BattleUnit, skill: BattleSkill, target: BattleUnit, isEnemy = false, fixedRolls?: number[]) {
     if (!authoritativeBattle) {
       showTutorialHint(authorityError || "权威战斗引擎正在连接，请稍候。", 4000);
       return;
     }
-
-    setUsedResources((current) => ({
-      ...current,
-      [unit.id]: {
-        ...(current[unit.id] ?? {}),
-        [skill.resource]: true,
-      },
-    }));
-
-    setTargetSelection(null);
-    setAdvantage(null); // 消耗优势/劣势
     authorityBusyRef.current = true;
-
     try {
       const actionResult = await dispatchGameAction({ battle: authoritativeBattle.battleState }, {
         id: `battle-${Date.now()}-${unit.id}`,
@@ -1142,6 +1403,7 @@ export function BattleTestScreen({
         actorId: unit.id,
         skillId: skill.id,
         targetIds: [target.id],
+        fixed_rolls: fixedRolls,
         createdAt: Date.now(),
       });
       if (!actionResult.accepted) throw new Error(actionResult.errors[0] || '行动未通过规则验证');
@@ -1155,7 +1417,7 @@ export function BattleTestScreen({
       const hit = Boolean(attackDice?.data["命中"]);
 
       // 攻击技能仍分两段展示，但两次骰值均来自后端同一次 ActionResult。
-      if (attackDice) {
+      if (attackDice && !fixedRolls?.length) {
         setAttackPhase("d20");
         pendingAttackRef.current = { unit, target, skill, hit, isEnemy };
         setActiveDice(attackDice);
@@ -1175,6 +1437,7 @@ export function BattleTestScreen({
       const dice = authoritativeDice(result, "damage");
       const effect = authorityEffectRef.current;
       setActiveDice(dice);
+      if (!dice && fixedRolls?.length) pendingAttackRef.current = null;
       if (effect) setPendingSettlement({ unit, target, skill, effect, isEnemy });
 
       advanceTutorialStep(3);
@@ -1191,8 +1454,81 @@ export function BattleTestScreen({
     }
   }
 
+  async function confirmLocalHitRoll() {
+    const decision = pendingLocalHitRef.current;
+    if (!decision || !authoritativeBattle || authorityBusyRef.current) return;
+    pendingLocalHitRef.current = null;
+    setActiveDice(null);
+    setAttackPhase(null);
+    setLocalHitVersion((value) => value + 1);
+    await submitAuthoritativeSkillAction(decision.unit, decision.skill, decision.target, decision.isEnemy, [decision.finalRoll]);
+  }
+
+  function rerollLocalHit(itemId: "fiction-dice" | "omni-dice", chosenD20?: number) {
+    const decision = pendingLocalHitRef.current;
+    if (!decision || decision.rerollUsed) return;
+    if (!onConsumeRerollItem?.(itemId)) {
+      pushBattleLog(itemId === "fiction-dice" ? "虚构骰子不足。" : "万能骰子不足。");
+      return;
+    }
+    const rerollRoll = itemId === "fiction-dice"
+      ? rollD20()
+      : Math.max(1, Math.min(20, Math.floor(chosenD20 ?? 20)));
+    const finalRoll = itemId === "fiction-dice" ? Math.max(decision.initialRoll, rerollRoll) : rerollRoll;
+    const nextDecision: LocalHitDecision = {
+      ...decision,
+      rerollRoll,
+      finalRoll,
+      rerollUsed: true,
+    };
+    pendingLocalHitRef.current = nextDecision;
+    pendingAttackRef.current = {
+      unit: nextDecision.unit,
+      target: nextDecision.target,
+      skill: nextDecision.skill,
+      hit: localHitSucceeded(finalRoll, finalRoll + nextDecision.modifier, nextDecision.targetAc),
+      isEnemy: nextDecision.isEnemy,
+    };
+    setActiveDice(createLocalHitDice(nextDecision));
+    setLocalHitVersion((value) => value + 1);
+    pushBattleLog(itemId === "fiction-dice"
+      ? `虚构骰子掷出 ${rerollRoll}，命中骰采用 ${finalRoll}。`
+      : `万能骰子将命中骰指定为 ${finalRoll}。`);
+  }
+
+  async function resolveAction(unit: BattleUnit, skill: BattleSkill, target: BattleUnit, isEnemy = false) {
+    if (authorityBusyRef.current || battleWon || battleLost || unit.hp <= 0 || target.hp <= 0 || skill.locked || resourceIsSpent(skill.resource, usedResources[unit.id] ?? {})) return;
+
+    if (!authoritativeBattle) {
+      showTutorialHint(authorityError || "权威战斗引擎正在连接，请稍候。", 4000);
+      return;
+    }
+
+    setUsedResources((current) => ({
+      ...current,
+      [unit.id]: {
+        ...(current[unit.id] ?? {}),
+        [skill.resource]: true,
+      },
+    }));
+
+    setTargetSelection(null);
+    setAdvantage(null); // 消耗优势/劣势
+
+    if (!isEnemy && isDamagingAction(unit, target, skill) && /\d+d\d+/i.test(skill.formula)) {
+      stageLocalHitRoll(unit, skill, target, isEnemy);
+      return;
+    }
+
+    await submitAuthoritativeSkillAction(unit, skill, target, isEnemy);
+  }
+
   function handleChooseSkill(unit: BattleUnit, skill: BattleSkill) {
     if (battleWon || battleLost || unit.hp <= 0 || unit.faction !== "ally" || unit.id !== activeUnit?.id || skill.locked || resourceIsSpent(skill.resource, usedResources[unit.id] ?? {})) return;
+    if (skill.id === BATTLE_HEALING_POTION_SKILL.id && healingPotionQuantity <= 0) {
+      pushBattleLog("治疗药水不足。");
+      return;
+    }
 
     setTargetSelection({ unitId: unit.id, skillId: skill.id });
     pushBattleLog(`${unit.name} 准备 ${skill.name}，等待指定释放对象。`);
@@ -1297,9 +1633,12 @@ export function BattleTestScreen({
       advanceTurn();
       return;
     }
-    const target = tactic
-      ? targetPool.find((item) => item.id === tactic.targetIds[0]) ?? targetPool[0]
-      : targetPool[0];
+    const randomSingleTarget = !isGroupDamageSkill(skill) && isDamagingAction(actingUnit, targetPool[0], skill);
+    const target = randomSingleTarget
+      ? targetPool[rollDie(targetPool.length) - 1]
+      : tactic
+        ? targetPool.find((item) => item.id === tactic.targetIds[0]) ?? targetPool[0]
+        : targetPool[0];
     if (tactic) {
       setTacticalAdvice(tactic);
       pushBattleLog(`AI战术：${tactic.reason}`);
@@ -1335,10 +1674,19 @@ export function BattleTestScreen({
         hit: pendingAttackRef.current.hit,
       }
     : null;
+  const localHitDecision = pendingLocalHitRef.current;
+  void localHitVersion;
+  const localHitComparisonRolls = localHitDecision?.rerollRoll !== undefined
+    ? {
+        initial: localHitDecision.initialRoll,
+        reroll: localHitDecision.rerollRoll,
+        selected: localHitDecision.finalRoll === localHitDecision.initialRoll ? "initial" as const : "reroll" as const,
+      }
+    : undefined;
 
   return (
     <main className="battle-test-screen">
-      <div className="battle-background" style={{ backgroundImage: `url(${config.backgroundUrl || BACKGROUND_URL})` }} />
+      <div className="battle-background" style={{ backgroundImage: `url(${config.backgroundUrl || '/assets/battle/b1-cablestreet-battle.png'})` }} />
       <div className="battle-overlay" />
 
       <header className="battle-hud-header">
@@ -1348,7 +1696,10 @@ export function BattleTestScreen({
           <small>{config.subtitle}</small>
         </div>
         <div className="battle-hud-actions">
-          {(mode === "tutorial" || mode === "test") && onSkip && (
+          <span className={`battle-ai-status is-${aiNarrationStatus}`}>
+            AI播报：{aiNarrationStatus === 'checking' ? '连接检查中' : aiNarrationStatus === 'online' ? '已连接' : aiNarrationStatus === 'generating' ? '生成中' : '本地兜底'}
+          </span>
+          {onSkip && (
             <button type="button" className="ghost-button" onClick={onSkip} style={{ borderColor: "rgba(211,99,99,0.4)", color: "#d36363" }}>
               ⏭ 跳过战斗（胜利）
             </button>
@@ -1560,6 +1911,15 @@ export function BattleTestScreen({
         activeDice={activeDice}
         attackPhase={attackPhase}
         pendingAttack={pendingDiceAttack}
+        rerollDecision={localHitDecision ? {
+          fictionQuantity,
+          omniQuantity,
+          rerollUsed: localHitDecision.rerollUsed,
+          onConfirm: () => { void confirmLocalHitRoll(); },
+          onUseFiction: () => rerollLocalHit("fiction-dice"),
+          onUseOmni: (value) => rerollLocalHit("omni-dice", value),
+        } : undefined}
+        comparisonRolls={localHitComparisonRolls}
         onClose={() => {
           // 攻击技能两阶段流程
           if ((attackPhase === "d20" || attackPhase === "save") && pendingAttackRef.current) {

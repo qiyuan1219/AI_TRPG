@@ -1,4 +1,4 @@
-import { DiceRollOverlay } from '../../components/DiceRollOverlay';
+import { DiceRollOverlay, type DiceRollOverlayProps } from '../../components/DiceRollOverlay';
 import type { DiceResult } from '../../types/game';
 
 export type BattleDicePhase = 'd20' | 'save' | 'damage' | null;
@@ -16,6 +16,8 @@ export interface BattleDiceBindingProps {
   attackPhase: BattleDicePhase;
   pendingAttack: BattleDicePendingAttack | null;
   onClose: () => void;
+  rerollDecision?: DiceRollOverlayProps['rerollDecision'];
+  comparisonRolls?: DiceRollOverlayProps['comparisonRolls'];
 }
 
 function inferDiceKind(activeDice: DiceResult, attackPhase: BattleDicePhase) {
@@ -43,6 +45,8 @@ export function BattleDiceBinding({
   attackPhase,
   pendingAttack,
   onClose,
+  rerollDecision,
+  comparisonRolls,
 }: BattleDiceBindingProps) {
   if (!activeDice) return null;
 
@@ -59,6 +63,8 @@ export function BattleDiceBinding({
       charSkill={inferCharSkill(activeDice, pendingAttack)}
       showD20Calc={isD20Phase}
       onClose={onClose}
+      rerollDecision={rerollDecision}
+      comparisonRolls={comparisonRolls}
     />
   );
 }

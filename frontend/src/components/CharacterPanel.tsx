@@ -46,15 +46,25 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
 
       {savePanel && <div className="panel-block">{savePanel}</div>}
 
-      <div className="panel-block">
-        <div className="meter-label">
-          <span>HP</span>
-          <b>
-            {currentHp}/{maxHp}
-          </b>
+      <div className="panel-block character-vitals">
+        <div className="vital-hp">
+          <div className="meter-label">
+            <span>HP</span>
+            <b>
+              {currentHp}/{maxHp}
+            </b>
+          </div>
+          <div className="hp-track">
+            <i style={{ width: `${hpPercent}%` }} />
+          </div>
         </div>
-        <div className="hp-track">
-          <i style={{ width: `${hpPercent}%` }} />
+        <div className="vital-pill">
+          <span>AC</span>
+          <b>{state.ac || 18}</b>
+        </div>
+        <div className="vital-pill">
+          <span>金币</span>
+          <b>{state.gold || 200} GP</b>
         </div>
       </div>
 
@@ -69,15 +79,6 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
             </div>
           );
         })}
-      </div>
-
-      <div className="panel-row">
-        <span>AC</span>
-        <b>{state.ac || 18}</b>
-      </div>
-      <div className="panel-row">
-        <span>金币</span>
-        <b>{state.gold || 200} GP</b>
       </div>
 
       <div className="panel-block">
@@ -116,27 +117,6 @@ export function CharacterPanel({ state, savePanel }: CharacterPanelProps) {
         )}
       </div>
 
-      <div className="panel-block companion-skill-block">
-        <h2>队友技能</h2>
-        {visibleCompanions.map((companion) => {
-          const joined = isCompanionJoined(companion.id, state);
-          const hp = Number(state[companion.hpKey] ?? companion.hp);
-          const trust = getCompanionTrust(state, COMPANION_ID_BY_UI_ID[companion.id] || 'serin');
-          return (
-            <div key={companion.id} className={`companion-skill ${joined ? 'companion-joined' : 'companion-pending'}`}>
-              <strong>
-                {companion.name}
-                <em>{companion.id === 'selin' ? '固定同行' : joined ? '已入队' : '待招募'}</em>
-              </strong>
-              <small>
-                {companion.role} · HP {hp}/{companion.hp} · 信任 {trust} · {getTrustTier(trust)}
-              </small>
-              <p>{companion.skills.combat[0].name}: {companion.skills.combat[0].check}</p>
-              <p>{companion.skills.nonCombat[0].name}: {companion.skills.nonCombat[0].check}</p>
-            </div>
-          );
-        })}
-      </div>
     </aside>
   );
 }

@@ -138,37 +138,29 @@ SKILLS: dict[str, dict] = {
         "cooldown": 1,
         "effects": [],
     },
-    "ailin_light": {
-        "id": "ailin_light",
-        "name": "生命之光",
+    "brock_stew": {
+        "id": "brock_stew", "name": "矮人炖汤", "targetType": "single_ally",
+        "requiresHitRoll": False, "healingDice": "1d12+3", "cost": {}, "cooldown": 1, "effects": [],
+    },
+    "ailin-heal": {
+        "id": "ailin-heal",
+        "name": "白枝治疗",
         "targetType": "single_ally",
         "requiresHitRoll": False,
-        "healingDice": "2d8+4",
+        "healingDice": "1d8+2",
         "cost": {},
         "cooldown": 1,
         "effects": [],
     },
-    "ailin_blessing": {
-        "id": "ailin_blessing",
-        "name": "神圣祝福",
-        "targetType": "single_ally",
+    "ailin-strike": {
+        "id": "ailin-strike",
+        "name": "白枝杖击",
+        "targetType": "all_allies",
         "requiresHitRoll": False,
-        "tempHpDice": "1d4+2",
-        "defenseBonus": 1,
+        "healingDice": "2d6+2",
         "cost": {},
-        "cooldown": 2,
-        "effects": [{"type": "defense_bonus", "duration": 1, "value": 1}],
-    },
-    "ailin_white_branch": {
-        "id": "ailin_white_branch",
-        "name": "白枝护盾",
-        "targetType": "single_ally",
-        "requiresHitRoll": False,
-        "tempHpDice": "2d6",
-        "defenseBonus": 2,
-        "cost": {},
-        "cooldown": 2,
-        "effects": [{"type": "defense_bonus", "duration": 1, "value": 2}],
+        "cooldown": 0,
+        "effects": [],
     },
     "kaiya_claw": {
         "id": "kaiya_claw",
@@ -183,6 +175,21 @@ SKILLS: dict[str, dict] = {
         "cost": {},
         "cooldown": 0,
         "effects": [],
+    },
+    "kaiya_weak": {
+        "id": "kaiya_weak", "name": "弱点刺击", "targetType": "single_enemy",
+        "requiresHitRoll": True, "hitBonus": 1, "damageDice": "1d2",
+        "damageBonusAttribute": None, "damageType": "piercing", "armorPierce": 0,
+        "cost": {}, "cooldown": 0, "effects": [],
+    },
+    "guard": {
+        "id": "guard",
+        "name": "防御",
+        "targetType": "self",
+        "requiresHitRoll": False,
+        "cost": {},
+        "cooldown": 0,
+        "effects": [{"type": "damage_reduction_once", "value": 0.5, "duration": 99, "name": "防御"}],
     },
     "crawler_claw": {
         "id": "crawler_claw",
@@ -210,7 +217,7 @@ DEFAULT_CHARACTERS: list[dict] = [
         "attributes": {"strength": 3, "dexterity": 1, "constitution": 2, "intelligence": 0, "wisdom": 1, "charisma": -1},
         "combatStats": {"hp": 30, "maxHp": 30, "armor": 5, "maxArmor": 5, "defense": 18, "attackBonus": 4, "initiativeBonus": 1},
         "resources": {},
-        "skillIds": ["warrior_slash"],
+        "skillIds": ["warrior_slash", "guard"],
         "statuses": [],
         "cooldowns": {},
     },
@@ -220,9 +227,9 @@ DEFAULT_CHARACTERS: list[dict] = [
         "team": "player",
         "alive": True,
         "attributes": {"strength": -1, "dexterity": 2, "constitution": 1, "intelligence": 3, "wisdom": 2, "charisma": 0},
-        "combatStats": {"hp": 24, "maxHp": 24, "armor": 1, "maxArmor": 1, "defense": 14, "attackBonus": 4, "initiativeBonus": 2},
+        "combatStats": {"hp": 36, "maxHp": 36, "armor": 1, "maxArmor": 1, "defense": 12, "attackBonus": 4, "initiativeBonus": 2},
         "resources": {},
-        "skillIds": ["selin_bolt", "selin_starburst"],
+        "skillIds": ["selin_bolt", "selin_starburst", "guard"],
         "statuses": [],
         "cooldowns": {},
     },
@@ -232,9 +239,9 @@ DEFAULT_CHARACTERS: list[dict] = [
         "team": "player",
         "alive": True,
         "attributes": {"strength": 3, "dexterity": 1, "constitution": 3, "intelligence": 0, "wisdom": 2, "charisma": -1},
-        "combatStats": {"hp": 48, "maxHp": 48, "armor": 4, "maxArmor": 4, "defense": 16, "attackBonus": 4, "initiativeBonus": 1},
+        "combatStats": {"hp": 45, "maxHp": 45, "armor": 4, "maxArmor": 4, "defense": 13, "attackBonus": 4, "initiativeBonus": 1},
         "resources": {},
-        "skillIds": ["brock_pan", "brock_bomb"],
+        "skillIds": ["brock_pan", "brock_stew", "guard"],
         "statuses": [],
         "cooldowns": {},
     },
@@ -244,9 +251,9 @@ DEFAULT_CHARACTERS: list[dict] = [
         "team": "player",
         "alive": True,
         "attributes": {"strength": -1, "dexterity": 2, "constitution": 1, "intelligence": 1, "wisdom": 4, "charisma": 2},
-        "combatStats": {"hp": 28, "maxHp": 28, "armor": 1, "maxArmor": 1, "defense": 14, "attackBonus": 3, "initiativeBonus": 2},
+        "combatStats": {"hp": 36, "maxHp": 36, "armor": 1, "maxArmor": 1, "defense": 12, "attackBonus": 3, "initiativeBonus": 2},
         "resources": {},
-        "skillIds": ["ailin_light", "ailin_blessing", "ailin_white_branch"],
+        "skillIds": ["ailin-heal", "ailin-strike", "guard"],
         "statuses": [],
         "cooldowns": {},
     },
@@ -256,9 +263,9 @@ DEFAULT_CHARACTERS: list[dict] = [
         "team": "player",
         "alive": True,
         "attributes": {"strength": 0, "dexterity": 4, "constitution": 1, "intelligence": 1, "wisdom": 2, "charisma": 0},
-        "combatStats": {"hp": 34, "maxHp": 34, "armor": 2, "maxArmor": 2, "defense": 15, "attackBonus": 5, "initiativeBonus": 4},
+        "combatStats": {"hp": 30, "maxHp": 30, "armor": 2, "maxArmor": 2, "defense": 18, "attackBonus": 5, "initiativeBonus": 4},
         "resources": {},
-        "skillIds": ["kaiya_claw"],
+        "skillIds": ["kaiya_claw", "kaiya_weak", "guard"],
         "statuses": [],
         "cooldowns": {},
     },
@@ -268,7 +275,7 @@ DEFAULT_CHARACTERS: list[dict] = [
         "team": "enemy",
         "alive": True,
         "attributes": {"strength": -1, "dexterity": 2, "constitution": 1, "intelligence": -3, "wisdom": 0, "charisma": -3},
-        "combatStats": {"hp": 18, "maxHp": 18, "armor": 1, "maxArmor": 1, "defense": 12, "attackBonus": 3, "initiativeBonus": 2},
+        "combatStats": {"hp": 20, "maxHp": 20, "armor": 1, "maxArmor": 1, "defense": 12, "attackBonus": 3, "initiativeBonus": 2},
         "resources": {},
         "skillIds": ["crawler_claw"],
         "statuses": [],
@@ -280,7 +287,7 @@ DEFAULT_CHARACTERS: list[dict] = [
         "team": "enemy",
         "alive": True,
         "attributes": {"strength": -1, "dexterity": 2, "constitution": 1, "intelligence": -3, "wisdom": 0, "charisma": -3},
-        "combatStats": {"hp": 18, "maxHp": 18, "armor": 1, "maxArmor": 1, "defense": 12, "attackBonus": 3, "initiativeBonus": 2},
+        "combatStats": {"hp": 20, "maxHp": 20, "armor": 1, "maxArmor": 1, "defense": 12, "attackBonus": 3, "initiativeBonus": 2},
         "resources": {},
         "skillIds": ["crawler_claw"],
         "statuses": [],
@@ -431,9 +438,8 @@ class BattleEngine:
             if hit:
                 shared_damage_roll = None
                 if len(targets) > 1:
-                    damage_formula = _double_dice(skill.get("damageDice", "1d4")) if critical else skill.get("damageDice", "1d4")
                     shared_damage_roll = dice.roll_formula(
-                        damage_formula, f"{actor['name']} {skill['name']} damage", "damage",
+                        skill.get("damageDice", "1d4"), f"{actor['name']} {skill['name']} damage", "damage",
                         metadata={"actorId": actor["id"], "skillId": skill["id"]},
                     )
                 for resolved_target in targets:
@@ -449,7 +455,9 @@ class BattleEngine:
             check_outcome = "critical_success" if check_roll == 20 else "critical_fail" if check_roll == 1 else "success" if succeeded else "fail"
             events.append({"type": "skill_check", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "rawRoll": check_roll, "modifier": check_bonus, "total": check_total, "dc": check_dc, "result": "success" if succeeded else "failure", "diceEvent": _canonical_dice_event("story_check", "1d20", [check_roll], check_bonus, check_total, actor, target, skill, dc=check_dc, success=succeeded, outcome=check_outcome)})
             if succeeded and skill.get("damageDice"):
-                self._apply_damage(actor, target, skill, dice, False, events)
+                self._apply_damage(actor, target, skill, dice, check_roll == 20, events)
+            elif succeeded and skill.get("healingDice"):
+                self._apply_healing(actor, target, skill, dice, events, critical=check_roll == 20)
             elif succeeded:
                 events.append({"type": "effect", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]})
         elif skill.get("requiresSaveRoll"):
@@ -477,6 +485,20 @@ class BattleEngine:
         elif skill.get("tempHpDice"):
             for resolved_target in targets:
                 self._apply_temp_hp(actor, resolved_target, skill, dice, events)
+        elif skill.get("effects"):
+            for resolved_target in targets:
+                applied_effects = [copy.deepcopy(effect) for effect in skill.get("effects", [])]
+                resolved_target.setdefault("statuses", []).extend(applied_effects)
+                events.append({
+                    "type": "buff",
+                    "actorId": actor["id"],
+                    "targetId": resolved_target["id"],
+                    "skillId": skill["id"],
+                    "statuses": copy.deepcopy(applied_effects),
+                    "total": 0,
+                    "tempHp": 0,
+                    "targetArmor": resolved_target["combatStats"].get("armor", 0),
+                })
         else:
             events.append({"type": "effect", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]})
 
@@ -517,8 +539,8 @@ class BattleEngine:
         action = legal[0]
         targets = [self.get_character(target_id) for target_id in action["allowedTargetIds"]]
         living = [target for target in targets if target and target.get("alive", True)]
-        living.sort(key=lambda item: item["combatStats"]["hp"] / max(item["combatStats"]["maxHp"], 1))
-        return {"actorId": actor["id"], "skillId": action["skillId"], "targetIds": [living[0]["id"]]}
+        target = random.SystemRandom().choice(living)
+        return {"actorId": actor["id"], "skillId": action["skillId"], "targetIds": [target["id"]]}
 
     def choose_tactical_action(self, actor: dict | None = None) -> dict | None:
         actor = actor or self.current_actor()
@@ -546,6 +568,14 @@ class BattleEngine:
 
         if not best:
             return None
+
+        selected_skill = self.state["skills"].get(best["skillId"], {})
+        if actor.get("team") == "enemy" and selected_skill.get("targetType", "single_enemy") == "single_enemy":
+            allowed = next((entry["allowedTargetIds"] for entry in legal if entry["skillId"] == best["skillId"]), [])
+            living_ids = [target_id for target_id in allowed if (self.get_character(target_id) or {}).get("alive", False)]
+            if living_ids:
+                best["targetIds"] = [random.SystemRandom().choice(living_ids)]
+                best["reason"] = "单体攻击采用随机索敌，避免持续锁定同一名队员"
 
         score = best.pop("score")
         best["aiTactic"] = {
@@ -583,7 +613,7 @@ class BattleEngine:
                 score += 30
             return score, "heal", reason
 
-        if skill.get("tempHpDice") or any(effect.get("type") == "defense_bonus" for effect in skill.get("effects", []) if isinstance(effect, dict)):
+        if skill.get("tempHpDice") or any(effect.get("type") in {"defense_bonus", "damage_reduction_once"} for effect in skill.get("effects", []) if isinstance(effect, dict)):
             score = 52 + (1 - hp_ratio) * 28
             return score, "protect", f"{target['name']}承压较高，防护可提高下一轮容错"
 
@@ -607,14 +637,27 @@ class BattleEngine:
 
     def _apply_damage(self, actor: dict, target: dict, skill: dict, dice: DiceService, critical: bool, events: list[dict], flat_bonus: int = 0, damage_roll: dict | None = None, damage_multiplier: float = 1.0):
         damage_formula = skill.get("damageDice", "1d4")
-        if critical:
-            damage_formula = _double_dice(damage_formula)
         roll = damage_roll or dice.roll_formula(
             damage_formula, f"{actor['name']} {skill['name']} damage", "damage",
             metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]},
         )
         attr_bonus = self._attr_bonus(actor, skill.get("damageBonusAttribute"))
-        raw_damage = max(0, int((roll["total"] + attr_bonus + flat_bonus) * damage_multiplier))
+        reduction_multiplier = 1.0
+        consumed_statuses = []
+        remaining_statuses = []
+        for status in target.get("statuses", []):
+            if isinstance(status, dict) and status.get("type") == "damage_reduction_once":
+                reduction_value = float(status.get("value", 0.5))
+                reduction_multiplier *= max(0.0, 1.0 - reduction_value)
+                consumed_statuses.append(copy.deepcopy(status))
+                continue
+            remaining_statuses.append(status)
+        if consumed_statuses:
+            target["statuses"] = remaining_statuses
+        total_multiplier = damage_multiplier * reduction_multiplier
+        critical_multiplier = 2 if critical else 1
+        base_total = roll["total"] + attr_bonus + flat_bonus
+        raw_damage = max(0, int(base_total * critical_multiplier * total_multiplier))
         pierce = min(raw_damage, int(skill.get("armorPierce", 0)))
         armor_damage = min(target["combatStats"].get("armor", 0), raw_damage - pierce)
         hp_damage = raw_damage - armor_damage
@@ -622,13 +665,13 @@ class BattleEngine:
         target["combatStats"]["hp"] = max(0, target["combatStats"]["hp"] - hp_damage)
         if target["combatStats"]["hp"] <= 0:
             target["alive"] = False
-        display_modifier = raw_damage - sum(roll["rolls"])
+        display_modifier = int(roll.get("fixed", 0)) + attr_bonus + flat_bonus
         formula_base = re.sub(r"[+-]\d+$", "", roll["dice"].replace(" ", ""))
         display_formula = f"{formula_base}{display_modifier:+d}" if display_modifier else formula_base
-        dice_event = _canonical_dice_event("damage", display_formula, roll["rolls"], display_modifier, raw_damage, actor, target, skill, metadata={"hpDamage": hp_damage, "armorDamage": armor_damage, "multiplier": damage_multiplier, "targetHp": target["combatStats"]["hp"]})
-        events.append({"type": "damage", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "attributeBonus": attr_bonus, "flatBonus": flat_bonus, "multiplier": damage_multiplier, "rawDamage": raw_damage, "armorPierce": pierce, "armorDamage": armor_damage, "hpDamage": hp_damage, "targetArmor": target["combatStats"]["armor"], "targetHp": target["combatStats"]["hp"], "targetAlive": target["alive"], "critical": critical, "diceEvent": dice_event})
+        dice_event = _canonical_dice_event("damage", display_formula, roll["rolls"], display_modifier, raw_damage, actor, target, skill, metadata={"hpDamage": hp_damage, "armorDamage": armor_damage, "multiplier": total_multiplier, "criticalMultiplier": critical_multiplier, "baseTotal": base_total, "targetHp": target["combatStats"]["hp"]})
+        events.append({"type": "damage", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "attributeBonus": attr_bonus, "flatBonus": flat_bonus, "displayModifier": display_modifier, "baseTotal": base_total, "criticalMultiplier": critical_multiplier, "multiplier": total_multiplier, "damageMultiplier": damage_multiplier, "damageReductionMultiplier": reduction_multiplier, "consumedStatuses": consumed_statuses, "rawDamage": raw_damage, "armorPierce": pierce, "armorDamage": armor_damage, "hpDamage": hp_damage, "targetArmor": target["combatStats"]["armor"], "targetHp": target["combatStats"]["hp"], "targetAlive": target["alive"], "critical": critical, "diceEvent": dice_event})
 
-    def _apply_healing(self, actor: dict, target: dict, skill: dict, dice: DiceService, events: list[dict]):
+    def _apply_healing(self, actor: dict, target: dict, skill: dict, dice: DiceService, events: list[dict], critical: bool = False):
         if not target.get("alive", True):
             raise ValueError("dead target cannot be healed")
         roll = dice.roll_formula(
@@ -636,17 +679,21 @@ class BattleEngine:
             metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"]},
         )
         before = target["combatStats"]["hp"]
-        target["combatStats"]["hp"] = min(target["combatStats"]["maxHp"], before + roll["total"])
+        critical = critical or any(int(value) == 20 for value in roll["rolls"])
+        critical_multiplier = 2 if critical else 1
+        base_total = roll["total"]
+        total = max(0, int(base_total * critical_multiplier))
+        target["combatStats"]["hp"] = min(target["combatStats"]["maxHp"], before + total)
         modifier = roll["total"] - sum(roll["rolls"])
-        dice_event = _canonical_dice_event("healing", roll["dice"], roll["rolls"], modifier, roll["total"], actor, target, skill, metadata={"targetHp": target["combatStats"]["hp"]})
-        events.append({"type": "healing", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "total": roll["total"], "targetHp": target["combatStats"]["hp"], "diceEvent": dice_event})
+        dice_event = _canonical_dice_event("healing", roll["dice"], roll["rolls"], modifier, total, actor, target, skill, metadata={"targetHp": target["combatStats"]["hp"], "criticalMultiplier": critical_multiplier, "baseTotal": base_total})
+        events.append({"type": "healing", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "baseTotal": base_total, "criticalMultiplier": critical_multiplier, "critical": critical, "total": total, "targetHp": target["combatStats"]["hp"], "diceEvent": dice_event})
 
     def _apply_temp_hp(self, actor: dict, target: dict, skill: dict, dice: DiceService, events: list[dict]):
         roll = dice.roll_formula(
             skill["tempHpDice"], f"{actor['name']} {skill['name']} temp hp", "healing",
             metadata={"actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "tempHp": True},
         )
-        target["combatStats"]["armor"] = min(target["combatStats"]["maxArmor"] + roll["total"], target["combatStats"].get("armor", 0) + roll["total"])
+        target["combatStats"]["armor"] = min(target["combatStats"]["maxArmor"], target["combatStats"].get("armor", 0) + roll["total"])
         for effect in skill.get("effects", []):
             target.setdefault("statuses", []).append(copy.deepcopy(effect))
         events.append({"type": "buff", "actorId": actor["id"], "targetId": target["id"], "skillId": skill["id"], "dice": roll["dice"], "diceResult": roll["rolls"], "total": roll["total"], "tempHp": roll["total"], "defenseBonus": skill.get("defenseBonus", 0), "targetArmor": target["combatStats"]["armor"]})

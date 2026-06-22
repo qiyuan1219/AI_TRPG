@@ -271,7 +271,7 @@ const OPENING: ScriptedScene = {
     {
       speaker: "主持人",
       text: "你穿过重力定向法阵，短暂失重后，整个世界在眼前猛然翻转。",
-      bgImage: "/assets/scenes/01city.webp",
+      bgImage: "/assets/scenes/01.webp",
     },
     {
       speaker: "主持人",
@@ -305,7 +305,7 @@ const OPENING: ScriptedScene = {
     {
       speaker: "主持人",
       text: "你跟随守卫沿主缆街前往冒险者公会。",
-      bgImage: "/assets/scenes/0101cable-street-walk.webp",
+      bgImage: "/assets/scenes/11.webp",
     },
     {
       speaker: "主持人",
@@ -347,7 +347,7 @@ const OPENING_SUSPENSE: ScriptedScene = {
   manualOnly: true,
   triggers: ["开场疑云"],
   setArea: "逆穹悬城·主缆街",
-  bgImage: "/assets/scenes/0101cable-street-walk.webp",
+  bgImage: "/assets/scenes/11.webp",
   lastEvent: "裂隙爬兽冲出吊箱，教学战斗触发",
   statePatch: {
     tutorial_battle_pending: true,
@@ -401,62 +401,62 @@ const OPENING_SUSPENSE: ScriptedScene = {
     {
       speaker: "主持人",
       text: "下一秒，半空中的一只运输吊箱剧烈摇晃。固定它的金属扣发出连续的崩裂声，缆索像被无形的手撕开一样绷断。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
       text: "吊箱从轨道上脱离，重重砸在街面上。木板碎裂，铁片翻卷，蓝绿色孢尘从箱体缝隙里喷涌而出，瞬间淹没了半条街。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
       text: "人群惊叫着后退。几名巡街守卫刚想上前，箱体内部却传来密集的刮擦声，像许多细小的爪子正在同时撕扯木板。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "瑟琳",
       text: "「后退，别吸入孢尘。」",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
       text: "她抬起银杖，寒白色法光在杖尖聚成一圈，将翻涌的孢尘短暂压低。你这才看清，箱中没有补给，只有数只沾满孢粉的裂隙爬兽。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
       text: "那些生物像是刚从狭窄的黑暗里被惊醒，背部甲壳不断开合，口器里流出带着荧光的黏液。它们不是有组织地伏击，更像是被吊箱坠落和人群尖叫彻底激怒。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
       text: "其中一只裂隙爬兽踏着断裂缆索跃起，锋利的前肢在石面上拖出一串火星，径直扑向你。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "瑟琳",
       text: "「别退向护栏！那里没有第二次落脚机会！」",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
       text: "瑟琳的银杖向前一指，寒白色法光照亮了裂隙爬兽腹侧一片没有硬壳覆盖的软甲。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "瑟琳",
       text: "「看清楚它的动作。腹侧软肋是弱点，等它跃起时攻击。」",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
       text: "裂隙爬兽已经逼近。周围的行人四散逃离，巡街守卫被孢尘阻隔在另一侧，而你正站在它冲锋路线的正前方。",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      bgImage: "/assets/scenes/02.webp",
     },
     {
       speaker: "主持人",
-      text: "这是你抵达逆穹城后的第一场战斗。按照你平时战斗的思路来吧",
-      bgImage: "/assets/scenes/02tutorial-battle-trigger.webp",
+      text: "这是你抵达逆穹城后的第一场战斗。请选择最适合你的战斗策略",
+      bgImage: "/assets/scenes/02.webp",
     },
   ],
   hints: [
@@ -475,7 +475,7 @@ const TUTORIAL_BATTLE_AFTER: ScriptedScene = {
   manualOnly: true,
   triggers: ["教学战斗后剧情"],
   setArea: "逆穹悬城·主缆街",
-  bgImage: "/assets/scenes/03post-battle-street.webp",
+  bgImage: "/assets/scenes/03.webp",
   statePatch: {
     tutorial_battle_done: true,
     tutorial_battle_pending: false,
@@ -551,8 +551,8 @@ const TUTORIAL_BATTLE_AFTER: ScriptedScene = {
   ],
   hints: [
     "放弃调查，直接前往冒险者公会登记",
-    "查看吊箱封条【智力DC10】",
-    "询问瑟琳这些魔物为什么怕光【智力DC8】",
+    "查看吊箱封条",
+    "询问瑟琳这些魔物为什么怕光",
   ],
 };
 
@@ -563,23 +563,23 @@ const GUILD_ARRIVAL: ScriptedScene = {
   id: "guild-arrival",
   triggers: ["前往冒险者公会", "去公会", "冒险者公会登记"],
   setArea: "逆穹悬城·冒险者公会",
-  bgImage: "/assets/scenes/04guild-interior.webp",
+  bgImage: "/assets/scenes/04.webp",
+  bgm: "/assets/bgm/bgm_03_guild_tavern_companions.mp3",
   statePatch: {
     guild_registered: true,
-    city_map_unlocked: true,
     team_target_size: 5,
     required_companions: "艾琳,布洛克,凯娅",
     al_recruited: false,
     sl_recruited: false,
     kl_recruited: false,
   },
-  events: ["公会登记完成", "三名目标队友线索已获得", "城市地图已解锁"],
+  events: ["公会登记完成", "三名目标队友线索已获得"],
   lastEvent: "在冒险者公会登记，并从米娜处获得三名目标队友的基本信息",
   lines: [
     {
       speaker: "主持人",
       text: "你沿主缆街朝公会方向走去。",
-      bgImage: "/assets/scenes/04guild-interior.webp",
+      bgImage: "/assets/scenes/04.webp",
     },
 
     // ===== 冒险者公会 =====
@@ -709,9 +709,9 @@ const GUILD_ARRIVAL: ScriptedScene = {
   ],
   hints: [
     "前往回声酒馆找萨洛打听三名队友",
-    "观察柜台旁的报告单【智力DC12】",
+    "观察柜台旁的报告单",
     "说服米娜查看失踪远征队登记册",
-    "检查委托火漆与公会认证【智力DC10】",
+    "检查委托火漆与公会认证",
   ],
 };
 
@@ -728,7 +728,7 @@ const TAVERN_INTRO: ScriptedScene = {
     "前往回声酒馆找萨洛打听三名队友",
   ],
   setArea: "逆穹悬城·回声酒馆",
-  bgImage: "/assets/scenes/06tavern-interior.webp",
+  bgImage: "/assets/scenes/06.webp",
   autoDicePoker: true,
   statePatch: {
     tavern_salo_intro_seen: true,
@@ -839,7 +839,7 @@ const TAVERN_INTRO: ScriptedScene = {
       text: "「来吧，新远征队。让我看看，米娜这次是找来了希望，还是又给我送来一场麻烦。」",
     },
   ],
-  hints: ["接受游戏", "付100G购买萨洛的情报"],
+  hints: ["坐下陪萨洛完成骰局", "付 100G 向萨洛购买队友情报"],
 };
 
 const SALO_COMPANION_INTEL: ScriptedScene = {
@@ -847,7 +847,7 @@ const SALO_COMPANION_INTEL: ScriptedScene = {
   manualOnly: true,
   triggers: ["酒馆骰局结束获取队友情报"],
   setArea: "逆穹悬城·回声酒馆",
-  bgImage: "/assets/scenes/06tavern-interior.webp",
+  bgImage: "/assets/scenes/06.webp",
   bgm: "/assets/bgm/bgm_03_guild_tavern_companions.mp3",
   statePatch: {
     salo_intel_done: true,
@@ -897,7 +897,7 @@ const SALO_COMPANION_INTEL: ScriptedScene = {
     },
     {
       speaker: "萨洛",
-      text: "「她最近想要一颗钻石。奥兰爵的幸运盲盒里正好有，二十金一次。能不能抽到，看骰子，也看你舍不舍得赌。」",
+      text: "「她最近想要一颗钻石。奥兰爵的幸运盲盒里正好有，五十金一次。能不能抽到，看骰子，也看你舍不舍得赌。」",
     },
     {
       speaker: "瑟琳",
@@ -908,11 +908,7 @@ const SALO_COMPANION_INTEL: ScriptedScene = {
       text: "「顺序不错。至少听起来，你们还没打算把所有麻烦一起塞进行囊。」",
     },
   ],
-  hints: [
-    "前往静默神殿寻找艾琳",
-    "向萨洛确认布洛克的采样报酬【说服DC12】",
-    "询问凯娅暗号的使用方式【洞悉DC13】",
-  ],
+  hints: ["前往静默神殿寻找艾琳", "向萨洛确认布洛克的采样报酬【说服DC12】"],
 };
 
 // ============================================================
@@ -929,11 +925,11 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
     "前往静默神殿寻找艾琳",
   ],
   setArea: "逆穹悬城·静默神殿",
-  bgImage: "/assets/scenes/05temple-interior.png",
+  bgImage: "/assets/scenes/05.webp",
   bgm: "/assets/bgm/temple.mp3",
   statePatch: {
-    al_trust: 55,
-    trust_al: 55,
+    al_trust: 50,
+    trust_al: 50,
     ailin_answer_pending: true,
   },
   events: ["艾琳提出同行资格问题"],
@@ -947,7 +943,7 @@ const CATHEDRAL_AILIN_RECRUIT: ScriptedScene = {
     {
       speaker: "主持人",
       text: "你们踏入大厅时，外面的主缆震动被厚重石墙隔绝，只剩下修女们低声诵念安魂祷词。那声音很轻，却像一条缓慢流过黑暗的河。",
-      bgImage: "/assets/scenes/11temple-prayer.webp",
+      bgImage: "/assets/scenes/10.webp",
     },
     {
       speaker: "主持人",
@@ -1007,7 +1003,7 @@ const CATHEDRAL_AILIN_RECRUIT_FINALE: ScriptedScene = {
   manualOnly: true,
   triggers: ["艾琳回答判定后入队"],
   setArea: "逆穹悬城·静默神殿",
-  bgImage: "/assets/scenes/11temple-prayer.webp",
+  bgImage: "/assets/scenes/10.webp",
   bgm: "/assets/bgm/temple.mp3",
   statePatch: {
     al_recruited: true,
@@ -1053,7 +1049,7 @@ const BROCK_TAVERN_INTRO: ScriptedScene = {
     "去酒馆找布洛克",
   ],
   setArea: "逆穹悬城·回声酒馆",
-  bgImage: "/assets/scenes/06tavern-interior.webp",
+  bgImage: "/assets/scenes/06.webp",
   statePatch: {
     brock_intro_seen: true,
   },
@@ -1064,7 +1060,7 @@ const BROCK_TAVERN_INTRO: ScriptedScene = {
     {
       speaker: "主持人",
       text: "你们回到回声酒馆时，炉火已经烧得更旺。萨洛没说话，只用擦杯子的手朝角落抬了抬下巴。",
-      bgImage: "/assets/scenes/09brock-tavern-table.webp",
+      bgImage: "/assets/scenes/08.webp",
     },
     {
       speaker: "主持人",
@@ -1073,7 +1069,6 @@ const BROCK_TAVERN_INTRO: ScriptedScene = {
     {
       speaker: "布洛克",
       text: "「别站门口挡风。你们一身公会的味道，我隔着三张桌子我都闻得出来。」",
-      portrait: "/assets/characters/senluo/brock_tavern.webp",
     },
     { speaker: "萨洛", text: "「布洛克，他们是米娜派来的。」" },
     {
@@ -1149,7 +1144,7 @@ const BROCK_RECRUITED: ScriptedScene = {
   manualOnly: true,
   triggers: ["布洛克喝酒骰子结束"],
   setArea: "逆穹悬城·回声酒馆",
-  bgImage: "/assets/scenes/06tavern-interior.webp",
+  bgImage: "/assets/scenes/06.webp",
   statePatch: {
     sl_recruited: true,
     brock_recruited: true,
@@ -1162,8 +1157,7 @@ const BROCK_RECRUITED: ScriptedScene = {
     {
       speaker: "布洛克",
       text: "「酒量没倒，骰子也没把你们卖了。行，我承认，你们至少不是一群只会喊口号的公会新人。」",
-      bgImage: "/assets/scenes/09brock-tavern-table.webp",
-      portrait: "/assets/characters/senluo/brock_tavern.webp",
+      bgImage: "/assets/scenes/08.webp",
     },
     {
       speaker: "布洛克",
@@ -1182,7 +1176,7 @@ const BROCK_RECRUITED: ScriptedScene = {
     },
     {
       speaker: "布洛克",
-      text: "「好，我加入。进了孢海以后听我指挥。别看见发光的东西就伸手，别听见声音就回头，别觉得自己比地底活得更久的东西聪明。」",
+      text: "「好，我加入。进了孢海以后听我指挥。规矩三条：发光的不急着摸，叫你名字的不急着答；真觉得自己聪明，先问问这片地底埋了多少聪明人。」",
     },
     {
       speaker: "萨洛",
@@ -1208,7 +1202,7 @@ const BLACK_MARKET_KAIYA_INTRO: ScriptedScene = {
   id: "blackmarket-kaiya-intro",
   triggers: ["前往黑市寻找凯娅", "去黑市找凯娅", "寻找凯娅", "前往黑市"],
   setArea: "逆穹悬城·黑市",
-  bgImage: "/assets/scenes/07blackmarket-stall.webp",
+  bgImage: "/assets/scenes/07.webp",
   statePatch: {
     blackmarket_unlocked: true,
     kaiya_passphrase_pending: true,
@@ -1221,7 +1215,7 @@ const BLACK_MARKET_KAIYA_INTRO: ScriptedScene = {
     {
       speaker: "主持人",
       text: "黑市藏在补给市场背后的斜巷里。冷光灯被黑布遮住，只照亮摊位上的半张桌面。厚重帘幕隔开一间间铺子，也将讨价还价声切得断断续续。",
-      bgImage: "/assets/scenes/07blackmarket-stall.webp",
+      bgImage: "/assets/scenes/07.webp",
     },
     {
       speaker: "主持人",
@@ -1244,7 +1238,7 @@ const BLACK_MARKET_KAIYA_CONTACT: ScriptedScene = {
   manualOnly: true,
   triggers: ["黑市暗号正确，凯娅现身"],
   setArea: "逆穹悬城·黑市",
-  bgImage: "/assets/scenes/07blackmarket-stall.webp",
+  bgImage: "/assets/scenes/07.webp",
   statePatch: {
     blackmarket_unlocked: true,
     kaiya_intro_seen: true,
@@ -1262,7 +1256,6 @@ const BLACK_MARKET_KAIYA_CONTACT: ScriptedScene = {
     {
       speaker: "凯娅",
       text: "「断缆不问来路……哼，萨洛连这个都交给你了？行，我听你说完。」",
-      portrait: "/assets/characters/kelaiya/kaiya_blackmarket.webp",
     },
     { speaker: "凯娅", text: "「只问筹码够不够。」" },
     {
@@ -1317,7 +1310,7 @@ const BLACK_MARKET_KAIYA_CONTACT: ScriptedScene = {
     },
     {
       speaker: "奥兰",
-      text: "「谈到钻石，怎么能少了奥兰爵？幸运盲盒，二十金一次。骰点超过十八，钻石立刻带走。」",
+      text: "「谈到钻石，怎么能少了奥兰爵？幸运盲盒，五十金一次。骰点十八、十九或二十，钻石立刻带走。」",
     },
     {
       speaker: "奥兰",
@@ -1367,11 +1360,11 @@ const KAIYA_RECRUITED: ScriptedScene = {
   manualOnly: true,
   triggers: ["凯娅收到钻石加入队伍"],
   setArea: "逆穹悬城·黑市",
-  bgImage: "/assets/scenes/07blackmarket-stall.webp",
+  bgImage: "/assets/scenes/07.webp",
   statePatch: {
     kl_recruited: true,
-    kl_trust: 45,
-    trust_kl: 45,
+    kl_trust: 50,
+    trust_kl: 50,
     kaiya_recruited: true,
     kaiya_diamond_paid: true,
   },
@@ -1382,6 +1375,7 @@ const KAIYA_RECRUITED: ScriptedScene = {
     {
       speaker: "主持人",
       text: "钻石落入凯娅掌心时，她没有立刻收起，而是举到冷光灯下缓缓转动。她检查了切面，又用指甲轻敲边缘，直到确认上面没有附魔刻痕和追踪印记。",
+      bgImage: "/assets/scenes/07.webp",
     },
     {
       speaker: "主持人",
@@ -1390,7 +1384,6 @@ const KAIYA_RECRUITED: ScriptedScene = {
     {
       speaker: "凯娅",
       text: "「天然钻石，没有标记，也不是奥兰拿玻璃糊弄人的残次品。不错。」",
-      portrait: "/assets/characters/kelaiya/kaiya_blackmarket.webp",
     },
     {
       speaker: "奥兰",
@@ -1437,14 +1430,11 @@ const KAIYA_RECRUITED: ScriptedScene = {
       speaker: "瑟琳",
       text: "「艾琳负责治疗与净化，布洛克负责孢海生存，凯娅负责机关和暗线。五人编队已经齐了。」",
     },
-    {
-      speaker: "瑟琳",
-      text: "「现在返回公会登记，领取远征物资。之后前往降渊缆梯，正式进入深层区域。」",
-    },
-    {
-      speaker: "主持人",
-      text: "凯娅拉低斗篷，跟在队伍最后。至此，前往地底堡垒的远征队终于完成集结。",
-    },
+    { condition: "!tavern_yunling_unlocked", speaker: "瑟琳", text: "「现在返回公会登记，领取远征物资。之后前往降渊缆梯，正式进入深层区域。」" },
+    { condition: "!tavern_yunling_unlocked", speaker: "主持人", text: "凯娅拉低斗篷，跟在队伍最后。至此，前往地底堡垒的远征队终于完成集结。" },
+    { condition: "tavern_yunling_unlocked", speaker: "主持人", text: "瑟琳正要收起公会名单，一张夹在名单背面的窄纸条却滑了出来。萨洛只在上面写了一个名字：云苓。" },
+    { condition: "tavern_yunling_unlocked", speaker: "凯娅", text: "「她的铺子就在黑市深处。既然已经走到这里，先把萨洛留的这条线索查完，免得下了孢海才想起缺药。」" },
+    { condition: "tavern_yunling_unlocked", speaker: "瑟琳", text: "「先去找云苓补齐药剂，再返回公会登记。队伍已经集结，接下来把能准备的都准备好。」" },
   ],
   hints: [
     "返回冒险者公会找赫尔曼正式登记小队",
@@ -1461,7 +1451,7 @@ const YUNLING_FAREWELL: ScriptedScene = {
   manualOnly: true,
   triggers: ["云苓告别完成"],
   setArea: "逆穹悬城·黑市深处",
-  bgImage: "/assets/scenes/12yunling-apothecary.webp",
+  bgImage: "/assets/scenes/12.webp",
   statePatch: {
     yunling_farewell_done: true,
   },
@@ -1470,7 +1460,7 @@ const YUNLING_FAREWELL: ScriptedScene = {
   lines: [
     {
       speaker: "主持人",
-      text: "交易结束后，云苓没有立刻收起药瓶。她低头在柜台下翻找片刻，取出一枚小小的护身符。",
+      text: "交易结束后，云苓把找零推到柜台边，却没有立刻收起药瓶。她的手指在围裙边攥了一下，才低头从柜台内侧摸出一枚小小的护身符。",
     },
     {
       speaker: "主持人",
@@ -1514,7 +1504,7 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
   manualOnly: true,
   triggers: ["根据萨洛额外情报寻找云苓"],
   setArea: "逆穹悬城·黑市深处",
-  bgImage: "/assets/scenes/07blackmarket-stall.webp",
+  bgImage: "/assets/scenes/07.webp",
   statePatch: {
     yunling_met: true,
     yunling_shop_unlocked: true,
@@ -1525,7 +1515,7 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
     // ===== 黑市药师·云苓 =====
     {
       speaker: "主持人",
-      text: "凯娅收起钻石后，瑟琳取出萨洛留下的纸条。上面只写着一个名字：云苓。",
+      text: "顺着萨洛纸条上的名字，凯娅领你们继续往黑市深处走。云苓的药铺不挂招牌，只在门边系着一束晒干的蓝色菌叶。",
     },
     {
       speaker: "凯娅",
@@ -1534,7 +1524,7 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
     {
       speaker: "主持人",
       text: "凯娅带你们穿过补给摊，在黑市深处找到一间没有招牌的药铺。门内没有叫卖声，只有玻璃瓶里的药液咕噜冒泡。",
-      bgImage: "/assets/scenes/12yunling-apothecary.webp",
+      bgImage: "/assets/scenes/12.webp",
     },
     {
       speaker: "主持人",
@@ -1548,7 +1538,7 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
     { speaker: "瑟琳", text: "「我们需要适合深层探索的药剂。」" },
     {
       speaker: "云苓",
-      text: "「那就别只买治疗药。治疗药只能补伤口，救不了中毒、感染和走不动路的人。」",
+      text: "「那就不要只买治疗药。治疗药只能补伤口，救不了中毒、感染和走不动路的人。」",
     },
     {
       speaker: "主持人",
@@ -1556,29 +1546,22 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
     },
     {
       speaker: "云苓",
-      text: "「绿色的是抗孢剂。喝下去以后，短时间内能压住咳嗽、眩晕和孢毒，不至于刚进菌区就倒下。」",
+      text: "「这六种颜色都是强化药水，别看瓶子小，补的地方不一样。力气不够、手慢、脑子发木、眼神跟不上——挑对了再喝。下去前想清楚，别等怪物贴脸了才手忙脚乱找瓶塞。」",
     },
     {
       speaker: "云苓",
-      text: "「银灰色的是净血剂。污染刚进入伤口时用，能延缓侵蚀，给修女争取施术的时间。」",
+      text: "「红色的是治疗药水。小伤能止血回气，伤得太重也别指望它起死回生，最多帮你多撑几口气，撑到修女赶到。」",
     },
     {
       speaker: "云苓",
-      text: "「黄色的是醒神剂。赶路太久、缺氧或者被幻觉影响时喝一小口，能让人多清醒一阵。」",
-    },
-    {
-      speaker: "布洛克",
-      text: "「这些东西能救急，但不能当水喝。药效过去以后，该休息还是得休息。」",
+      text: "「这个是净化之心，不是给擦破皮准备的。真被孢毒、黑石污染缠上，或者身体开始不像自己的时候，就别心疼钱了——那会儿省下来也没地方花。」",
     },
     {
       speaker: "云苓",
-      text: "「我知道。你负责让他们别踩进毒窝，我负责他们踩进去以后别马上死。」",
+      text: "「我知道。你负责让他们别踩进毒窝，我负责他们踩进去以后还能出来。」",
     },
     { speaker: "艾琳", text: "「这些药能代替净化术吗？」" },
-    {
-      speaker: "云苓",
-      text: "「不能。药只能拖时间，让你们撑到安全地方。真把它当治愈，最后只会死得晚一点。」",
-    },
+    { speaker: "云苓", text: "「不能。药只能拖时间，让你们撑到安全地方。」" },
     { speaker: "主持人", text: "她又取出三瓶封蜡的红色药水，推到你们面前。" },
     {
       speaker: "云苓",
@@ -1586,7 +1569,7 @@ const YUNLING_BLACK_MARKET: ScriptedScene = {
     },
     {
       speaker: "主持人",
-      text: "云苓随后指向柜台最内侧。一枚被银丝包裹的黑红色结晶，正像心脏一样缓慢跳动。",
+      text: "云苓随后指向柜台最内侧。一枚被银丝包裹的纯白色结晶，正像心脏一样缓慢跳动。",
     },
     {
       speaker: "云苓",
@@ -1613,7 +1596,8 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
     "返回公会登记",
   ],
   setArea: "逆穹悬城·冒险者公会任务室",
-  bgImage: "/assets/scenes/04guild-interior.webp",
+  bgImage: "/assets/scenes/04.webp",
+  bgm: "/assets/bgm/bgm_03_guild_tavern_companions.mp3",
   statePatch: {
     formal_mission_briefed: true,
     companions_selected: true,
@@ -1625,8 +1609,6 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
     expedition_registered: true,
     blackmarket_done: true,
     currentNodeId: "guild-final-registration",
-    inventory:
-      "长剑,冒险者工具包,抗孢面罩,冷光灯,止血粉,解毒剂,缆梯安全扣,公会补给箱,虚构骰子x3,万能骰子x3",
   },
   events: ["五人远征队登记完成", "公会物资已领取"],
   lastEvent: "在冒险者公会登记五人小队，并领取前往无光孢海的正式物资",
@@ -1660,7 +1642,6 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
     },
     { speaker: "凯娅", text: "「从规则上说？听起来可不像祝福。」" },
     { speaker: "赫尔曼", text: "「祝福留给神殿。公会只负责把风险说清楚。」" },
-
     { speaker: "米娜", text: "「签名之前，正式委托重申一遍。」" },
     {
       speaker: "主持人",
@@ -1679,10 +1660,9 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
       speaker: "米娜",
       text: "「是。若确认阵亡，必须记录姓名、遗物和最后位置。」",
     },
-
     {
       speaker: "赫尔曼",
-      text: "「旧地图显示，黑石之门是通往深层堡垒区的关键入口。穿过那里之后，你们就会进入十年来无人带回完整消息的区域。」",
+      text: "「旧地图到黑石之门后就断了。门后的记录一片空白——也许不是堡垒，至少不是我们能确认的堡垒。十年来，没有人从那里带回完整消息。」",
     },
     {
       speaker: "主持人",
@@ -1704,15 +1684,15 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
     },
     {
       speaker: "米娜",
-      text: "「这些是五人份基础远征物资。抗孢面罩用于穿越高浓度孢尘区，冷光灯用于低能见度环境，安全扣必须全程系在缆梯索上。」",
+      text: "「五人份，按编号拿。面罩别摘，哪怕只觉得闷；冷光灯省着开，下面没有补给灯油的柜台；安全扣从上缆梯开始就系好，中途嫌麻烦的人会让整队跟着倒霉。」",
     },
     {
       speaker: "米娜",
-      text: "「止血粉和解毒剂只能处理常规伤势。遇到污染、黑石侵蚀或深层变异，不要硬撑，立刻让艾琳和瑟琳判断。」",
+      text: "「止血粉、解毒剂，普通伤能压住，别把它们当奇迹。遇到污染、黑石侵蚀或深层变异，不要硬撑，立刻让艾琳和瑟琳判断。」",
     },
     {
       speaker: "米娜",
-      text: "「样本瓶和滤网用于收集孢子、菌丝和污染残留。样本必须封存编号，不能直接塞进背包，更不能带回城里乱放。」",
+      text: "「样本瓶和滤网单独放。孢子、菌丝、污染残留，一样一样封存编号，不能直接塞进背包，更不能带回城里乱放——上次有人这么做，档案室三天都是霉味。」",
     },
 
     {
@@ -1767,7 +1747,7 @@ const GUILD_FINAL_REGISTRATION: ScriptedScene = {
 
     {
       speaker: "主持人",
-      text: "补给箱被合上，沉重的锁扣声在任务室里回响。你们离开地图桌，朝通往深渊的方向走去。",
+      text: "米娜扣上补给箱的锁扣，却没有催你们离开。她把旧报告、火漆样本和补给清单重新排到桌边，抬头问你们离开前还有没有要核对的地方；确认完毕，再去降渊缆梯。",
     },
   ],
   hints: [
@@ -1792,7 +1772,7 @@ const ELEVATOR_DESCENT: ScriptedScene = {
     "准备前往第一层",
   ],
   setArea: "降渊缆梯·垂降途中",
-  bgImage: "/assets/scenes/ele2.webp",
+  bgImage: "/assets/scenes/25.webp",
   statePatch: {
     elevator_descent_started: true,
     reach_elevator_hub: true,
@@ -1881,9 +1861,9 @@ const ELEVATOR_DESCENT: ScriptedScene = {
     },
   ],
   hints: [
-    "固定安全扣，适应垂降【体质DC10】",
+    "鼓舞队伍士气，让众人在垂降前重新集中精神【魅力DC10】",
     "观察下方异常孢光带【感知DC13】",
-    "抵达孢海据点，确认当地情况",
+    "直接抵达孢海据点，确认当地情况",
   ],
 };
 
@@ -1897,7 +1877,7 @@ const SPORE_OUTPOST_ARRIVAL: ScriptedScene = {
     "确认当地情况",
   ],
   setArea: "无光孢海·孢海据点",
-  bgImage: "/assets/scenes/jidi.webp",
+  bgImage: "/assets/scenes/24.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     spore_outpost_reached: true,
@@ -1973,7 +1953,7 @@ const OUTPOST_NAME_LIST: ScriptedScene = {
   id: "outpost-name-list",
   triggers: ["整理阵亡者名册"],
   setArea: "无光孢海·孢海据点",
-  bgImage: "/assets/scenes/jidi.webp",
+  bgImage: "/assets/scenes/24.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     outpost_name_list_checked: true,
@@ -2017,7 +1997,7 @@ const OUTPOST_PATROL_LOG: ScriptedScene = {
   id: "outpost-patrol-log",
   triggers: ["翻看旧巡逻记录"],
   setArea: "无光孢海·孢海据点",
-  bgImage: "/assets/scenes/jidi.webp",
+  bgImage: "/assets/scenes/24.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     patrol_log_checked: true,
@@ -2068,7 +2048,7 @@ const AILIN_WOUNDED_PRE: ScriptedScene = {
   manualOnly: true,
   triggers: ["艾琳支线前置"],
   setArea: "无光孢海·孢海据点",
-  bgImage: "/assets/scenes/jidi.webp",
+  bgImage: "/assets/scenes/24.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     ailin_wounded_pre_seen: true,
@@ -2132,7 +2112,7 @@ const AILIN_SIDEQUEST: ScriptedScene = {
   manualOnly: true,
   triggers: ["艾琳支线白枝下的名字"],
   setArea: "无光孢海·孢海据点伤员棚",
-  bgImage: "/assets/scenes/ailin_side_tent_interior.webp",
+  bgImage: "/assets/scenes/22.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     ailin_backstory_revealed: true,
@@ -2244,7 +2224,7 @@ const AILIN_SIDEQUEST_COMPLETE: ScriptedScene = {
   manualOnly: true,
   triggers: ["艾琳支线收束"],
   setArea: "无光孢海·孢海据点出口",
-  bgImage: "/assets/scenes/jidi.webp",
+  bgImage: "/assets/scenes/24.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     ailin_wounded_names_done: true,
@@ -2321,7 +2301,7 @@ const IGNORE_AILIN: ScriptedScene = {
   id: "ignore-ailin",
   triggers: ["无视伤员继续前进"],
   setArea: "无光孢海·孢海据点",
-  bgImage: "/assets/scenes/jidi.webp",
+  bgImage: "/assets/scenes/24.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     ailin_request_ignored: true,
@@ -2375,7 +2355,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
   manualOnly: true,
   triggers: ["进入蓝伞浅滩前置"],
   setArea: "无光孢海·蓝伞浅滩",
-  bgImage: "/assets/scenes/16blue-umbrella-shoal.webp",
+  bgImage: "/assets/scenes/15.webp",
   bgm: "/assets/bgm/bgm_09_observatory.mp3",
   statePatch: {},
   events: ["踏入蓝伞浅滩", "发现孢化兽和拟声菌团"],
@@ -2414,7 +2394,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
     {
       speaker: "主持人",
       text: "继续向前后，黑暗忽然开阔起来。无数巨大的蓝伞真菌从浅滩中升起，菌柄粗得像石柱，菌盖层层舒展，像一片倒扣在地底的幽蓝森林。",
-      bgImage: "/assets/scenes/16blue-umbrella-shoal.webp",
+      bgImage: "/assets/scenes/15.webp",
     },
     {
       speaker: "主持人",
@@ -2482,7 +2462,7 @@ const ENTER_BLUE_SHOAL: ScriptedScene = {
     { speaker: "凯娅", text: "「我现在更讨厌会说话的东西了。」" },
     {
       speaker: "布洛克",
-      text: "「拟声菌团。别听它们说什么，打散核心，不然它们会一直学你们的声音。」",
+      text: "「拟声菌团。耳朵先当摆设，眼睛找核心；不打散它们，回头连你咳嗽声都能学给你听。」",
     },
     {
       speaker: "瑟琳",
@@ -2676,7 +2656,7 @@ const ABANDONED_FORWARD_POST: ScriptedScene = {
     },
   ],
   hints: [
-    "让凯娅检查少了两个封扣",
+    "请凯娅复查缺失的封扣",
     "检查补给箱封扣与锁痕【调查DC12】",
     "让凯娅判断暗道机关【巧手DC13】",
   ],
@@ -2752,14 +2732,42 @@ const PRE_BOSS_REST: ScriptedScene = {
       text: "空气中每隔数息就有一次低沉脉冲，像某种巨大的锁仍在地下尝试闭合。",
     },
     {
+      speaker: "主持人",
+      text: "队伍停在一段还算平整的岩棚上。冷光灯被调到最低，只在靴尖和药瓶边缘留下一圈微弱的蓝白色。",
+    },
+    {
+      speaker: "主持人",
+      text: "远处没有兽吼，也没有水声。正因为太安静，背包扣环轻轻一碰，都像能传到黑石深处。",
+    },
+    {
+      speaker: "布洛克",
+      text: "「这地方安静得不吉利。孢海真睡着的时候，通常是在等你先打呼噜。」",
+    },
+    {
+      speaker: "凯娅",
+      text: "「我不打呼噜。也不喜欢在会回声的地方数钱。」",
+    },
+    {
+      speaker: "艾琳",
+      text: "「伤口现在处理，祷词现在念。等门前动手，就没有补第二遍的时间了。」",
+    },
+    {
+      speaker: "主持人",
+      text: "瑟琳没有立刻说话。她抬起银杖，杖身细微的裂痕在黑石脉冲里一明一暗。",
+    },
+    {
       speaker: "瑟琳",
-      text: "「这里适合短暂休整。检查药剂、装备和伤势。再往前，就没有安全的地方了。」",
+      text: "「这里适合短暂休整。检查药剂、装备和伤势。声音放低，灯光收住——再往前，就没有安全的地方了。」",
+    },
+    {
+      speaker: "主持人",
+      text: "短暂的平静落在每个人肩上，轻得像孢尘，却没人急着把它抖掉。",
     },
   ],
   hints: [
-    "检查瑟琳银杖裂痕",
-    "和瑟琳交谈",
-    "让瑟琳分析黑石脉冲规律【奥秘DC14】",
+    "留意瑟琳银杖上的裂痕",
+    "趁休整与瑟琳低声交谈",
+    "请瑟琳分析黑石脉冲规律【奥秘DC14】",
   ],
 };
 
@@ -2806,7 +2814,7 @@ const ACT1_BLUE_SHOAL_AFTERMATH_COMPRESSED: ScriptedScene = {
   manualOnly: true,
   triggers: ["蓝伞浅滩战后余波"],
   setArea: "无光孢海·蓝伞浅滩",
-  bgImage: "/assets/scenes/10blue-shoal-after-battle.webp",
+  bgImage: "/assets/scenes/14.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     compressedAct1EndingStarted: true,
@@ -2834,7 +2842,7 @@ const ACT1_BLACK_ROOT_ENTRANCE: ScriptedScene = {
   manualOnly: true,
   triggers: ["进入黑石根区"],
   setArea: "无光孢海·黑石根区入口",
-  bgImage: "/assets/scenes/11black-root-entrance.webp",
+  bgImage: "/assets/scenes/17.webp",
   bgm: "/assets/bgm/bgm_04b_fungal_sea_explore.mp3",
   statePatch: {
     blackRootEntranceSeen: true,
@@ -2857,7 +2865,7 @@ const ACT1_LAIN_SURVIVOR: ScriptedScene = {
   manualOnly: true,
   triggers: ["发现莱因"],
   setArea: "无光孢海·黑石根区废营",
-  bgImage: "/assets/scenes/12lain-survivor-site.webp",
+  bgImage: "/assets/scenes/16.webp",
   statePatch: {
     lainEncountered: true,
     currentNodeId: "act1-lain-survivor-event",
@@ -2886,7 +2894,7 @@ const ACT1_SERIN_CRACK: ScriptedScene = {
   manualOnly: true,
   triggers: ["黑石根区休整"],
   setArea: "无光孢海·黑石根区休整点",
-  bgImage: "/assets/scenes/13black-root-rest-point.webp",
+  bgImage: "/assets/scenes/18.webp",
   statePatch: { currentNodeId: "act1-black-root-rest-serin-crack" },
   lastEvent: "黑暗之门前休整，瑟琳的银杖出现裂痕",
   lines: [
@@ -2909,13 +2917,15 @@ const ACT1_SERIN_CRACK: ScriptedScene = {
 const ACT1_BOSS_CORE_CHOICE: ScriptedScene = {
   ...BLACKSTONE_CORE_CHOICE,
   id: "act1-boss-core-choice",
-  bgImage: "/assets/scenes/14dark-gate-forecourt-battle.webp",
+  bgImage: "/assets/scenes/29.webp",
   statePatch: {
     ...BLACKSTONE_CORE_CHOICE.statePatch,
     blackstoneGatekeeperDefeated: true,
     currentNodeId: "act1-boss-core-choice",
   },
 };
+
+const ACT1_ENDING_BGM = "/assets/bgm/bgm_13_candidate2_raw(1).mp3";
 
 const ACT1_ENDINGS: ScriptedScene[] = [
   [
@@ -2944,6 +2954,7 @@ const ACT1_ENDINGS: ScriptedScene[] = [
   triggers: [title],
   setArea: "黑暗之门",
   bgImage: `/assets/scenes/ending-${id}.webp`,
+  bgm: ACT1_ENDING_BGM,
   statePatch: { currentNodeId: `act1-ending-${id}`, act1EndingId: id },
   lastEvent: `第一幕结局：${title}`,
   lines: [{ speaker: "主持人", text }],
@@ -2955,7 +2966,8 @@ const ACT1_OCEAN_REVEAL: ScriptedScene = {
   manualOnly: true,
   triggers: ["穿过黑暗之门"],
   setArea: "地下海洋·黑暗之门彼端",
-  bgImage: "/assets/scenes/15underground-ocean-reveal.webp",
+  bgImage: "/assets/scenes/31.webp",
+  bgm: ACT1_ENDING_BGM,
   statePatch: {
     undergroundOceanRevealed: true,
     currentNodeId: "act1-ending-ocean-reveal",
@@ -2977,7 +2989,8 @@ const ACT1_GAME_COMPLETE: ScriptedScene = {
   manualOnly: true,
   triggers: ["结束第一幕"],
   setArea: "第一幕·完",
-  bgImage: "/assets/scenes/15underground-ocean-reveal.webp",
+  bgImage: "/assets/scenes/31.webp",
+  bgm: ACT1_ENDING_BGM,
   statePatch: { act1GameCompleted: true, currentNodeId: "act1-game-complete" },
   lastEvent: "第一幕结束",
   lines: [
@@ -2991,7 +3004,8 @@ const ACT1_BAD_ENDING: ScriptedScene = {
   manualOnly: true,
   triggers: ["逆时归零"],
   setArea: "逆时归零",
-  bgImage: "/assets/scenes/14dark-gate-forecourt-battle.webp",
+  bgImage: "/assets/scenes/29.webp",
+  bgm: ACT1_ENDING_BGM,
   statePatch: {
     act1EndingId: "time-reset",
     act1GameCompleted: true,
@@ -3000,19 +3014,19 @@ const ACT1_BAD_ENDING: ScriptedScene = {
   },
   lastEvent: "坏结局：逆时归零",
   lines: [
-    {
-      speaker: "主持人",
-      text: "小队倒在黑石根区。所有声音都变得遥远，像被厚重石层隔开。",
-    },
+    { speaker: "主持人", text: "小队倒在黑石根区。" },
+    { speaker: "主持人", text: "黑石门卫胸口的核心光芒压过孢海冷光。所有声音都变得遥远，像被厚重石层隔开。" },
+    { speaker: "主持人", text: "瑟琳拖着裂开的银杖来到你身边。她第一次完全失去平静。" },
     { speaker: "瑟琳", text: "「对不起……这一次，还是来不及。」" },
-    {
-      speaker: "瑟琳",
-      text: "「如果你醒来后什么都不记得，也请你……再走一次。」",
-    },
-    {
-      speaker: "主持人",
-      text: "银杖彻底裂开。你眼前出现逆穹悬城最初的灯火。你回到了最初，不记得自己曾经失败。游戏结束。",
-    },
+    { speaker: "瑟琳", text: "「如果你醒来后什么都不记得，也请你……再走一次。」" },
+    { speaker: "瑟琳", text: "「我会付出代价。你只要活下去。」" },
+    { speaker: "主持人", text: "银杖彻底裂开。" },
+    { speaker: "主持人", text: "黑石纹路倒流，孢子停在半空。队伍的声音逐渐远去，只剩瑟琳的声音还在黑暗里回响。" },
+    { speaker: "主持人", text: "你眼前出现逆穹悬城最初的灯火。" },
+    { speaker: "系统", text: "你回到了最初。" },
+    { speaker: "系统", text: "你不记得无光孢海，不记得黑石门卫，不记得自己曾经失败。" },
+    { speaker: "系统", text: "但有一瞬间，你似乎听见有人在很远的地方说：“请再来一次。”" },
+    { speaker: "系统", text: "游戏结束。" },
   ],
   hints: ["[第一幕结束 · 逆时归零]"],
 };
@@ -3047,15 +3061,14 @@ export const SCRIPTED_SCENES: ScriptedScene[] = [
   RHEIN_ENCOUNTER,
   PRE_BOSS_REST,
   BLACKSTONE_CORE_CHOICE,
-  // [已停用/归档] 以下为旧版压缩主线，不再加入运行时场景注册表。
-  // ACT1_BLUE_SHOAL_AFTERMATH_COMPRESSED,
-  // ACT1_BLACK_ROOT_ENTRANCE,
-  // ACT1_LAIN_SURVIVOR,
-  // ACT1_SERIN_CRACK,
-  // ACT1_BOSS_CORE_CHOICE,
-  // ...ACT1_ENDINGS,
-  // ACT1_OCEAN_REVEAL,
-  // ACT1_GAME_COMPLETE,
+  ACT1_BLUE_SHOAL_AFTERMATH_COMPRESSED,
+  ACT1_BLACK_ROOT_ENTRANCE,
+  ACT1_LAIN_SURVIVOR,
+  ACT1_SERIN_CRACK,
+  ACT1_BOSS_CORE_CHOICE,
+  ...ACT1_ENDINGS,
+  ACT1_OCEAN_REVEAL,
+  ACT1_GAME_COMPLETE,
   ACT1_BAD_ENDING,
   ...POST_BLUE_SHOAL_SCENES,
 ];

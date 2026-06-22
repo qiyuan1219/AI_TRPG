@@ -535,20 +535,15 @@ def _fallback_chat_narrative(message: str, state: dict, systems: list[str] | Non
         if fixed_lines:
             return "\n".join(fixed_lines)
 
-    action_line = f"你刚才选择了：{prompt}" if prompt else "你停下脚步，重新整理眼前的局势。"
+    clean_action = prompt.splitlines()[0].strip() if prompt else "整理眼前线索"
+    clean_action = re.sub(r"【[^】]+】", "", clean_action).strip("。 ")
     dice_line = _dice_summary_from_systems(systems)
-    result_line = (
-        f"{dice_line}瑟琳迅速把这个结果压进判断里，提醒队伍别让一次判定把节奏拖死。"
-        if dice_line
-        else "瑟琳扫过周围的动静，示意队伍先把眼前线索收束，再决定下一步。"
-    )
-    return (
-        f"{player}在{area}稳住呼吸，远处的荧光在黑暗中明灭，空气中弥漫着潮湿的孢尘。\n"
-        f"{action_line}\n"
-        f"{result_line}\n"
-        "局势继续向前推进。你可以保存进度、检查角色状态，或从眼前线索中选择下一步行动。\n\n"
-        "[HINTS:观察周围环境【感知DC12】|回顾任务线索【智力DC12】|和瑟琳确认计划【魅力DC12】]"
-    )
+    if "让艾琳疗伤" in clean_action:
+        outcome = "艾琳确认伤口已经稳定，示意你重新活动手臂。" if "成功" in dice_line else "艾琳先替你压住伤势，提醒你别在情况不明时继续逞强。"
+        return f"艾琳打开药箱，白枝药香很快压过周围的孢尘味。\n{dice_line}{outcome}"
+    if dice_line:
+        return f"你着手{clean_action}。\n{dice_line}队伍依据这个结果重新确认了眼前的线索与站位。"
+    return f"你着手{clean_action}。\n同伴们收拢到近处，仔细核对现场留下的痕迹，等待你决定下一步。"
 
 
 # ============================================================
@@ -607,7 +602,7 @@ async def create_dnd_game(req: CreateDNDRequest):
         "atk_bonus": derived["atk_bonus"],
         "proficiency_bonus": PROFICIENCY_BONUS.get(req.level, 2),
         "gold": 400,
-        "inventory": "长剑,冒险者工具包,治疗药水x2,虚构骰子x3,万能骰子x3",
+        "inventory": "长剑,冒险者工具包,治疗药水x2,虚构骰子x5,万能骰子x3",
         "player": {
             "styleId": selected_style_id,
             "styleName": style_name,
@@ -617,16 +612,15 @@ async def create_dnd_game(req: CreateDNDRequest):
             "ac": derived["ac"],
         },
         "guild_registered": False,
-        "city_map_unlocked": False,
         "blackmarket_unlocked": False,
         "al_recruited": False,
         "sl_recruited": False,
         "kl_recruited": False,
         "recruited_companions": "瑟琳",
-        "se_hp": 34, "se_trust": 84, "se_alive": True,   # 瑟琳
-        "sl_hp": 46, "sl_trust": 50, "trust_block": 50, "sl_alive": True,  # 布洛克(森洛) — sl_trust/trust_block 同义
-        "al_hp": 32, "al_trust": 55, "al_alive": True,   # 艾琳
-        "kl_hp": 36, "kl_trust": 45, "kl_alive": True,   # 凯娅
+        "se_hp": 36, "se_hp_max": 36, "se_trust": 50, "se_alive": True,   # 瑟琳
+        "sl_hp": 45, "sl_hp_max": 45, "sl_trust": 50, "trust_block": 50, "sl_alive": True,  # 布洛克
+        "al_hp": 36, "al_hp_max": 36, "al_trust": 50, "al_alive": True,   # 艾琳
+        "kl_hp": 30, "kl_hp_max": 30, "kl_trust": 50, "kl_alive": True,   # 凯娅
         "triggered_events": "",
         "documents": [],
         "clues": [],
@@ -1120,7 +1114,7 @@ async def battle_narrate(req: BattleNarrateRequest):
         tags=req.tags,
         ac_dc=req.ac_dc,
     )
-    return {"narration": text}
+    return {"narration": text, "source": "ai" if text else "fallback"}
 
 
 class AdvantageRequest(BaseModel):

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import * as THREE from "three";
 import { sfx } from "../utils/audio";
@@ -29,6 +29,7 @@ export interface DiceRollOverlayProps {
     onConfirm: () => void;
     onUseFiction: () => void;
     onUseOmni: (chosenD20: number) => void;
+    omniMax?: number;
   };
   comparisonRolls?: {
     initial: number;
@@ -57,6 +58,20 @@ const DIE_SIDES: Record<DieType, number> = {
   d12: 12,
   d20: 20,
 };
+
+function normalizeAbilityLabel(raw: string): string {
+  const value = raw.trim().toLowerCase().replace(/[【】\[\]_\s-]/g, '');
+  if (!value) return '';
+  const aliases: Array<[RegExp, string]> = [
+    [/^(str|strength|力量|athletics|运动)$/, '力量'],
+    [/^(dex|dexterity|敏捷|acrobatics|sleightofhand|stealth|体操|巧手|隐匿)$/, '敏捷'],
+    [/^(con|constitution|体质)$/, '体质'],
+    [/^(int|intelligence|智力|arcana|history|investigation|nature|religion|奥秘|历史|调查|自然|宗教)$/, '智力'],
+    [/^(wis|wisdom|感知|perception|insight|medicine|survival|animalhandling|察觉|洞悉|医药|求生|驯兽)$/, '感知'],
+    [/^(cha|charisma|魅力|deception|intimidation|performance|persuasion|欺瞒|威吓|表演|游说)$/, '魅力'],
+  ];
+  return aliases.find(([pattern]) => pattern.test(value))?.[1] ?? raw.replace(/[【】\[\]]/g, '');
+}
 
 function diceSizeForCount(count: number): number {
   if (count <= 1) return 220;
@@ -157,7 +172,7 @@ export function formatResult(dice: DiceResult, fallbackDieType: DieType): Format
         : event.dc !== undefined ? String(event.dc) : undefined,
       success: event.success,
       attr: [event.actorName, event.skillName].filter(Boolean).join(' · '),
-      verdict: isDamage ? `造成 ${event.total} 点伤害` : isHealing ? `恢复 ${event.total} 点生命` : undefined,
+      verdict: isDamage || isHealing ? `结果：${event.total}` : undefined,
       eventType: event.type,
       formula: event.formula,
       rolls: event.rolls,
@@ -345,7 +360,9 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
   const [skillFx, setSkillFx] = useState<SkillEffectConfig | null>(null);
   const [closed, setClosed] = useState(false);
   const [showOmniPicker, setShowOmniPicker] = useState(false);
-  const [chosenD20, setChosenD20] = useState(20);
+  const omniMax = rerollDecision?.omniMax ?? 20;
+  const [chosenD20, setChosenD20] = useState(omniMax);
+  useEffect(() => setChosenD20(omniMax), [omniMax, dice?.event?.rollId]);
   const timerRef = useRef<number[]>([]);
   const closeTimerRef = useRef<number | null>(null);
   const skillEffectRef = useRef<SkillEffectConfig | null>(null);
@@ -396,6 +413,9 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
   const isNat1 = result?.roll === "1";
   const dcLabel = result?.dc ? (String(result.dc).startsWith("AC") ? String(result.dc).replace(/\s+/g, "") : `DC${String(result.dc).replace(/^DC\s*/i, "")}`) : "";
   const isDamageLike = result?.eventType === 'damage' || result?.eventType === 'healing';
+  const criticalMultiplier = Number(dice?.data["大成功倍率"] ?? dice?.event?.metadata?.criticalMultiplier ?? 1);
+  const isCriticalEffect = isDamageLike && criticalMultiplier > 1;
+  const fixedBonusLabel = result?.eventType === 'healing' ? '固定治疗' : '固定伤害';
 
   // 推断技能特效类型
   const skillEffect = useMemo(() => (dice ? inferSkillEffect(dice.data) : null), [dice]);
@@ -609,9 +629,10 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                     <>
                       <span className="dice-eq-sep">{Number(result.modifier) >= 0 ? '+' : '-'}</span>
                       <span className="dice-eq-bonus">{Math.abs(Number(result.modifier))}</span>
-                      <span className="dice-eq-note">（修正）</span>
+                      <span className="dice-eq-note">（{fixedBonusLabel}）</span>
                     </>
                   )}
+                  {isCriticalEffect && <span className="dice-eq-note">（大成功效果翻倍）</span>}
                   <span className="dice-eq-sep">=</span>
                   <span className="dice-total dice-eq-total">{result.total}</span>
                 </>
@@ -626,13 +647,13 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   {(() => {
                     const statMod = Number(dice?.data["属性加值"] ?? bonus);
                     const profMod = Number(dice?.data["熟练加值"] ?? 0);
-                    const ability = String(dice?.data["六维"] ?? "");
+                    const ability = normalizeAbilityLabel(String(dice?.data["六维"] ?? dice?.data["属性"] ?? dice?.data["检定属性"] ?? ""));
                     if (statMod !== 0 || profMod !== 0) {
                       return (
                         <>
                           <span className="dice-eq-sep">+</span>
                           <span className="dice-eq-bonus">{statMod}</span>
-                          {ability ? <span className="dice-eq-note">（【{ability}】加值）</span> : <span className="dice-eq-note">（加值）</span>}
+                          {ability ? <span className="dice-eq-note">（{ability}加值）</span> : <span className="dice-eq-note">（属性加值）</span>}
                           {profMod > 0 && (
                             <>
                               <span className="dice-eq-sep">+</span>
@@ -656,13 +677,13 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   {(() => {
                     const statMod = Number(dice?.data["属性加值"] ?? bonus);
                     const profMod = Number(dice?.data["熟练加值"] ?? 0);
-                    const ability = String(dice?.data["六维"] ?? "");
+                    const ability = normalizeAbilityLabel(String(dice?.data["六维"] ?? dice?.data["属性"] ?? dice?.data["检定属性"] ?? ""));
                     if (statMod !== 0 || profMod !== 0) {
                       return (
                         <>
                           <span className="dice-eq-sep">+</span>
                           <span className="dice-eq-bonus">{statMod}</span>
-                          {ability ? <span className="dice-eq-note">（【{ability}】加值）</span> : <span className="dice-eq-note">（加值）</span>}
+                          {ability ? <span className="dice-eq-note">（{ability}加值）</span> : <span className="dice-eq-note">（属性加值）</span>}
                           {profMod > 0 && (
                             <>
                               <span className="dice-eq-sep">+</span>
@@ -685,13 +706,13 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   {(() => {
                     const statMod = Number(dice?.data["属性加值"] ?? bonus);
                     const profMod = Number(dice?.data["熟练加值"] ?? 0);
-                    const ability = String(dice?.data["六维"] ?? "");
+                    const ability = normalizeAbilityLabel(String(dice?.data["六维"] ?? dice?.data["属性"] ?? dice?.data["检定属性"] ?? ""));
                     if (statMod !== 0 || profMod !== 0) {
                       return (
                         <>
                           <span className="dice-eq-sep">+</span>
                           <span className="dice-eq-bonus">{statMod}</span>
-                          {ability ? <span className="dice-eq-note">（【{ability}】加值）</span> : <span className="dice-eq-note">（加值）</span>}
+                          {ability ? <span className="dice-eq-note">（{ability}加值）</span> : <span className="dice-eq-note">（属性加值）</span>}
                           {profMod > 0 && (
                             <>
                               <span className="dice-eq-sep">+</span>
@@ -715,13 +736,13 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
                   {(() => {
                     const statMod = Number(dice?.data["属性加值"] ?? 0);
                     const profMod = Number(dice?.data["熟练加值"] ?? 0);
-                    const ability = String(dice?.data["六维"] ?? "");
+                    const ability = normalizeAbilityLabel(String(dice?.data["六维"] ?? dice?.data["属性"] ?? dice?.data["检定属性"] ?? ""));
                     if (statMod !== 0 || profMod !== 0) {
                       return (
                         <>
                           <span className="dice-eq-sep">+</span>
                           <span className="dice-eq-bonus">{statMod}</span>
-                          <span className="dice-eq-note">（【{ability}】加值）</span>
+                          {ability ? <span className="dice-eq-note">（{ability}加值）</span> : <span className="dice-eq-note">（属性加值）</span>}
                           {profMod > 0 && (
                             <>
                               <span className="dice-eq-sep">+</span>
@@ -785,8 +806,8 @@ export function DiceRollOverlay({ dice, dieType = "d20", onClose, attackMode = f
             </>}
             {showOmniPicker && !rerollDecision.rerollUsed && (
               <div className="dice-omni-picker">
-                <span>指定 D20 点数</span>
-                <input type="number" min={1} max={20} value={chosenD20} onChange={(event) => setChosenD20(Number(event.target.value))} />
+                <span>指定 D{omniMax} 点数</span>
+                <input type="number" min={1} max={omniMax} value={chosenD20} onChange={(event) => setChosenD20(Number(event.target.value))} />
                 <button type="button" onClick={() => rerollDecision.onUseOmni(chosenD20)}>采用</button>
               </div>
             )}

@@ -453,7 +453,7 @@
 .battle-side-ally .battle-combatant:nth-child(7) { grid-column: 1; grid-row: 3; }
 
 .battle-side-enemy {
-  right: 322px;
+  right: 350px;
   gap: 20px;
 }
 
@@ -508,6 +508,52 @@
   filter: drop-shadow(0 0 18px rgba(209, 213, 219, 0.36)) drop-shadow(0 20px 18px rgba(0, 0, 0, 0.42));
 }
 
+.battle-ai-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid rgba(95, 183, 167, 0.42);
+  border-radius: 999px;
+  background: rgba(8, 15, 20, 0.78);
+  color: #8fe2d2;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.battle-ai-status.is-fallback { border-color: rgba(225, 166, 78, 0.58); color: #f0c979; }
+.battle-ai-status.is-generating,
+.battle-ai-status.is-checking { animation: battle-model-flicker 820ms ease-in-out infinite alternate; }
+
+.battle-combatant.is-guarded .battle-sprite {
+  filter: drop-shadow(0 0 18px rgba(95, 183, 167, 0.58)) drop-shadow(0 20px 18px rgba(0, 0, 0, 0.42));
+}
+
+.battle-combatant.is-guarded .battle-sprite::after {
+  content: "";
+  position: absolute;
+  inset: 10px 16px 20px;
+  z-index: 4;
+  border: 2px solid rgba(132, 238, 220, 0.58);
+  border-radius: 48%;
+  background: radial-gradient(circle, rgba(95, 183, 167, 0.16), rgba(95, 183, 167, 0.02) 62%, transparent 72%);
+  box-shadow: 0 0 22px rgba(95, 183, 167, 0.34), inset 0 0 18px rgba(95, 183, 167, 0.24);
+  pointer-events: none;
+  animation: battle-shield-pulse 1.45s ease-in-out infinite;
+}
+
+@keyframes battle-shield-pulse {
+  0%, 100% {
+    opacity: 0.62;
+    transform: scale(0.96);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
 .battle-combatant.is-defeated {
   opacity: 0.48;
 }
@@ -534,8 +580,8 @@
 }
 
 .battle-combatant.is-enemy .battle-sprite {
-  --enemy-model-scale: 2.25;
-  --enemy-model-cast-scale: 2.385;
+  --enemy-model-scale: 1.12;
+  --enemy-model-cast-scale: 1.2;
   animation: battle-idle-enemy 2.7s ease-in-out infinite;
   transform: scale(var(--enemy-model-scale));
 }
@@ -1667,7 +1713,7 @@
 
 .battle-action-skill-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1695,6 +1741,24 @@
 .battle-action-skill-list small {
   color: var(--muted);
   line-height: 1.35;
+}
+
+/* 大型敌人原图留白少，统一再收一档，避免浅滩、骨柱和 Boss 战被右侧裁切。 */
+.battle-combatant.is-enemy.battle-model-bone_beast .battle-sprite,
+.battle-combatant.is-enemy.battle-model-gatekeeper .battle-sprite,
+.battle-combatant.is-enemy.battle-model-boss_gatekeeper .battle-sprite {
+  --enemy-model-scale: 1.02;
+  --enemy-model-cast-scale: 1.1;
+}
+
+.battle-tactical-advice {
+  display: inline-block;
+  margin-top: 4px;
+  color: #8ff6df;
+  font-size: 0.96rem;
+  font-weight: 900;
+  line-height: 1.45;
+  text-shadow: 0 0 10px rgba(95, 183, 167, 0.42);
 }
 
 /* ===== 鍙充笂瑙掕鍒欓€熸煡鎸夐挳 ===== */
@@ -2242,6 +2306,20 @@
   border-radius: 10px;
   background: rgba(10, 14, 20, 0.8);
   box-shadow: 0 0 18px rgba(95, 183, 167, 0.08), 0 12px 32px rgba(0,0,0,0.3);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  pointer-events: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.battle-log-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.battle-log-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(95, 183, 167, 0.42);
 }
 
 .battle-log-panel span {
@@ -3465,7 +3543,7 @@
   }
 
   .battle-side-enemy {
-    right: 230px;
+    right: 280px;
   }
 
   .battle-action-sheet {

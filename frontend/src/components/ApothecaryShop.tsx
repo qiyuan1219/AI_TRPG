@@ -15,6 +15,7 @@ interface ApothecaryShopProps {
   gold: number;
   inventoryText: string;
   purchasedKeys: string[];
+  purchaseCounts?: Record<string, number>;
   onPurchase: (itemId: string, name: string, price: number, stat?: string) => void;
   onExit: () => void;
   fullScreen?: boolean;
@@ -24,7 +25,13 @@ function countInventory(inventoryText: string, itemName: string) {
   return inventoryText
     .split(',')
     .map((entry) => entry.trim())
-    .filter((entry) => entry === itemName).length;
+    .filter(Boolean)
+    .reduce((total, raw) => {
+      const match = raw.match(/^(.+?)(?:x|×)(\d+)$/i);
+      const name = (match ? match[1] : raw).trim();
+      const quantity = match ? Math.max(1, Number(match[2]) || 1) : 1;
+      return name === itemName ? total + quantity : total;
+    }, 0);
 }
 
 function fallbackYunlingConsult(item: ShopItem) {
@@ -45,6 +52,7 @@ function ShopItemCard({
   owned,
   count,
   consulting,
+  purchasedCount,
   onBuy,
   onConsult,
 }: {
@@ -53,11 +61,14 @@ function ShopItemCard({
   owned: boolean;
   count: number;
   consulting: boolean;
+  purchasedCount: number;
   onBuy: (item: ShopItem) => void;
   onConsult: (item: ShopItem) => void;
 }) {
   const cannotAfford = gold < item.price;
-  const disabled = owned || cannotAfford;
+  const remainingStock = item.stock === undefined ? null : Math.max(0, item.stock - purchasedCount);
+  const soldOut = remainingStock === 0;
+  const disabled = owned || soldOut || cannotAfford;
 
   return (
     <article className={`shop-item-card ${item.type === 'rare' ? 'shop-item-card-rare' : ''}`}>
@@ -71,6 +82,7 @@ function ShopItemCard({
             {item.type === 'rare' ? '稀有' : '药剂'}
           </span>
           {count > 0 && item.repeatable && <span className="shop-item-count">x{count}</span>}
+          {remainingStock !== null && <span className="shop-item-count">库存 {remainingStock}/{item.stock}</span>}
         </div>
         <p>{item.desc}</p>
       </div>
@@ -80,7 +92,7 @@ function ShopItemCard({
           {consulting ? '咨询中' : '咨询'}
         </button>
         <button type="button" disabled={disabled} onClick={() => onBuy(item)}>
-          {owned ? '已购买' : cannotAfford ? '金币不足' : '购买'}
+          {owned ? '已购买' : soldOut ? '已售罄' : cannotAfford ? '金币不足' : '购买'}
         </button>
       </div>
     </article>
@@ -91,6 +103,7 @@ export function ApothecaryShop({
   gold,
   inventoryText,
   purchasedKeys,
+  purchaseCounts = {},
   onPurchase,
   onExit,
   fullScreen = false,
@@ -101,10 +114,12 @@ export function ApothecaryShop({
   const [ownedUnique, setOwnedUnique] = useState<Set<string>>(new Set(purchasedKeys));
   const [localInventory, setLocalInventory] = useState(inventoryText);
   const [consultingId, setConsultingId] = useState<string | null>(null);
+  const [localPurchaseCounts, setLocalPurchaseCounts] = useState<Record<string, number>>(purchaseCounts);
 
   useEffect(() => setCurrentGold(gold), [gold]);
   useEffect(() => setOwnedUnique(new Set(purchasedKeys)), [purchasedKeys]);
   useEffect(() => setLocalInventory(inventoryText), [inventoryText]);
+  useEffect(() => setLocalPurchaseCounts(purchaseCounts), [purchaseCounts]);
 
   const inventoryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -123,6 +138,10 @@ export function ApothecaryShop({
         showMessage(`${item.name}已经买过了。云苓轻轻合上木匣，没有再打开。`, 'warning');
         return;
       }
+      if (item.stock !== undefined && (localPurchaseCounts[item.id] || 0) >= item.stock) {
+        showMessage(`${item.name}已经售罄。`, 'warning');
+        return;
+      }
       if (currentGold < item.price) {
         showMessage('金币不足。云苓看了看你的钱袋，没有说话。', 'warning');
         return;
@@ -133,17 +152,18 @@ export function ApothecaryShop({
       if (!item.repeatable) {
         setOwnedUnique((prev) => new Set([...prev, item.id]));
       }
+      setLocalPurchaseCounts((prev) => ({ ...prev, [item.id]: (prev[item.id] || 0) + 1 }));
 
       const successText =
         item.id === 'purification_heart'
           ? '你购买了净化之心。云苓提醒你：这东西不是给小伤小痛用的。'
           : item.stat
-            ? `你购买了${item.name}，花费 ${item.price}G。药效立刻生效，${item.name.replace('药水', '')}相关能力提升。`
+            ? `你购买了${item.name}，花费 ${item.price}G。药水已放入背包，使用后${item.name.replace('药水', '')}相关能力提升。`
           : `你购买了${item.name}，花费 ${item.price}G。`;
       showMessage(successText, 'success');
       onPurchase(item.id, item.name, item.price, item.stat);
     },
-    [currentGold, onPurchase, ownedUnique, showMessage],
+    [currentGold, localPurchaseCounts, onPurchase, ownedUnique, showMessage],
   );
 
   const handleConsult = useCallback(
@@ -196,6 +216,7 @@ export function ApothecaryShop({
               owned={!item.repeatable && ownedUnique.has(item.id)}
               count={inventoryCounts.get(item.id) ?? 0}
               consulting={consultingId === item.id}
+              purchasedCount={localPurchaseCounts[item.id] || 0}
               onBuy={handleBuy}
               onConsult={handleConsult}
             />

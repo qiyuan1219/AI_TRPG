@@ -30,6 +30,8 @@ export const POST_BLUE_SHOAL_IDS = {
   complete: "post-blue-shoal-game-complete-v2",
 } as const;
 
+const ACT1_ENDING_BGM = "/assets/bgm/bgm_13_candidate2_raw(1).mp3";
+
 export type PostBlueShoalOutcome =
   | "great"
   | "success"
@@ -43,6 +45,166 @@ export interface PostBlueShoalResolution {
   nextSceneId?: string;
   /** 固定推进出口直接播放下一段脚本，不经过 AI 续写。 */
   skipAiNarration?: boolean;
+  /** campNight 复用现有 AI 续写时附加的受控上下文。 */
+  aiPrompt?: string;
+  campNightTalkTarget?: CampNightTalkTarget;
+}
+
+export type CampNightTalkTarget =
+  | "serin"
+  | "ailin"
+  | "brock"
+  | "kaiya"
+  | "laine";
+
+const CAMP_NIGHT_TALK_DEFS: Record<
+  CampNightTalkTarget,
+  { name: string; actionId: string; stateKey: string }
+> = {
+  serin: {
+    name: "瑟琳",
+    actionId: "night_talk_serin",
+    stateKey: "campNightTalkedToSerin",
+  },
+  ailin: {
+    name: "艾琳",
+    actionId: "night_talk_eileen",
+    stateKey: "campNightTalkedToAilin",
+  },
+  brock: {
+    name: "布洛克",
+    actionId: "night_talk_brock",
+    stateKey: "campNightTalkedToBrock",
+  },
+  kaiya: {
+    name: "凯娅",
+    actionId: "night_talk_kaia",
+    stateKey: "campNightTalkedToKaiya",
+  },
+  laine: {
+    name: "莱因",
+    actionId: "night_talk_laine",
+    stateKey: "campNightTalkedToLain",
+  },
+};
+
+export function isLaineHelpedForCampNight(state: GameState) {
+  return Boolean(
+    state.lainHelped === true ||
+      state.helpedRhein === true ||
+      (state.purification_heart_used_on_laine &&
+        state.laine_alive &&
+        state.laine_stabilized &&
+        !state.laine_left_behind &&
+        !state.laine_mercy_killed),
+  );
+}
+
+export function getCampNightRequiredTalkTargets(
+  state: GameState,
+): CampNightTalkTarget[] {
+  const targets: CampNightTalkTarget[] = ["serin", "ailin", "brock", "kaiya"];
+  if (isLaineHelpedForCampNight(state)) targets.push("laine");
+  return targets;
+}
+
+export function hasTalkedToCampNightTarget(
+  state: GameState,
+  target: CampNightTalkTarget,
+) {
+  return Boolean(state[CAMP_NIGHT_TALK_DEFS[target].stateKey]);
+}
+
+export function areAllRequiredCampNightTalksDone(state: GameState) {
+  return getCampNightRequiredTalkTargets(state).every((target) =>
+    hasTalkedToCampNightTarget(state, target),
+  );
+}
+
+export function getCampNightTargetName(target: CampNightTalkTarget) {
+  return CAMP_NIGHT_TALK_DEFS[target].name;
+}
+
+const CAMP_NIGHT_FALLBACK_LINES: Record<CampNightTalkTarget, string[]> = {
+  serin: [
+    "瑟琳坐在火光照不到的地方，银杖横放在膝上。裂纹里的微光一明一暗，像一只很疲惫的眼睛。",
+    "瑟琳：「明天如果黑石纹路亮起来，不要站在原地等我提醒。」",
+    "瑟琳：「我会尽力跟上你。但你也要答应我，先让自己活下来。」",
+  ],
+  ailin: [
+    "艾琳把白枝圣徽擦得很慢。火光照在银白纹路上，像一截没有完全熄灭的烛芯。",
+    "艾琳：「我以前以为，只要还能说出名字，就一定要救。」",
+    "艾琳：「现在我知道，有些地方会逼人先选择谁能走到明天。」",
+  ],
+  brock: [
+    "布洛克把锅倒扣在膝前，用布擦去斧刃上的孢粉。锅里还剩一点热汤，味道不算好，却让人想起还活着这件事。",
+    "布洛克：「明天别逞英雄。孢海里逞英雄的人，最后都变成别人踩过去时脚下那声响。」",
+    "布洛克：「吃点东西。胃里有热气，手就不会抖得那么厉害。」",
+  ],
+  kaiya: [
+    "凯娅背对火光坐着，尾巴尖一下一下敲着石头。她手里那枚黑缆扣已经被检查了很多遍，还是没有放回袋子里。",
+    "凯娅：「我给明天算过账。进门亏，退回去也亏。」",
+    "凯娅：「所以我们只能赌第三种——活着穿过去，然后让欠账的人慢慢还。」",
+  ],
+  laine: [
+    "莱因靠在火光边缘，断裂军牌被他攥得很紧。菌丝随着他的呼吸轻轻收缩，像还在替某个不存在的队伍报数。",
+    "莱因：「点名……不对。你们不是第一队。」",
+    "莱因：「如果它叫你们归队，别答应。队长死在门前了。」",
+    "莱因：「胸口的黑石不是心脏……是锁。锁坏了，可锁还在响。」",
+  ],
+};
+
+function getPlayerAttributes(state: GameState) {
+  const source = state.player?.attributes || state.attributes || state;
+  return {
+    str: Number(source.str ?? source.attr_str ?? 10),
+    dex: Number(source.dex ?? source.attr_dex ?? 10),
+    con: Number(source.con ?? source.attr_con ?? 10),
+    int: Number(source.int ?? source.attr_int ?? 10),
+    wis: Number(source.wis ?? source.attr_wis ?? 10),
+    cha: Number(source.cha ?? source.attr_cha ?? 10),
+  };
+}
+
+function buildCampNightAiPrompt(
+  state: GameState,
+  target: CampNightTalkTarget,
+) {
+  const alreadyTalkedTargets = getCampNightRequiredTalkTargets(state).filter((entry) =>
+    hasTalkedToCampNightTarget(state, entry),
+  );
+  const context = {
+    target,
+    targetName: getCampNightTargetName(target),
+    currentNodeId: POST_BLUE_SHOAL_IDS.campNight,
+    currentArea: state.current_area || "第三远征队营地·夜火",
+    playerName: state.player_name || state.player?.name || "冒险者",
+    playerArchetype: state.char_class || state.player?.styleName || "",
+    playerAttributes: getPlayerAttributes(state),
+    recentStorySummary:
+      state.scene_summary || state.story?.summary || state.last_event || "",
+    completedEvents: state.events || state.completedEvents || [],
+    importantFlags: {
+      lainEncountered: Boolean(state.laine_found || state.lainEncountered),
+      lainHelped: isLaineHelpedForCampNight(state),
+      purificationHeartUsed: Boolean(state.purification_heart_used_on_laine),
+      laineStabilized: Boolean(state.laine_stabilized),
+      corePurificationKnown: Boolean(state.core_purification_known),
+    },
+    blueShoalBattleResult: "win",
+    inventoryText: state.inventory || "",
+    inventoryItems:
+      state.inventoryState?.items || state.inventory_items || state.items || [],
+    companionTrust: {
+      serin: getCompanionTrust(state, "serin"),
+      ailin: getCompanionTrust(state, "ailin"),
+      brock: getCompanionTrust(state, "brock"),
+      kaiya: getCompanionTrust(state, "kaiya"),
+    },
+    alreadyTalkedTargets,
+  };
+
+  return `【campNight 强制夜谈】\n当前只生成与${getCampNightTargetName(target)}的营火夜谈。根据以下上下文写 3—6 行标准剧本：\n${JSON.stringify(context)}\n要求：以动作、停顿和角色口吻体现信任差异；可使用前文经历与背包道具，但不得修改状态、道具或信任。不要替玩家作决定，不要输出行动选项。不得提前揭露瑟琳来自未来、玩家未来身份、完整时间锚点，也不得出现地下海洋、海声、海浪、海风、盐味或黑潮。莱因只能给模糊警告，不得解释完整真相。`;
 }
 
 const BGM = "/assets/bgm/bgm_04b_fungal_sea_explore.mp3";
@@ -82,7 +244,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["蓝伞浅滩战后扩展"],
     setArea: "无光孢海·蓝伞浅滩战场",
-    bgImage: "/assets/scenes/10blue-shoal-after-battle.webp",
+    bgImage: "/assets/scenes/14.webp",
     bgm: BLUE_SHOAL_BGM,
     statePatch: {
       postBlueShoalExpandedStarted: true,
@@ -92,46 +254,16 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "蓝伞浅滩战斗结束，开始调查战场异常",
     lines: [
-      {
-        speaker: "主持人",
-        text: "战斗结束后，蓝伞浅滩并没有真正安静下来。被斩碎的菌丝散落在浅水与岩缝之间，仍一下一下抽动，像某种濒死的东西还在隔着地面呼吸。",
-      },
-      {
-        speaker: "主持人",
-        text: "蓝伞菌盖上的荧光忽明忽暗，水洼里倒映出的不只是你们的影子。偶尔有细微波纹从战场中央扩散开来，可周围没有风，也没有活物走动。",
-      },
-      {
-        speaker: "布洛克",
-        text: "「先别收武器。」布洛克用斧柄挑开一团焦黑菌毯，脸色比刚才更沉，「这些孢兽不是来捕食的。它们像是被什么东西从更深处赶出来的。」",
-      },
-      {
-        speaker: "主持人",
-        text: "菌毯底部有几道被硬生生撕开的沟痕，方向全部朝向浅滩之外，仿佛整片孢海曾在某一瞬间集体后退，又被迫重新涌上来。",
-      },
-      {
-        speaker: "艾琳",
-        text: "艾琳跪在浅水边，将白枝圣徽按向地面。圣徽没有立刻发光，反而被一层细小的蓝绿色孢尘覆盖，像是这里的污染正在抵抗净化。",
-      },
-      {
-        speaker: "艾琳",
-        text: "「不只是孢毒。」她低声说，「这里残留着某种恐惧，像是被反复压进土地里，又被刚才的战斗翻了出来。」",
-      },
-      {
-        speaker: "瑟琳",
-        text: "瑟琳抬起法杖，银灰色符文在杖端短暂倒转。「这里留下了封印脉冲的余波。地底堡垒还在回应，但回应方式不对，像是有人把求救信号和驱赶命令叠在了一起。」",
-      },
-      {
-        speaker: "凯娅",
-        text: "凯娅蹲在一截断裂的黑缆旁，指尖擦过缆线切口。「这不是孢兽咬断的。切面太整齐，像是有人提前处理过。」",
-      },
-      {
-        speaker: "主持人",
-        text: "你们这才注意到，浅滩战场上散落着三类异常痕迹：菌群集体迁徙的沟痕、封印脉冲留下的逆转余波，以及一段被人为破坏的黑缆残片。",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「继续前进前，最好先弄清楚这里到底发生了什么。否则下一次，我们可能连敌人从哪里来都不知道。」",
-      },
+      { speaker: "主持人", text: "战斗结束后，蓝伞浅滩并没有真正安静下来。被斩碎的菌丝散落在浅水与岩缝之间，仍一下一下抽动，像某种濒死的东西还在隔着地面呼吸。", },
+      { speaker: "主持人", text: "蓝伞菌盖上的荧光忽明忽暗，水洼里倒映出的不只是你们的影子。偶尔有细微波纹从战场中央扩散开来，可周围没有风，也没有活物走动。", },
+      { speaker: "布洛克", text: "「先别收武器。」布洛克用斧柄挑开一团焦黑菌毯，脸色比刚才更沉，「这些孢兽不是来捕食的。它们像是被什么东西从更深处赶出来的。」", },
+      { speaker: "主持人", text: "菌毯底部有几道被硬生生撕开的沟痕，方向全部朝向浅滩之外，仿佛整片孢海曾在某一瞬间集体后退，又被迫重新涌上来。", },
+      { speaker: "艾琳", text: "艾琳跪在浅水边，将白枝圣徽按向地面。圣徽没有立刻发光，反而被一层细小的蓝绿色孢尘覆盖，像是这里的污染正在抵抗净化。", },
+      { speaker: "艾琳", text: "「不只是孢毒。」她低声说，「这里残留着某种恐惧，像是被反复压进土地里，又被刚才的战斗翻了出来。」", },
+      { speaker: "瑟琳", text: "瑟琳抬起法杖，银灰色符文在杖端短暂倒转。「这里留下了封印脉冲的余波。地底堡垒还在回应，但回应方式不对，像是有人把求救信号和驱赶命令叠在了一起。」", },
+      { speaker: "凯娅", text: "凯娅蹲在一截断裂的黑缆旁，指尖擦过缆线切口。「这不是孢兽咬断的。切面太整齐，像是有人提前处理过。」", },
+      { speaker: "主持人", text: "菌毯上的拖痕、封印的余波、被整齐切开的缆线——这三样东西不该同时出现在同一片战场上。", },
+      { speaker: "瑟琳", text: "「继续前进前，最好先弄清楚这里到底发生了什么。否则下一次，我们可能连敌人从哪里来都不知道。」", },
       { speaker: "凯娅", text: "「也就是说，真正值钱的线索，还没露头。」" },
     ],
     hints: [],
@@ -141,7 +273,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["前往骨柱湿地"],
     setArea: "无光孢海·湿地岔路",
-    bgImage: "/assets/scenes/11black-root-entrance.webp",
+    bgImage: "/assets/scenes/17.webp",
     bgm: BGM,
     statePatch: {
       blue_shoal_expanded_done: true,
@@ -151,42 +283,11 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "离开蓝伞浅滩，选择前往骨柱湿地的路线",
     lines: [
-      {
-        speaker: "主持人",
-        text: "离开蓝伞浅滩后，孢海的光变得更低。蓝伞菌的柔光被身后甩远，前方只剩一片贴着地面流动的雾，像湿地本身正在缓慢吐息。",
-      },
-      {
-        speaker: "主持人",
-        text: "这里的地面不像真正的地面。靴底陷入柔软菌毯，下面传来空响，仿佛你们踩在一层覆盖深井的皮肤上。尼布留下的发光铆钉在前方分成四列，分别没入不同方向。",
-      },
-      {
-        speaker: "布洛克",
-        text: "「第一条是发光桩道。」布洛克指向最规整的一列铆钉，「尼布那小子走过的安全线，绕远，但能避开大部分软泥坑和孢兽巢。想少惹麻烦，就看准这些桩。」",
-      },
-      {
-        speaker: "凯娅",
-        text: "「第二条是旧排水渠。」凯娅蹲下看向一排半埋在菌毯里的矮人石孔，「窄、滑、恶心，但能绕到湿地侧面。走得好，就是伏击别人；走不好，就是把自己塞进泥里。」",
-      },
-      {
-        speaker: "布洛克",
-        text: "「第三条沿菌毯脊线走。」他用斧柄拨开一层发亮孢尘，「那地方能看清孢群往哪儿迁。懂生态的人能提前判断骨柱湿地里有什么东西在动，不懂的人只会吸一肚子孢粉。」",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「第四条是断裂秘银缆索。」瑟琳望向雾中横过裂隙的暗银色残缆，「风险最高，但那上面可能残留封印回路的痕迹。若能取到样本，也许能解释蓝伞浅滩的异常脉冲。」",
-      },
-      {
-        speaker: "艾琳",
-        text: "「所以，发光桩道更安全，旧排水渠更适合绕行，菌毯脊线能看懂孢群变化，秘银缆索则可能接近封印真相。」艾琳轻按圣徽，「但每一条路都不会白白放人过去。」",
-      },
-      {
-        speaker: "凯娅",
-        text: "「说简单点：稳路保命，暗路抢位，菌路拿情报，缆路赌大线索。」凯娅笑了笑，「现在看你们想怎么进骨柱湿地。」",
-      },
-      {
-        speaker: "主持人",
-        text: "四条路线沉默地伸向雾中。你们可以在继续深入前做出数次准备，但同一条路线没有必要重复尝试。",
-      },
+      { speaker: "主持人", text: "旧地图在这里分成四条线。纸面上，它们仍然清清楚楚；可现实里的孢海没有那么听话。", },
+      { speaker: "主持人", text: "发光桩道还亮着，但每根桩子之间都隔着深浅不一的菌水。旧排水渠半埋在岩壁下方，里面传来断续的滴水声。菌脊小路绕向更高处，像一条被蓝光勾出的兽脊。至于黑缆残线，它横在远处裂谷上方，断面整齐得像被什么东西咬开。", },
+      { speaker: "布洛克", text: "「桩道稳，至少看得见脚下。排水渠快，但里面要是堵着东西，你们连转身都难。」", },
+      { speaker: "主持人", text: "艾琳没有立刻说话，只是看向四条路尽头。白枝圣徽在她指间轻轻晃了一下。", },
+      { speaker: "凯娅", text: "「说白了。想活命走桩道，想占便宜钻渠，想弄明白走菌脊，想赌一把走缆索。你们定。」", },
     ],
     hints: [],
   },
@@ -196,7 +297,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["抵达骨柱湿地"],
     setArea: "无光孢海·骨柱湿地",
-    bgImage: "/assets/scenes/bg-10-bone-pillar-marsh.webp",
+    bgImage: "/assets/scenes/27.webp",
     bgm: "/assets/bgm/bgm_12_v2_candidate1_raw.mp3",
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.boneInvestigation,
@@ -204,58 +305,19 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "抵达会模仿人声的骨柱湿地",
     lines: [
-      {
-        speaker: "主持人",
-        text: "穿过湿地岔路后，脚下的菌毯逐渐变硬，颜色也从蓝绿转为灰白。雾气贴着地面翻滚，像一层被骨头撑起的潮水。",
-      },
-      {
-        speaker: "主持人",
-        text: "骨柱湿地没有水声，却有潮声。一根根苍白骨柱从菌毯中伸出，有的像肋骨，有的像断裂的手指，青绿色孢光沿骨缝缓慢上升。",
-      },
-      {
-        speaker: "布洛克",
-        text: "「到了。」布洛克压低声音，「别碰那些骨柱，别踩柱根，尤其别相信从雾里传出来的熟人声。」",
-      },
-      {
-        speaker: "主持人",
-        text: "他话音刚落，远处便传来尼布的声音：“这边安全，跟着铆钉走。”那声音温和、清晰，甚至连停顿都和本人一模一样。",
-      },
-      {
-        speaker: "艾琳",
-        text: "「不要回应。」艾琳立刻按住圣徽，声音很轻，却没有犹豫，「它不是在说话，是在等我们承认它。」",
-      },
-      {
-        speaker: "主持人",
-        text: "雾中很快又响起第二个声音。这一次，它像是队伍里某个人在叫你的名字，语气焦急，位置忽左忽右，仿佛只要你回头，就能看见有人落在了后面。",
-      },
-      {
-        speaker: "凯娅",
-        text: "「终于开始像个陷阱了。问题是，它想骗我们走过去，还是想拖延我们别继续往前？」",
-      },
-      {
-        speaker: "主持人",
-        text: "瑟琳抬起法杖，银灰符文在雾中划出短暂的圆弧。",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「骨柱之间有回声回路，声音不是随机出现的。它们在读取我们的记忆残响，再用熟悉的声音制造方向误判。」",
-      },
-      {
-        speaker: "布洛克",
-        text: "「骨柱湿地里通常有三样东西最要命：会学人说话的回声菌、藏在柱根下的孢兽巢，还有被菌毯盖住的旧路标。」",
-      },
-      {
-        speaker: "艾琳",
-        text: "「如果能找出声音的源头，或许可以让它短时间安静下来。如果能净化柱根，也许能削弱这里的污染。」",
-      },
-      {
-        speaker: "凯娅",
-        text: "「如果能找到旧路标，我们就不用被这片鬼地方牵着鼻子走。」",
-      },
-      {
-        speaker: "主持人",
-        text: "骨柱之间的雾越来越厚，熟悉的声音在远处一遍遍呼唤。继续深入前，你们必须先决定要调查哪里。",
-      },
+      { speaker: "主持人", text: "穿过湿地岔路后，脚下的菌毯逐渐变硬，颜色也从蓝绿转为灰白。雾气贴着地面翻滚，像一层被骨头撑起的潮水。", },
+      { speaker: "主持人", text: "骨柱湿地没有水声。一根根苍白骨柱从菌毯中伸出，有的像肋骨，有的像断裂的手指，青绿色孢光沿骨缝缓慢上升。", },
+      { speaker: "布洛克", text: "「到了。」布洛克压低声音，「别碰那些骨柱，别踩柱根，尤其别相信从雾里传出来的熟人声。」", },
+      { speaker: "主持人", text: "他话音刚落，远处便传来尼布的声音：“这边安全，跟着铆钉走。”那声音温和、清晰，甚至连停顿都和本人一模一样。", },
+      { speaker: "艾琳", text: "「不要回应。」艾琳立刻按住圣徽，声音很轻，却没有犹豫，「它不是在说话，是在等我们承认它。」", },
+      { speaker: "主持人", text: "雾中很快又响起第二个声音。这一次，它像是队伍里某个人在叫你的名字，语气焦急，位置忽左忽右，仿佛只要你回头，就能看见有人落在了后面。", },
+      { speaker: "凯娅", text: "「终于开始像个陷阱了。问题是，它想骗我们走过去，还是想拖延我们别继续往前？」", },
+      { speaker: "主持人", text: "瑟琳抬起法杖，银灰符文在雾中划出短暂的圆弧。", },
+      { speaker: "瑟琳", text: "「骨柱之间有回声回路，声音不是随机出现的。它们在读取我们的记忆残响，再用熟悉的声音制造方向误判。」", },
+      { speaker: "布洛克", text: "「有三样东西最要命：声音从哪来，柱根往哪扎，旧路标被谁挪过。」", },
+      { speaker: "艾琳", text: "「声音有源头就能让它闭嘴。柱根能净化，就少一份污染。」", },
+      { speaker: "凯娅", text: "「找到旧路标就不用被它耍。我受不了这片鬼地方了。」", },
+      { speaker: "主持人", text: "骨柱之间的雾越来越厚，熟悉的声音在远处一遍遍呼唤。继续深入前，你们必须先决定要调查哪里。", },
     ],
     hints: [],
   },
@@ -265,7 +327,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["骨柱湿地伏击"],
     setArea: "无光孢海·骨柱湿地伏击区",
-    bgImage: "/assets/scenes/bg-10-bone-pillar-marsh.webp",
+    bgImage: "/assets/scenes/27.webp",
     bgm: BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.bonePrebattle,
@@ -273,14 +335,12 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "骨柱湿地伏击出现，只够进行一次战前行动",
     lines: [
-      {
-        speaker: "主持人",
-        text: "骨柱间的雾突然塌下。拟声菌丝从石柱背后滑出，一头披着苍白骨片的孢兽缓慢站起。",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「它们在等同一个心跳。还有时间做一个准备动作——只够一个。」",
-      },
+      { speaker: "主持人", text: "骨柱间的雾突然塌下。", },
+      { speaker: "主持人", text: "不是散开，是像被抽走了支撑一样，整片雾从半空坠落到菌毯上。你们脚下的地面随之剧烈震颤，深处传来一阵又一阵沉闷的回声。", },
+      { speaker: "主持人", text: "拟声菌丝从三人高的骨柱背后滑出，像从石头里拧出来的手掌。它们没有立刻扑上来，只是贴着地面展开，慢慢围住你们的退路。", },
+      { speaker: "主持人", text: "一头披着苍白骨片的孢兽缓慢站起。它抖落身上的菌毯碎屑，空洞眼窝里两团青绿色孢光转向队伍。", },
+      { speaker: "瑟琳", text: "「它们在等同一个心跳。」", },
+      { speaker: "瑟琳", text: "「还有时间做一个准备动作——只够一个。」", },
     ],
     hints: [],
   },
@@ -289,7 +349,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["骨柱湿地战后"],
     setArea: "无光孢海·骨柱湿地尽头",
-    bgImage: "/assets/scenes/bg-10-bone-pillar-marsh.webp",
+    bgImage: "/assets/scenes/27.webp",
     bgm: BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.boneAftermath,
@@ -299,72 +359,21 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "穿过骨柱湿地，发现第三远征队营地",
     lines: [
-      {
-        speaker: "主持人",
-        text: "最后一只拟声菌团伏在折断的骨柱下，菌膜随着最后一次抽搐层层塌陷。它没有发出兽类的哀鸣，而是挤出几个彼此重叠的人声。",
-      },
-      {
-        speaker: "拟声菌团",
-        text: "「三号缆索断了……把伤员送回医疗帐……莱因，别让他们从里面开门……」",
-      },
-      {
-        speaker: "主持人",
-        text: "那些话不是临死时随意拼出的诱饵。呼吸、停顿、甚至远处金属撞击的回声都属于同一段记忆——第三远征队覆灭前，被菌群吞下的最后几分钟。",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「萨洛说失联前的求援方向一直在变，公会报告却记录他们始终驻守同一片区域。现在解释得通了：移动的不是远征队，是有人借他们的声音从堡垒里面发出假信号。」",
-      },
-      {
-        speaker: "艾琳",
-        text: "艾琳蹲下检查残留在菌膜里的药液结晶。「这和伤员净化记录里的剂量一致。第三远征队不是瞬间被杀死的；他们救治过伤员，也撑过了一段时间。」",
-      },
-      {
-        condition: "flags.pre_bone_take_high_ground",
-        speaker: "主持人",
-        text: "战前抢下的骨柱高点此刻也派上了用场：从高处望去，所有逃窜沟痕都绕开营地中央那盏仍在闪烁的冷光灯。",
-      },
-      {
-        condition: "flags.pre_bone_purify_spores",
-        speaker: "艾琳",
-        text: "「幸好先净化了周围孢尘。」艾琳收起圣徽，「我们听见的是被污染保存的旧记忆，不是新一轮诱导。」",
-      },
-      {
-        condition: "flags.pre_bone_brock_bait",
-        speaker: "布洛克",
-        text: "布洛克剖开诱饵旁留下的菌丝：「它们宁愿扑向诱饵也不肯靠近营地。后面有东西连孢兽都在躲。」",
-      },
-      {
-        condition: "flags.pre_bone_kaia_trap",
-        speaker: "凯娅",
-        text: "凯娅从战前拆除的陷阱里抽出半截黑缆：「这条缆线被人改成了阻拦索，切口朝里——布置它的人防的是堡垒方向。」",
-      },
-      {
-        condition: "flags.pre_bone_serin_pulse",
-        speaker: "瑟琳",
-        text: "瑟琳将战前读到的脉冲节奏与拟声残片重叠，确认那句‘别从里面开门’恰好发生在一次封印逆转的峰值。",
-      },
-      {
-        condition: "yunling_farewell_done",
-        speaker: "主持人",
-        text: "云苓的护身符贴在胸前微微发热，封在里面的蓝色菌叶与白枝烛芯同时褪去一层颜色，替你挡下了拟声菌团消散时最后一阵记忆回响。",
-      },
-      {
-        speaker: "布洛克",
-        text: "布洛克检查战前行动留下的痕迹，又望向孢兽倒下的位置。「它们不是守着这里。它们是在挡住后面的营地，或者——被后面那东西赶出来。」",
-      },
-      {
-        speaker: "主持人",
-        text: "凯娅从菌泥中挑出半枚压扁的黑缆扣。扣环内侧的受力痕朝向堡垒，证明有人曾从营地方向拼命拉住一条通往内部的缆索。",
-      },
-      {
-        speaker: "凯娅",
-        text: "「记下来。门不是被外面的东西撞开的——有人在里面开门，而远征队里有人试过阻止它。」",
-      },
-      {
-        speaker: "主持人",
-        text: "战场终于沉入寂静。雾后露出倾斜的帐杆、向内倒伏的拒马、断裂的旗帜和被菌毯半吞没的补给箱。第三远征队营地就在前方；那里看不见活人，却有一盏冷光灯仍在断断续续地亮。",
-      },
+      { speaker: "主持人", text: "最后一只骨柱孢兽伏在折断的骨柱下，菌膜随着最后一次抽搐层层塌陷。它没有发出兽类的哀鸣，而是挤出几个彼此重叠的人声。", },
+      { speaker: "骨柱孢兽", text: "「三号缆索断了……把伤员送回医疗帐……莱因，别让他们从里面开门……」", },
+      { speaker: "主持人", text: "那些话不是临死时随意拼出的诱饵。呼吸、停顿、甚至远处金属撞击的回声都属于同一段记忆——第三远征队覆灭前，被菌群吞下的最后几分钟。", },
+      { speaker: "瑟琳", text: "「萨洛说失联前的求援方向一直在变，公会报告却记录他们始终驻守同一片区域。现在解释得通了：移动的不是远征队，是有人借他们的声音从堡垒里面发出假信号。」", },
+      { speaker: "艾琳", text: "艾琳蹲下检查残留在菌膜里的药液结晶。「这和伤员净化记录里的剂量一致。第三远征队不是瞬间被杀死的；他们救治过伤员，也撑过了一段时间。」", },
+      { condition: "flags.pre_bone_take_high_ground", speaker: "主持人", text: "战前抢下的骨柱高点此刻也派上了用场：从高处望去，所有逃窜沟痕都绕开营地中央那盏仍在闪烁的冷光灯。", },
+      { condition: "flags.pre_bone_purify_spores", speaker: "艾琳", text: "「幸好先净化了周围孢尘。」艾琳收起圣徽，「我们听见的是被污染保存的旧记忆，不是新一轮诱导。」", },
+      { condition: "flags.pre_bone_brock_bait", speaker: "布洛克", text: "布洛克剖开诱饵旁留下的菌丝：「它们宁愿扑向诱饵也不肯靠近营地。后面有东西连孢兽都在躲。」", },
+      { condition: "flags.pre_bone_kaia_trap", speaker: "凯娅", text: "凯娅从战前拆除的陷阱里抽出半截黑缆：「这条缆线被人改成了阻拦索，切口朝里——布置它的人防的是堡垒方向。」", },
+      { condition: "flags.pre_bone_serin_pulse", speaker: "瑟琳", text: "瑟琳将战前读到的脉冲节奏与拟声残片重叠，确认那句‘别从里面开门’恰好发生在一次封印逆转的峰值。", },
+      { condition: "yunling_farewell_done", speaker: "主持人", text: "云苓的护身符贴在胸前微微发热，封在里面的蓝色菌叶与白枝烛芯同时褪去一层颜色，替你挡下了拟声菌团消散时最后一阵记忆回响。", },
+      { speaker: "布洛克", text: "布洛克检查战前行动留下的痕迹，又望向孢兽倒下的位置。「它们不是守着这里。它们是在挡住后面的营地，或者——被后面那东西赶出来。」", },
+      { speaker: "主持人", text: "凯娅从菌泥中挑出半枚压扁的黑缆扣。扣环内侧的受力痕朝向堡垒，证明有人曾从营地方向拼命拉住一条通往内部的缆索。", },
+      { speaker: "凯娅", text: "「记下来。门不是被外面的东西撞开的——有人在里面开门，而远征队里有人试过阻止它。」", },
+      { speaker: "主持人", text: "战场终于沉入寂静。雾后露出倾斜的帐杆、向内倒伏的拒马、断裂的旗帜和被菌毯半吞没的补给箱。第三远征队营地就在前方；那里看不见活人，却有一盏冷光灯仍在断断续续地亮。", },
     ],
     hints: [],
   },
@@ -373,7 +382,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["调查第三远征队营地"],
     setArea: "无光孢海·第三远征队营地",
-    bgImage: "/assets/scenes/12lain-survivor-site.webp",
+    bgImage: "/assets/scenes/16.webp",
     bgm: BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.camp,
@@ -383,30 +392,13 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "进入第三远征队遗弃营地",
     lines: [
-      {
-        speaker: "主持人",
-        text: "营地外围的拒马全部朝向堡垒，而不是朝向孢海。木桩背面布满刀斧劈砍留下的缺口，说明最后的冲突发生在防线内侧；第三远征队并非被外部兽群一拥而上地撕碎。",
-      },
-      {
-        speaker: "主持人",
-        text: "营火旁叠着吃空的口粮袋，医疗帐外排着三只清洗过的水盆，一口锅被反复加热到锅底开裂。这里的人在第一次出事后又活了数日，救治、轮岗、修补防线，直到某个命令让一切彻底失控。",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「失联报告把这里写成一次突发袭击，但营地至少经历过三轮值守。公会收到的最后通信，很可能已经不是他们本人发出的。」",
-      },
-      {
-        speaker: "艾琳",
-        text: "艾琳在医疗帐门口找到一行用炭写下的字：‘仍能说出自己名字的人，先救。’旁边的计数每天都在减少，却从未归零。",
-      },
-      {
-        speaker: "布洛克",
-        text: "「有人撑到了最后，也有人一直在修那条黑缆。」布洛克指向通往堡垒的拖痕，「不是为了开门，是为了把门拽回去。」",
-      },
-      {
-        speaker: "凯娅",
-        text: "凯娅望向指挥帐、医疗帐、地图桌和封蜡锁箱。「先把他们没来得及带走的真相拼起来。要是还有人活着，他会需要我们先知道该问什么。」",
-      },
+      { speaker: "主持人", text: "营地不像遭遇过兽群袭击，更像所有人都在某一刻同时停下手里的事，朝同一个方向走去。", },
+      { speaker: "主持人", text: "一口锅仍架在熄灭的炉石上，几封写到一半的信压在石块下面。拒马全部朝向堡垒，而不是朝向孢海。", },
+      { speaker: "主持人", text: "炉灰还是温的。有人不久前在这里坐过，用烧剩的木炭在石头上画了一个指向堡垒的箭头——箭头上打了叉。", },
+      { speaker: "主持人", text: "艾琳在医疗帐门口停下，指尖轻轻碰到门帘上的干涸药粉。", },
+      { speaker: "艾琳", text: "「这里有人坚持救治到最后。你看这行字——‘仍能说出自己名字的人，先救。’旁边的计数每天都在减少，却从未归零。」", },
+      { speaker: "布洛克", text: "「有人一直在修那条黑缆。不是为了逃走，是为了把什么东西重新接回去。」", },
+      { speaker: "凯娅", text: "「那就更坏了。逃路断了不可怕，可怕的是他们明知道路断了，还觉得必须往回走。」", },
     ],
     hints: [],
   },
@@ -415,7 +407,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["发现莱因"],
     setArea: "无光孢海·第三远征队营地岩棚",
-    bgImage: "/assets/scenes/12lain-survivor-site.webp",
+    bgImage: "/assets/scenes/16.webp",
     bgm: BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.laineSurvivor,
@@ -424,18 +416,15 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "在营地岩棚发现第三远征队最后一个活人莱因",
     lines: [
-      {
-        speaker: "主持人",
-        text: "你们准备离开营地时，凯娅忽然抬手。风里传来一道很轻的金属摩擦声，来自营地后方一座塌了一半的岩棚。",
-      },
-      {
-        speaker: "主持人",
-        text: "几根断裂的黑缆插在岩壁里。岩棚深处，一名重甲兵靠坐在石壁下，胸甲被血和孢液糊住，半边肩膀缠满随呼吸收缩的青绿色菌丝。",
-      },
-      { speaker: "布洛克", text: "「有人。还活着。」" },
-      { speaker: "莱因", text: "「别……别回应它。它会用你认识的声音叫你。」" },
-      { speaker: "艾琳", text: "「他还活着，而且意识没有完全被孢声吞掉。」" },
-      { speaker: "瑟琳", text: "「黑缆守卫，莱因。第三远征队最后一个活人。」" },
+      { speaker: "主持人", text: "你们在黑色菌根之间发现了一个活人。", },
+      { speaker: "主持人", text: "他靠坐在一块黑石旁，身上穿着严重锈蚀的堡垒重甲。胸口的地底堡垒徽记被爪痕划穿，一只护手不见了，披风被孢子腐蚀得只剩半片。", },
+      { speaker: "主持人", text: "半边肩膀缠满青绿色菌丝。那些菌丝不是长在铠甲外面的。它们从肩甲的裂缝、护喉的缝隙，甚至指节的关节处钻出来——不是寄生，是共生。", },
+      { speaker: "主持人", text: "他每呼吸一次，菌丝就收紧一次，像在替他喘气。", },
+      { speaker: "主持人", text: "他手里攥着一枚断裂军牌。周围没有完整尸体，只有散落的甲片、断剑和被黑根缠住的旧补给箱。", },
+      { speaker: "莱因", text: "「点名……第一队，报数……不对，少了三个人。不，是多了三个人……」", },
+      { speaker: "莱因", text: "「长官，我没有离队。我只是……我只是还在往下走。」", },
+      { speaker: "瑟琳", text: "「他是地底堡垒的人。」", },
+      { speaker: "艾琳", text: "「还活着。但再拖下去，他会分不清自己是在呼吸，还是被那些菌丝替他呼吸。」", },
     ],
     hints: [],
   },
@@ -444,29 +433,22 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["处理莱因伤势与证词"],
     setArea: "第三远征队营地·岩棚深处",
-    bgImage: "/assets/scenes/12lain-survivor-site.webp",
+    bgImage: "/assets/scenes/16.webp",
     bgm: BGM,
     statePatch: { currentNodeId: POST_BLUE_SHOAL_IDS.laineDecision },
     lastEvent: "莱因在清醒与孢声之间说出黑石门卫真相",
     lines: [
-      {
-        speaker: "主持人",
-        text: "莱因的意识像一盏快熄灭的灯。每当他闭眼，喉咙里都会响起另一个温柔而熟悉的声音：“回来吧，莱因。”",
-      },
-      {
-        speaker: "莱因",
-        text: "「那不是队长。队长死在门前了。那东西只是学会了他的声音。」",
-      },
-      { speaker: "瑟琳", text: "「黑石门卫呢？」" },
-      {
-        speaker: "莱因",
-        text: "「它在守门。它一直都在守门。是我们……把假命令带进去了。」",
-      },
-      {
-        condition: "purification_heart_used_on_laine",
-        speaker: "莱因",
-        text: "「净化之心压住了我体内的黑石侵蚀……同样的净化反应，也能稳定门卫的核心。别把它当成只能砸碎的怪物。」",
-      },
+      { speaker: "主持人", text: "艾琳试图把净化粉撒在莱因肩侧，菌丝却像听见祷词一样猛地收紧。莱因的喉咙里挤出一声短促的喘息，像有人从更深处借他的胸腔说话。", },
+      { speaker: "艾琳", text: "「不能硬拔。它们已经和他的呼吸绑在一起了。」", },
+      { speaker: "莱因", text: "「别回答……第三下……」", },
+      { speaker: "瑟琳", text: "「莱因，听我说。黑石门卫在哪里？」", },
+      { speaker: "主持人", text: "莱因的眼睛短暂聚焦。他像是终于从某种不断重复的命令声里挣扎出来，手指死死扣住断裂军牌。", },
+      { speaker: "莱因", text: "「门前。它还在门前。」", },
+      { speaker: "莱因", text: "「但它听的不是我们了。」", },
+      { speaker: "莱因", text: "「那不是队长。队长死在门前了。那东西只是学会了他的声音。」", },
+      { speaker: "主持人", text: "这句话落下后，营地里安静得只剩菌丝收缩的细响。布洛克没有再骂，凯娅也没有接话。", },
+      { speaker: "莱因", text: "「它让我们开门。它用队长的声音叫我们归队。可门后……不对。门开错了。」", },
+      { condition: "purification_heart_used_on_laine", speaker: "莱因", text: "「净化之心压住了我体内的黑石侵蚀……同样的净化反应，也能稳定门卫的核心。别把它当成只能砸碎的怪物。」", },
     ],
     hints: [],
   },
@@ -475,29 +457,24 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["营地夜谈"],
     setArea: "第三远征队营地·夜火",
-    bgImage: "/assets/scenes/13black-root-rest-point.webp",
+    bgImage: "/assets/scenes/18.webp",
     bgm: BGM,
     statePatch: { currentNodeId: POST_BLUE_SHOAL_IDS.campNight },
-    lastEvent: "进入堡垒前，与一名伙伴进行夜谈",
+    lastEvent: "进入堡垒前，队伍在夜火旁进行最后交谈",
     lines: [
-      {
-        speaker: "主持人",
-        text: "夜晚在地底没有真正降临，只是孢光变得更冷。你们在远征队留下的石圈里点起一小团火。",
-      },
-      {
-        speaker: "主持人",
-        text: "明天就要进入地底堡垒。今晚，队伍里的每个人似乎都有话想说。",
-      },
-      {
-        condition: "laine_alive && !laine_left_behind",
-        speaker: "主持人",
-        text: "莱因靠在火光边缘，没有真正睡着。每隔一会儿，他都会睁眼确认队伍和自己的手仍在原处。",
-      },
-      {
-        condition: "laine_left_behind && !purification_heart_used_on_laine",
-        speaker: "主持人",
-        text: "岩棚已经被黑暗吞没。没有净化之心，队伍既没能带走莱因，也没能取得他关于黑石门卫核心的证词。",
-      },
+      { speaker: "主持人", text: "那一夜，营地没有真正睡着。", },
+      { speaker: "主持人", text: "火光照在黑石根区边缘，影子被拉得很长，像一排站在黑暗里的死者。远处的黑缆偶尔轻轻震一下，声音沿着地面传回来，像有人在更深处敲门。", },
+      { speaker: "主持人", text: "布洛克没有讲笑话。他把锅倒扣在膝前，一遍遍检查斧刃和采样刀，最后只往火里添了一块干菌木。", },
+      { speaker: "主持人", text: "艾琳坐在火光边缘，擦拭白枝圣徽。每擦一下，她就停一会儿，像在确认自己还记得那些没能被救下的名字。", },
+      { speaker: "主持人", text: "凯娅背对火光，低头检查黑缆扣和锁针。她的尾巴很安静，安静到不像她。", },
+      { speaker: "主持人", text: "瑟琳没有写笔记。她只是看着银杖上的那道细裂纹，指腹停在裂痕旁边，迟迟没有按下去。", },
+      { speaker: "主持人", text: "没有人问明天会不会回来。在这种地方，说出那句话，反而像是在提醒黑暗记住你们的声音。", },
+      { speaker: "主持人", text: "火焰低下去之前，你还有一点时间，听听每个人最后想说的话。", },
+      { condition: "lainHelped || helpedRhein || purification_heart_used_on_laine", speaker: "主持人", text: "莱因被安置在火光边缘。艾琳替他固定了肩甲下的绷带，但那些青绿色菌丝仍会随着他的呼吸轻轻收缩。", },
+      { condition: "lainHelped || helpedRhein || purification_heart_used_on_laine", speaker: "主持人", text: "他每次数到三，都会停住，像在确认自己没有回应错误的敲门声。", },
+      { condition: "lainHelped || helpedRhein || purification_heart_used_on_laine", speaker: "主持人", text: "进入黑暗之门前，你需要和四位队友以及莱因分别谈谈。", },
+      { condition: "!lainHelped && !helpedRhein && !purification_heart_used_on_laine", speaker: "主持人", text: "远处偶尔传来盔甲拖过黑石的声音。没有人确认那是不是莱因。", },
+      { condition: "!lainHelped && !helpedRhein && !purification_heart_used_on_laine", speaker: "主持人", text: "进入黑暗之门前，你需要和四位队友分别谈谈。", },
     ],
     hints: [],
   },
@@ -506,7 +483,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["抵达地底堡垒外环"],
     setArea: "地底堡垒·外环",
-    bgImage: "/assets/scenes/bg-11-blackstone-root.webp",
+    bgImage: "/assets/scenes/28.webp",
     bgm: BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.fortressOuter,
@@ -514,38 +491,18 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "抵达仍在运行的地底堡垒门禁",
     lines: [
-      {
-        speaker: "主持人",
-        text: "地底堡垒从孢海尽头升起，像一块被黑暗浸透的巨骨。黑石与旧铜铆接的外墙爬满青绿色菌丝。",
-      },
-      {
-        speaker: "主持人",
-        text: "正门刻着三英雄时代的誓词：“此门不开，深渊不入；此城不退，众生不坠。”",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「菌丝正在模仿另一条命令。它们想让门禁相信，门内的人要回来了。」",
-      },
-      {
-        condition: "laine_stabilized && !laine_left_behind",
-        speaker: "莱因",
-        text: "「外环门禁不是锁，是问答。它会问你从哪条缆来。回答它：从断缆回到门前。」",
-      },
-      {
-        condition: "laine_alive && laine_spore_worsened && !laine_left_behind",
-        speaker: "莱因",
-        text: "「别走左边……不，是右边。等等，我又听见队长了。」",
-      },
-      {
-        condition: "laine_left_behind",
-        speaker: "拟声菌团",
-        text: "「你们为什么不带我走？」",
-      },
-      {
-        condition: "laine_mercy_killed",
-        speaker: "主持人",
-        text: "莱因的黑缆识别牌在门禁前泛起残光。艾琳看了它一眼，什么也没有说。",
-      },
+      { speaker: "主持人", text: "地底堡垒从孢海尽头升起，像一块被黑暗浸透的巨骨。", },
+      { speaker: "主持人", text: "外墙没有倒塌，却比废墟更像废墟。每一道垛口都还完整，每一面旗帜都垂在原处，只是上面没有风，也没有守军。", },
+      { speaker: "主持人", text: "正门上刻着旧誓词：守住门——直到门不再需要人守。", },
+      { condition: "laine_alive && !laine_left_behind", speaker: "主持人", text: "莱因盯着那行字，嘴唇动了几次，像想跟着念完，却怎么也接不上后半句。", },
+      { speaker: "布洛克", text: "「门口没有战斗痕迹。坏消息，这说明它不是被外面攻破的。」", },
+      { speaker: "凯娅", text: "「更坏的消息，锁是从里面开的。」", },
+      { speaker: "瑟琳", text: "「别靠近门缝。黑石脉冲从里面出来，节奏不稳定。」", },
+      { speaker: "主持人", text: "门后传来一声很轻的回响。不是脚步，也不是风。像有人在空大厅里慢慢放下了一把钥匙。", },
+      { condition: "laine_stabilized && !laine_left_behind", speaker: "莱因", text: "「外环门禁不是锁，是问答。它会问你从哪条缆来。回答它：从断缆回到门前。」", },
+      { condition: "laine_alive && laine_spore_worsened && !laine_left_behind", speaker: "莱因", text: "「别走左边……不，是右边。等等，我又听见队长了。」", },
+      { condition: "laine_left_behind", speaker: "拟声菌团", text: "「你们为什么不带我走？」", },
+      { condition: "laine_mercy_killed", speaker: "主持人", text: "莱因的黑缆识别牌在门禁前泛起残光。艾琳看了它一眼，什么也没有说。", },
     ],
     hints: [],
   },
@@ -554,7 +511,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["进入地底堡垒"],
     setArea: "地底堡垒·内环大厅",
-    bgImage: "/assets/scenes/bg-12-dark-gate-vestibule.webp",
+    bgImage: "/assets/scenes/30.webp",
     bgm: BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.fortressInner,
@@ -562,14 +519,16 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "进入仍在运行的地底堡垒遗迹",
     lines: [
-      {
-        speaker: "主持人",
-        text: "堡垒内部没有彻底死去。墙内符文管线一明一暗，节奏乱得像病人的脉搏。",
-      },
-      {
-        speaker: "主持人",
-        text: "大厅中央的缺头石像握着断剑，底座上刻着：“守门者可沉睡，不可遗忘。”",
-      },
+      { speaker: "主持人", text: "堡垒内部没有彻底死去。墙内符文管线一明一暗，节奏乱得像病人的脉搏。", },
+      { speaker: "主持人", text: "空气里有一股金属和菌丝混合的甜腥。十年里，没有活人的呼吸搅动过这些灰尘。", },
+      { speaker: "主持人", text: "你们踩过的每一块地砖都刻着名字。", },
+      { speaker: "主持人", text: "不是阵亡者，是建堡者——矮人、侏儒、人类，一层层从脚下延伸到黑暗深处。", },
+      { speaker: "主持人", text: "大厅中央，一尊缺头石像握着断剑。底座上刻着一行字。", },
+      { speaker: "石刻", text: "守门者可沉睡，不可遗忘。", },
+      { speaker: "主持人", text: "布洛克伸手摸了一下石像的断颈。指尖沾满的不是灰尘，是黑石粉末。", },
+      { speaker: "艾琳", text: "「这里不是荒废。这里像是有人一直在用错误的方法维持它活着。」", },
+      { speaker: "凯娅", text: "「那我宁愿它死干净一点。」", },
+      { speaker: "瑟琳", text: "「小声些。这里还在听。」", },
     ],
     hints: [],
   },
@@ -578,38 +537,18 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["进入封印控制大厅"],
     setArea: "地底堡垒·封印控制大厅",
-    bgImage: "/assets/scenes/14dark-gate-forecourt-battle.webp",
+    bgImage: "/assets/scenes/29.webp",
     bgm: BGM,
     statePatch: { currentNodeId: POST_BLUE_SHOAL_IDS.sealChamber },
     lastEvent: "在地心之门前发现被错误命令劫持的守门者",
     lines: [
-      {
-        speaker: "主持人",
-        text: "地心之门仍然闭合，却不再严丝合缝。门缝中透出极细的暗红光，像一道尚未愈合的伤口。",
-      },
-      {
-        speaker: "主持人",
-        text: "黑石门卫单膝跪在门前。它抬起头，眼中没有愤怒，只有一道被反复覆盖的命令。",
-      },
-      {
-        speaker: "黑石门卫",
-        text: "「维护队返航。开启外层封锁。迎接门内指令。」",
-      },
-      {
-        condition: "expedition_truth_complete",
-        speaker: "瑟琳",
-        text: "「门内污染伪造了维护命令。它以为自己在修复封印，实际上正在一点点打开门。」",
-      },
-      {
-        condition: "!expedition_truth_complete",
-        speaker: "瑟琳",
-        text: "「它的命令被污染了。细节还不完整，但任由它继续执行，门一定会打开。」",
-      },
-      {
-        condition: "flags.clue_gatekeeper_not_evil || clue_gatekeeper_not_evil",
-        speaker: "艾琳",
-        text: "「它不是想放深渊进来。它只是被迫相信，开门才是守门。」",
-      },
+      { speaker: "主持人", text: "封印控制大厅比你们想象中更宽，也更空。", },
+      { speaker: "主持人", text: "三圈巨大的封印环悬在大厅尽头，彼此错开半寸。就是这半寸，让整座大厅都发出低沉的错拍声。", },
+      { speaker: "主持人", text: "门缝中透出极细的暗红光，像一道尚未愈合的伤口。", },
+      { speaker: "古代警戒音", text: "「守门协议……异常。路线校准……失败。污染识别……失败。」", portrait: "/assets/enemies/enemy-gatekeeper.webp", },
+      { speaker: "瑟琳", text: "「它还在执行命令，只是命令已经被污染了。」", },
+      { condition: "lainHelped || helpedRhein || purification_heart_used_on_laine", speaker: "莱因", text: "「别听队长的声音。队长已经死了。」", },
+      { speaker: "主持人", text: "封印环深处，有什么庞大的东西缓缓抬起了头。", },
     ],
     hints: [],
   },
@@ -618,19 +557,17 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["黑石门卫战前行动"],
     setArea: "地心之门·守门者阵前",
-    bgImage: "/assets/scenes/14dark-gate-forecourt-battle.webp",
+    bgImage: "/assets/scenes/29.webp",
     bgm: BGM,
     statePatch: { currentNodeId: POST_BLUE_SHOAL_IDS.bossPrebattle },
     lastEvent: "黑石门卫起身，只剩一次战前准备机会",
     lines: [
-      {
-        speaker: "主持人",
-        text: "门内低语骤然重叠，黑石门卫抓住巨刃站起。它正在执行错误命令，却仍用身体挡在门前。",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「我们只能做一次准备。之后，无论它记不记得自己是谁，都必须先让它停下来。」",
-      },
+      { speaker: "主持人", text: "封印环下方的黑根开始回卷。", },
+      { speaker: "主持人", text: "它们不是向外生长，而是向内收束，把碎石、古代金属骨架、结晶菌丝和黑色方尖碑碎片一层层拖拽到同一个中心。", },
+      { speaker: "主持人", text: "一具巨大的守卫残骸从门前庭缓慢抬起。它像跪了十年，又像从来没有真正倒下。", },
+      { speaker: "主持人", text: "胸腔里的黑石核心亮起。一半像心脏，一半像锁。", },
+      { speaker: "古代警戒音", text: "「封锁……异常。路线……偏移。守门协议……失控。」", },
+      { speaker: "瑟琳", text: "「不要把它当成普通魔物。看它胸口——那不是弱点那么简单，是控制它的锁。」", },
     ],
     hints: [],
   },
@@ -639,7 +576,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["最终封印选择"],
     setArea: "地心之门·破损封印阵",
-    bgImage: "/assets/scenes/14dark-gate-forecourt-battle.webp",
+    bgImage: "/assets/scenes/29.webp",
     bgm: BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.finalChoice,
@@ -649,17 +586,13 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "黑石门卫被压制，地心之门等待最终处置",
     lines: [
-      {
-        speaker: "主持人",
-        text: "黑石门卫单膝跪在地心之门前，胸口核心裂开。青绿色菌丝和暗红光从裂缝里一同涌出。",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「还有一次机会。不是很多时间，但够我们做一个选择。」",
-      },
-      { speaker: "艾琳", text: "「它还没有完全消失。」" },
-      { speaker: "布洛克", text: "「要砸就现在砸，要救也得现在救。」" },
-      { speaker: "凯娅", text: "「稳定它，或者砸碎它。没有稳赚的选项，你来定。」" },
+      { speaker: "主持人", text: "黑石门卫的胸口核心完全暴露。", bgImage: "/assets/CG/cg07.webp", },
+      { speaker: "主持人", text: "那枚核心一半像心脏，一半像古代锁芯。青绿色菌光、深暗黑石光与暗红热裂在核心周围交替闪烁，每一次明灭都牵动整座门前庭的震动。", },
+      { speaker: "瑟琳", text: "「现在可以强行破坏它，也可以尝试稳定它。两种方法都能让我们接近黑暗之门。」", },
+      { speaker: "主持人", text: "没有人立刻回答。", },
+      { speaker: "主持人", text: "布洛克握紧斧柄，艾琳把圣徽按在掌心，凯娅看了一眼门环，又看向你。她没有开玩笑。", },
+      { speaker: "凯娅", text: "「锁坏了可以砸，也可以开。问题是，你想留下多少麻烦给以后？」", },
+      { speaker: "主持人", text: "所有人的目光最后都落到你身上。黑暗之门在前方低鸣，像是在等待你的手。", },
     ],
     hints: [],
   },
@@ -678,31 +611,15 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "黑石门卫跪倒在黑门之前，队伍必须决定最后处置方式。",
     lines: [
-      {
-        speaker: "主持人",
-        text: "黑石门卫跪倒在黑门前。它没有彻底碎裂，巨刃断成两截，胸口核心布满裂纹，左臂仍死死卡在门缝里。",
-      },
-      {
-        speaker: "主持人",
-        text: "黑根被你们斩断了大半，却还有更深的部分从门后探出，像不甘心退回黑暗的手指。大厅里的符文忽明忽暗，每一次亮起，你都能看见门卫胸口深处残留的蓝光。",
-      },
+      { speaker: "主持人", text: "黑石门卫跪倒在黑门前。它没有彻底碎裂，巨刃断成两截，胸口核心布满裂纹，左臂仍死死卡在门缝里。", bgImage: "/assets/CG/cg07.webp", },
+      { speaker: "主持人", text: "黑根从门环上松开，带着潮湿的摩擦声退入石缝。它们没有枯萎，只是像收到新的命令一样，安静地让开道路。大厅里的符文忽明忽暗，每一次亮起，你都能看见门卫胸口深处残留的蓝光。", },
       { speaker: "门后声音", text: "「开门。救我。回家。执行命令。」" },
-      {
-        speaker: "主持人",
-        text: "最后，所有声音合成一个与你完全相同的声音：「你已经走到这里了。现在只差最后一步。」",
-      },
-      {
-        speaker: "艾琳",
-        text: "「不要回应。现在该由活人决定，而不是门后的东西替我们说话。」",
-      },
+      { speaker: "主持人", text: "最后，所有声音合成一个与你完全相同的声音：「你已经走到这里了。现在只差最后一步。」", },
+      { speaker: "艾琳", text: "「不要回应。现在该由活人决定，而不是门后的东西替我们说话。」", },
       { speaker: "布洛克", text: "布洛克握紧斧头，第一次没有急着砍下去。" },
       { speaker: "凯娅", text: "「现在总该由活人说话了。」" },
       { speaker: "瑟琳", text: "「稳定核心，或是彻底破坏它。我们只有这两个选择。」" },
-      {
-        condition: "laine_alive && !laine_left_behind",
-        speaker: "莱因",
-        text: "莱因扶着墙站起来，看向门卫。「它站了十年。别让它最后只被记成怪物。」",
-      },
+      { condition: "laine_alive && !laine_left_behind", speaker: "莱因", text: "莱因扶着墙站起来，看向门卫。「它站了十年。别让它最后只被记成怪物。」", },
     ],
     hints: ["继续到最终处置选择"],
   },
@@ -711,7 +628,8 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["结局A：守门者仍在"],
     setArea: "地心之门·封印重启",
-    bgImage: "/assets/CG/cg05.png",
+    bgImage: "/assets/CG/cg05.webp",
+    bgm: ACT1_ENDING_BGM,
     statePatch: {
       ending: "guardian-remains",
       endingId: "guardian-remains",
@@ -724,21 +642,13 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "结局A：守门者仍在",
     lines: [
-      {
-        speaker: "主持人",
-        text: "你将双手按上裸露的黑石核心。瑟琳校准脉冲，艾琳压住污染，核心的震动终于从失控的轰鸣变回缓慢而稳定的心跳。",
-        bgImage: "/assets/CG/cg05.png",
-      },
-      {
-        speaker: "主持人",
-        text: "黑石门卫眼中的红光逐渐熄灭。它没有被彻底摧毁，而是重新沉入守门协议的长眠，旧防线也为你们留下了关于“门开错了”的证词。",
-        bgImage: "/assets/CG/cg01.png",
-      },
-      {
-        speaker: "莱因",
-        text: "「阿格洛恩，回到门前。第三远征队……归队。」",
-        bgImage: "/assets/CG/cg01.png",
-      },
+      { speaker: "主持人", text: "瑟琳的银杖抵住核心边缘时，那枚黑石核心还在狂跳。", bgImage: "/assets/CG/cg05.webp", },
+      { speaker: "主持人", text: "它不像心脏，更像一把在黑暗里不断试图转错方向的锁。你按住门卫垂落的手臂，艾琳的祷词压住菌丝污染，布洛克和凯娅清开缠绕地面的黑根。", },
+      { speaker: "主持人", text: "核心的节奏终于慢下来。暗红色裂光一寸寸熄灭，青绿色菌光退回根须深处，只剩黑石表面极低的冷光。", },
+      { speaker: "主持人", text: "黑石门卫重新跪回门前，像一名终于听见归队命令的老兵。", bgImage: "/assets/CG/cg01.webp", },
+      { speaker: "莱因", text: "「归队……」", bgImage: "/assets/CG/cg01.webp", },
+      { speaker: "主持人", text: "莱因说出这两个字时，门卫眼中的红光彻底熄灭。黑暗之门在稳定的低鸣中缓缓开启。", },
+      { speaker: "结局记录", text: "你救下了莱因，也让失控的黑石门卫重新沉眠。旧防线没有倒塌。它只是重新睡下了，胸口还留着“门开错了”的最后一个真话。", },
     ],
     hints: ["穿过黑暗之门"],
   },
@@ -747,7 +657,8 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["结局B：带伤者穿门"],
     setArea: "地心之门·破裂门体",
-    bgImage: "/assets/CG/cg06.png",
+    bgImage: "/assets/CG/cg06.webp",
+    bgm: ACT1_ENDING_BGM,
     statePatch: {
       ending: "wounded-through-gate",
       endingId: "wounded-through-gate",
@@ -760,21 +671,13 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "结局B：带伤者穿门",
     lines: [
-      {
-        speaker: "主持人",
-        text: "你将武器送进核心最深处。黑石在巨响中碎裂，封锁与错误命令一同崩塌，地心之门被粗暴地撕开。",
-        bgImage: "/assets/CG/cg06.png",
-      },
-      {
-        speaker: "主持人",
-        text: "门体在震动中变得更加不稳定，但你们没有丢下莱因。艾琳扶住他的肩膀，队伍带着唯一的幸存者走向门后。",
-        bgImage: "/assets/CG/cg02.png",
-      },
-      {
-        speaker: "莱因",
-        text: "「别丢下守门的人……别再丢下……」",
-        bgImage: "/assets/CG/cg02.png",
-      },
+      { speaker: "主持人", text: "你们选择强行开路。", bgImage: "/assets/CG/cg06.webp", },
+      { speaker: "主持人", text: "武器与法术一同落向核心裂隙。那枚一半像锁、一半像心脏的黑石核心发出沉闷的断响，暗红光沿着门环猛地扩散开来。", },
+      { speaker: "主持人", text: "黑石门卫失去支撑，庞大的身躯缓缓倾斜。门体在震动中裂开，碎石砸在地面，也砸在莱因残破的肩甲上。", bgImage: "/assets/CG/cg02.webp", },
+      { speaker: "主持人", text: "莱因的手搭上你的肩。那只手上还缠着收缩的菌丝，但他握得很紧。", },
+      { speaker: "莱因", text: "「别丢下守门的人……别再丢下……」", bgImage: "/assets/CG/cg02.webp", },
+      { speaker: "主持人", text: "瑟琳没有责备你。她只是扶住莱因，抬头看向裂开的门环。黑暗之门被强行打开，低鸣声比之前更乱，也更近。", },
+      { speaker: "结局记录", text: "你强行击碎了黑石门卫的核心，却没有丢下莱因。黑暗之门在震动中开启，队伍带着幸存者和更沉重的风险继续前进。", },
     ],
     hints: ["穿过黑暗之门"],
   },
@@ -783,7 +686,8 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["结局C：冷静的远征"],
     setArea: "地心之门·稳定通道",
-    bgImage: "/assets/CG/cg05.png",
+    bgImage: "/assets/CG/cg05.webp",
+    bgm: ACT1_ENDING_BGM,
     statePatch: {
       ending: "cold-expedition",
       endingId: "cold-expedition",
@@ -796,21 +700,14 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "结局C：冷静的远征",
     lines: [
-      {
-        speaker: "主持人",
-        text: "你选择稳定核心。瑟琳封住逆向脉冲，门体在可控的震动中缓慢开启，队伍几乎没有付出额外损伤。",
-        bgImage: "/assets/CG/cg05.png",
-      },
-      {
-        speaker: "主持人",
-        text: "这是一条理性、冷静而有效的道路。只是没有莱因的人证，关于守门者和第三远征队的最后真相，永远留在了黑根深处。",
-        bgImage: "/assets/CG/cg03.png",
-      },
-      {
-        speaker: "艾琳",
-        text: "艾琳最后回望了一次来路，没有责问，只把白枝圣徽握得更紧。",
-        bgImage: "/assets/CG/cg03.png",
-      },
+      { speaker: "主持人", text: "核心稳定下来。", bgImage: "/assets/CG/cg05.webp", },
+      { speaker: "主持人", text: "门体在可控的低鸣中缓缓开启。黑石门卫重新沉入根区，封印纹路一圈接一圈亮起，像某种久未维护的古老装置终于找回了正确节奏。", },
+      { speaker: "主持人", text: "队伍里的每一个人都还在——没有人倒下，没有人需要搀扶。", },
+      { speaker: "主持人", text: "布洛克第一个走向门缝，凯娅跟在后面。艾琳停了一步。她回头朝来路看了一眼，那里什么都没有，只有黑根、孢雾和半埋在菌毯里的断裂骨柱。", bgImage: "/assets/CG/cg03.webp", },
+      { speaker: "主持人", text: "瑟琳收起银杖。她没有记录任何东西。", },
+      { speaker: "瑟琳", text: "「任务继续。」", bgImage: "/assets/CG/cg03.webp", },
+      { speaker: "主持人", text: "远征队继续前进——完整，高效，沉默。", },
+      { speaker: "结局记录", text: "你没有停下救助莱因，但谨慎地稳定了黑石门卫的核心。远征得以继续。只是队伍里少了一道会解释真相的呼吸。", },
     ],
     hints: ["穿过黑暗之门"],
   },
@@ -831,24 +728,10 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "坏结局：门缝开启",
     lines: [
-      {
-        speaker: "主持人",
-        text: "门内的声音更快。封印阵上的符文同时倒转，地心之门打开了一道缝。那已经足够。",
-      },
-      {
-        condition: "laine_alive",
-        speaker: "主持人",
-        text: "莱因用最后一点清醒挡到门前，却被门缝里涌出的红光吞没。",
-      },
-      {
-        condition: "!laine_alive",
-        speaker: "拟声菌团",
-        text: "「别让门开。」那是莱因的声音。",
-      },
-      {
-        speaker: "主持人",
-        text: "你们回到城市时，人们仍在欢呼。直到第一场红色孢雨落下，没有人知道灾难已经把手伸进门缝。",
-      },
+      { speaker: "主持人", text: "门内的声音更快。封印阵上的符文同时倒转，地心之门打开了一道缝。那已经足够。", },
+      { condition: "laine_alive", speaker: "主持人", text: "莱因用最后一点清醒挡到门前，却被门缝里涌出的红光吞没。", },
+      { condition: "!laine_alive", speaker: "拟声菌团", text: "「别让门开。」那是莱因的声音。", },
+      { speaker: "主持人", text: "你们回到城市时，人们仍在欢呼。直到第一场红色孢雨落下，没有人知道灾难已经把手伸进门缝。", },
     ],
     hints: ["结束"],
   },
@@ -857,7 +740,8 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["结局D：裂门而下"],
     setArea: "地心之门·崩裂通道",
-    bgImage: "/assets/CG/cg06.png",
+    bgImage: "/assets/CG/cg06.webp",
+    bgm: ACT1_ENDING_BGM,
     statePatch: {
       ending: "gate-split-open",
       endingId: "gate-split-open",
@@ -870,21 +754,14 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     },
     lastEvent: "结局D：裂门而下",
     lines: [
-      {
-        speaker: "主持人",
-        text: "你没有再为核心留下余地。最后一击贯穿黑石，守门协议与封锁同时粉碎，整座大厅在门体开裂的轰鸣中摇晃。",
-        bgImage: "/assets/CG/cg06.png",
-      },
-      {
-        speaker: "主持人",
-        text: "没有莱因，也没有足够的人证与余地。你们得到了一条继续向下的道路，却以最不稳定、最冷酷的方式失去了最多线索。",
-        bgImage: "/assets/CG/cg04.png",
-      },
-      {
-        speaker: "瑟琳",
-        text: "「门开了。至于我们放出来了什么，只能继续往前找答案。」",
-        bgImage: "/assets/CG/cg04.png",
-      },
+      { speaker: "主持人", text: "黑石核心被强行破坏。", bgImage: "/assets/CG/cg06.webp", },
+      { speaker: "主持人", text: "封印纹路像被从内部扯乱，门前庭的地面一寸寸裂开。黑根向四周退去，不是枯萎，而是像害怕继续留在门边。", },
+      { speaker: "主持人", text: "远处似乎传来一声盔甲拖动的声音。很轻，很短，很快就被门体震动盖过。", bgImage: "/assets/CG/cg04.webp", },
+      { speaker: "主持人", text: "没有人回头。", },
+      { speaker: "瑟琳", text: "「门开了。至于我们放出来了什么——」", bgImage: "/assets/CG/cg04.webp", },
+      { speaker: "主持人", text: "她没有说完。门后的黑暗里，有什么东西在回应她的声音。", },
+      { speaker: "主持人", text: "黑暗之门裂开式开启。你们获得了继续前进的道路，也把最多的沉默留在了身后。", },
+      { speaker: "结局记录", text: "你无视莱因，也选择强行破坏黑石门卫核心。黑暗之门被粗暴撕开，队伍获得了前进道路，却失去了最多线索与余地。", },
     ],
     hints: ["穿过黑暗之门"],
   },
@@ -893,22 +770,23 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["穿过黑暗之门"],
     setArea: "地下深海·黑暗之门彼端",
-    bgImage: "/assets/scenes/15underground-ocean-reveal.webp",
+    bgImage: "/assets/scenes/31.webp",
+    bgm: ACT1_ENDING_BGM,
     statePatch: { currentNodeId: POST_BLUE_SHOAL_IDS.epilogue },
     lastEvent: "黑暗之门后显露出无边的地下深海",
     lines: [
-      {
-        speaker: "主持人",
-        text: "你们穿过黑暗之门。门后不是另一座堡垒，也不是继续下沉的矿道。",
-      },
-      {
-        speaker: "主持人",
-        text: "一片没有天空的深海在脚下铺开，遥远微光如同沉没的群星，在黑潮尽头缓慢明灭。",
-      },
-      {
-        speaker: "主持人",
-        text: "旅程还未结束。一行人的冒险，才刚刚开始。",
-      },
+      { speaker: "主持人", text: "你们穿过黑暗之门。", },
+      { speaker: "主持人", text: "门后不是另一座堡垒，也不是继续下沉的矿道。", },
+      { speaker: "主持人", text: "一片没有天空的深海在脚下铺开。", },
+      { speaker: "主持人", text: "湿冷的黑色岩岸向远处延伸，黑潮在地下穹顶下缓慢起伏。遥远微光如同沉没的群星，在潮雾尽头一盏盏明灭。", },
+      { speaker: "主持人", text: "那些光不像火把，也不像城灯。它们更像沉没遗迹的尖顶、远古航标，或者某些仍在海底等待回应的东西。", },
+      { speaker: "主持人", text: "旧地图到黑暗之门后就中断了。所有人都以为那只是因为没人能带回更深处的消息。", },
+      { speaker: "主持人", text: "现在你们知道了。", },
+      { speaker: "主持人", text: "不是没人抵达门后。", },
+      { speaker: "主持人", text: "是门后的世界大到足以吞没所有回程。", },
+      { speaker: "主持人", text: "瑟琳站在队伍最后，没有立刻说话。微光落在她裂开的银杖上，一闪，又一闪。", },
+      { speaker: "主持人", text: "远处黑潮尽头，有一道极细的光路向更深处延伸。", },
+      { speaker: "主持人", text: "第一幕结束。", },
     ],
     hints: ["结束第一幕"],
   },
@@ -917,6 +795,7 @@ export const POST_BLUE_SHOAL_SCENES: ScriptedScene[] = [
     manualOnly: true,
     triggers: ["扩展第一幕结束"],
     setArea: "第一幕·完",
+    bgm: ACT1_ENDING_BGM,
     statePatch: {
       currentNodeId: POST_BLUE_SHOAL_IDS.complete,
       act1GameCompleted: true,
@@ -1389,44 +1268,40 @@ export function getPostBlueShoalHints(
         return ["无法稳定莱因，继续前进"];
       }
       return [
-        checked("让莱因画出地底堡垒内部路线", "交涉/观察", 13),
-        checked("追问莱因：黑石门卫是否有真名或协议口令", "交涉/奥秘", 15),
+        "让莱因画出地底堡垒内部路线",
+        "追问莱因：黑石门卫是否有真名或协议口令",
       ];
     }
     case POST_BLUE_SHOAL_IDS.campNight: {
-      if (state.laine_alive && !state.laine_left_behind) {
-        return [
-          "告诉莱因：你会亲自走到门前",
-          "请莱因把知道的一切都告诉你",
-          "告诉莱因：我们会用最安全的办法结束这一切",
-          "告诉莱因：若必须有人留下，我们不会逃避",
-        ];
+      const hints = getCampNightRequiredTalkTargets(state).map((target) => {
+        const name = getCampNightTargetName(target);
+        return hasTalkedToCampNightTarget(state, target)
+          ? `${name}（已交谈）`
+          : `和${name}聊聊`;
+      });
+      if (areAllRequiredCampNightTalksDone(state)) {
+        hints.push("前往地底堡垒外环");
       }
-      return [
-        "与艾琳谈谈她为何成为修女",
-        "与布洛克核对活性孢子样本",
-        "与凯娅谈谈她为什么愿意跟来",
-        "与瑟琳讨论逆钟学派和封印",
-      ];
+      return hints;
     }
     case POST_BLUE_SHOAL_IDS.fortressOuter: {
       const hints: string[] = [];
       if (state.laine_stabilized && !state.laine_left_behind)
-        hints.push(checked("使用莱因的黑缆口令通过门禁", "交涉", 11));
+        hints.push(checked("使用莱因的黑缆口令通过门禁", "交涉", 9));
       if (
         /莱因的黑缆识别牌|损坏的莱因黑缆识别牌/.test(
           String(state.inventory || ""),
         )
       )
-        hints.push(checked("使用莱因的黑缆识别牌接近门禁", "交涉/奥秘", 12));
+        hints.push(checked("使用莱因的黑缆识别牌接近门禁", "交涉/奥秘", 10));
       if (/黑缆守卫徽章/.test(String(state.inventory || "")))
-        hints.push(checked("使用黑缆守卫徽章接近正门门禁", "魅力", 13));
+        hints.push(checked("使用黑缆守卫徽章接近正门门禁", "魅力", 11));
       if (/地底堡垒入口残图/.test(String(state.inventory || "")))
-        hints.push(checked("根据堡垒入口残图寻找维护井", "调查", 12));
+        hints.push(checked("根据堡垒入口残图寻找维护井", "调查", 10));
       hints.push(
-        checked("让凯娅破解外墙旧锁", "敏捷", 15),
-        checked("沿外墙寻找自然裂缝", "观察", 13),
-        checked("强行破开外墙菌丝", "力量", 14),
+        checked("让凯娅破解外墙旧锁", "敏捷", 12),
+        checked("沿外墙寻找自然裂缝", "观察", 11),
+        checked("强行破开外墙菌丝", "力量", 12),
       );
       return hints;
     }
@@ -1434,20 +1309,20 @@ export function getPostBlueShoalHints(
       const investigations: Array<[string, string]> = [
           [
             "investigate_seal_maintenance_room",
-            checked("调查封印维护室", "奥秘", 13),
+            checked("调查封印维护室", "奥秘", 11),
           ],
           [
             "read_gatekeeper_protocol",
-            checked("读取破损的黑石门卫协议", "奥秘", 14),
+            checked("读取破损的黑石门卫协议", "奥秘", 12),
           ],
-          ["enter_old_armory", checked("进入旧军械库寻找补给", "调查", 12)],
-          ["watch_hero_oath_memory", checked("触碰三英雄誓约残影", "宗教", 13)],
+          ["enter_old_armory", checked("进入旧军械库寻找补给", "调查", 10)],
+          ["watch_hero_oath_memory", checked("触碰三英雄誓约残影", "宗教", 11)],
         ];
       // 只有净化之心成功救回莱因后，玩家才知道门卫核心也可以被净化。
       if (state.purification_heart_used_on_laine && state.core_purification_known) {
         investigations.push([
             "purify_blackstone_core",
-            checked("净化一枚被污染的黑石核心", "宗教", 15),
+            checked("净化一枚被污染的黑石核心", "宗教", 12),
         ]);
       }
       return available(investigations, "结束调查，前往封印控制大厅");
@@ -1526,21 +1401,17 @@ export function getPostBlueShoalHintState(
   ) {
     return { disabled: true, reason: "需要先在云苓商店购买并持有净化之心" };
   }
-  if (
-    node === POST_BLUE_SHOAL_IDS.finalChoice &&
-    /稳定.*Boss.*核心|稳定.*核心/.test(hint)
-  ) {
-    const canStabilize = Boolean(
-      state.purification_heart_used_on_laine &&
-      state.core_purification_known &&
-      state.laine_alive &&
-      state.laine_stabilized &&
-      !state.laine_left_behind,
+  if (node === POST_BLUE_SHOAL_IDS.campNight) {
+    const target = getCampNightRequiredTalkTargets(state).find(
+      (entry) => getCampNightTargetName(entry) === hint.match(/瑟琳|艾琳|布洛克|凯娅|莱因/)?.[0],
     );
-    if (!canStabilize) {
+    if (target && hasTalkedToCampNightTarget(state, target)) {
+      return { disabled: true, reason: "已完成" };
+    }
+    if (/前往地底堡垒外环/.test(hint) && !areAllRequiredCampNightTalksDone(state)) {
       return {
         disabled: true,
-        reason: "必须先用净化之心救下莱因，并从证词中得知核心可以被净化",
+        reason: "还有人没有交谈。进入黑暗之门前，最好听听他们最后想说的话。",
       };
     }
   }
@@ -1904,6 +1775,74 @@ const OUTCOME_TEXT: Record<PostBlueShoalOutcome, string> = {
   critical: "检定大失败。现场危险突然升级，队伍只能在损失扩大前撤开。",
 };
 
+const OUTCOME_LINE_SET = new Set(Object.values(OUTCOME_TEXT));
+
+function compactActionLabel(action: string) {
+  return action
+    .replace(/【[^】]+】/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function fallbackResultLine(result: PostBlueShoalOutcome) {
+  if (result === "great") return "这一次行动比预想更顺利，现场还露出一处此前没人注意到的细节。";
+  if (result === "success") return "行动稳稳落定，队伍把能确认的线索当场记录下来。";
+  if (result === "partial") return "结果不算完美，但足够把线索从沉默里撬出来。";
+  if (result === "failure") return "主要目标没有完全达成，现场却仍留下能继续判断的痕迹。";
+  return "危险在一瞬间扩大，队伍及时收束阵形，才没有让损失继续蔓延。";
+}
+
+function fallbackAtmosphereLine(node: string) {
+  if (node === POST_BLUE_SHOAL_IDS.aftermath) return "蓝伞浅滩的冷光贴着灰烬起伏，战斗后的焦味还没有散尽。";
+  if (node === POST_BLUE_SHOAL_IDS.route || node === POST_BLUE_SHOAL_IDS.boneInvestigation || node === POST_BLUE_SHOAL_IDS.boneAftermath) return "骨柱湿地的雾压得很低，远处的骨片在孢风里轻轻相碰。";
+  if (node === POST_BLUE_SHOAL_IDS.camp) return "第三远征队营地安静得不自然，破布和旧绳在风里发出细碎声响。";
+  if (node === POST_BLUE_SHOAL_IDS.laineSurvivor || node === POST_BLUE_SHOAL_IDS.laineDecision) return "岩棚里的黑缆微微抽动，莱因的呼吸时断时续。";
+  if (node === POST_BLUE_SHOAL_IDS.fortressOuter) return "堡垒外环的石门沉在黑暗里，门缝间只有一点冷硬的微光。";
+  if (node === POST_BLUE_SHOAL_IDS.fortressInner) return "地底堡垒·内环大厅里，黑石脉冲沿墙面一明一暗地爬行。";
+  if (node === POST_BLUE_SHOAL_IDS.sealChamber) return "封印控制大厅的符文断续亮起，像一台还没完全死去的古老机器。";
+  return "队伍停在原地，把眼前能确认的细节重新收束到一起。";
+}
+
+function fallbackCompanionLine(node: string, result: PostBlueShoalOutcome) {
+  if (node === POST_BLUE_SHOAL_IDS.fortressInner) return "瑟琳把银杖压低，示意所有人先不要急着碰第二处黑石。";
+  if (node === POST_BLUE_SHOAL_IDS.sealChamber) return "艾琳握住圣徽，布洛克则把脚跟抵住地面，随时准备把人拖离脉冲中心。";
+  if (node === POST_BLUE_SHOAL_IDS.camp) return "凯娅没有说笑，只把发现过的痕迹一件件摆到火光边。";
+  if (node === POST_BLUE_SHOAL_IDS.boneInvestigation) return "布洛克用斧柄划出安全边界，提醒队伍别把湿地的沉默当成安全。";
+  if (result === "critical") return "同伴们没有追问，只用更快的动作把阵形重新补上。";
+  return "几名同伴交换了一个短促的眼神，没人把这次发现当成偶然。";
+}
+
+function fallbackForwardLine(node: string) {
+  if (node === POST_BLUE_SHOAL_IDS.fortressInner) return "新的判断被写进远征记录，通往封印控制大厅的方向也因此更清楚了一点。";
+  if (node === POST_BLUE_SHOAL_IDS.sealChamber) return "这些信息不足以让危险消失，却足够让队伍靠近守门者时少犯一次错。";
+  if (node === POST_BLUE_SHOAL_IDS.camp) return "线索没有给出完整答案，但已经把队伍推向岩棚深处那道金属声。";
+  return "队伍把发现收好，继续沿着当前路线向下一处关键地点推进。";
+}
+
+function buildPostBlueLocalFallbackLines(
+  node: string,
+  action: string,
+  result: PostBlueShoalOutcome,
+  lines: string[],
+) {
+  if (node === POST_BLUE_SHOAL_IDS.campNight) return lines;
+  const narrativeLines = lines.filter((line) => !OUTCOME_LINE_SET.has(line));
+  const nextLines = [...narrativeLines];
+  const label = compactActionLabel(action) || "这次行动";
+  const candidates = [
+    fallbackAtmosphereLine(node),
+    `你们围绕“${label}”迅速分工，没有把它当成一次随手尝试。`,
+    fallbackResultLine(result),
+    fallbackCompanionLine(node, result),
+    fallbackForwardLine(node),
+  ];
+  candidates.forEach((line) => {
+    if (nextLines.length >= 5) return;
+    if (!nextLines.includes(line)) nextLines.push(line);
+  });
+  return nextLines;
+}
+
 /**
  * 剧情领域层的分支状态计算。骰子、重投、场景播放与持久化仍全部走 App 现有管线；
  * 这里与现有 buildLainChoicePatch/buildSerinCrackPatch 一样，只返回确定性的本地 patch。
@@ -1919,7 +1858,12 @@ export function resolvePostBlueShoalAction(
     nextSceneId: string,
     lines: string[] = [],
     patch: GameState = {},
-  ): PostBlueShoalResolution => ({ patch, lines, nextSceneId });
+    fallbackResult?: PostBlueShoalOutcome,
+  ): PostBlueShoalResolution => ({
+    patch,
+    lines: fallbackResult ? buildPostBlueLocalFallbackLines(node, action, fallbackResult, lines) : lines,
+    nextSceneId,
+  });
   const fixedTransition = (
     nextSceneId: string,
     patch: GameState = {},
@@ -1974,6 +1918,22 @@ export function resolvePostBlueShoalAction(
     return fixedTransition(POST_BLUE_SHOAL_IDS.laineSurvivor, patch);
   }
   if (
+    node === POST_BLUE_SHOAL_IDS.campNight &&
+    /前往地底堡垒外环/.test(action)
+  ) {
+    if (!areAllRequiredCampNightTalksDone(state)) {
+      return {
+        patch: {},
+        lines: [
+          "还有人没有交谈。进入黑暗之门前，最好听听他们最后想说的话。",
+        ],
+      };
+    }
+    const patch: GameState = { campNightAllRequiredTalksDone: true };
+    advanceQuest(state, patch, "进入地底堡垒外环", "完成营地夜谈");
+    return fixedTransition(POST_BLUE_SHOAL_IDS.fortressOuter, patch);
+  }
+  if (
     node === POST_BLUE_SHOAL_IDS.fortressInner &&
     /结束调查|封印控制大厅/.test(action)
   ) {
@@ -2014,6 +1974,13 @@ export function resolvePostBlueShoalAction(
 
   const id = matchActionId(node, action);
   if (!id || completed(state, id)) return null;
+  if (
+    node === POST_BLUE_SHOAL_IDS.campNight &&
+    campNightTargetForActionId(id) === "laine" &&
+    !isLaineHelpedForCampNight(state)
+  ) {
+    return null;
+  }
   const result = outcome(state, action);
   const patch: GameState = { flags: { ...(state.flags || {}) } };
   const lines = /【[^】]*DC\s*\d+[^】]*】/i.test(action)
@@ -2026,7 +1993,7 @@ export function resolvePostBlueShoalAction(
   } else if (node === POST_BLUE_SHOAL_IDS.route) {
     resolveBoneRoute(state, patch, lines, id, result);
     advanceQuest(state, patch, "调查骨柱湿地", "选择进入骨柱湿地的路线");
-    return transition(POST_BLUE_SHOAL_IDS.boneInvestigation, lines, patch);
+    return transition(POST_BLUE_SHOAL_IDS.boneInvestigation, lines, patch, result);
   } else if (node === POST_BLUE_SHOAL_IDS.boneInvestigation) {
     markAction(state, patch, id, "boneMarshActions");
     resolveBoneInvestigation(state, patch, lines, id, result);
@@ -2074,16 +2041,25 @@ export function resolvePostBlueShoalAction(
       "在夜火旁与一名伙伴交谈",
       "取得莱因的证词或替代线索",
     );
-    return transition(POST_BLUE_SHOAL_IDS.campNight, lines, patch);
+    return transition(POST_BLUE_SHOAL_IDS.campNight, lines, patch, result);
   } else if (node === POST_BLUE_SHOAL_IDS.campNight) {
     markAction(state, patch, id);
     resolveCampNight(state, patch, lines, id);
-    advanceQuest(state, patch, "进入地底堡垒外环", "完成营地夜谈");
-    return transition(POST_BLUE_SHOAL_IDS.fortressOuter, lines, patch);
+    const target = campNightTargetForActionId(id);
+    if (!target) return null;
+    const nextState = { ...state, ...patch };
+    patch.campNightAllRequiredTalksDone = areAllRequiredCampNightTalksDone(nextState);
+    patch.campNightActiveTalkTarget = target;
+    return {
+      patch,
+      lines,
+      aiPrompt: buildCampNightAiPrompt(state, target),
+      campNightTalkTarget: target,
+    };
   } else if (node === POST_BLUE_SHOAL_IDS.fortressOuter) {
     resolveFortressEntry(state, patch, lines, id, result);
     advanceQuest(state, patch, "调查地底堡垒内环", "突破地底堡垒门禁");
-    return transition(POST_BLUE_SHOAL_IDS.fortressInner, lines, patch);
+    return transition(POST_BLUE_SHOAL_IDS.fortressInner, lines, patch, result);
   } else if (node === POST_BLUE_SHOAL_IDS.fortressInner) {
     markAction(state, patch, id, "fortressInnerActions");
     resolveFortressInvestigation(state, patch, lines, id, result);
@@ -2125,7 +2101,7 @@ export function resolvePostBlueShoalAction(
   }
 
   patch.last_event = `${id}：${result}`;
-  return { patch, lines };
+  return { patch, lines: buildPostBlueLocalFallbackLines(node, action, result, lines) };
 }
 
 function matchActionId(node: string, action: string): string | null {
@@ -2175,14 +2151,11 @@ function matchActionId(node: string, action: string): string | null {
       ["mercy_kill_laine", /最后的仁慈/],
     ],
     [POST_BLUE_SHOAL_IDS.campNight]: [
-      ["night_talk_eileen", /艾琳.*为何成为修女/],
-      ["night_talk_brock", /布洛克.*活性孢子/],
-      ["night_talk_kaia", /凯娅.*为什么愿意/],
-      ["night_talk_serin", /瑟琳.*逆钟|逆钟学派/],
-      ["night_laine_walk_to_gate", /莱因.*亲自走到门前|你会亲自走到门前/],
-      ["night_laine_full_truth", /莱因.*知道的一切|一切都告诉/],
-      ["night_laine_safe_end", /最安全的办法结束/],
-      ["night_laine_accept_sacrifice", /必须有人留下|不会逃避/],
+      ["night_talk_serin", /和?瑟琳.*聊|瑟琳（已交谈）/],
+      ["night_talk_eileen", /和?艾琳.*聊|艾琳（已交谈）/],
+      ["night_talk_brock", /和?布洛克.*聊|布洛克（已交谈）/],
+      ["night_talk_kaia", /和?凯娅.*聊|凯娅（已交谈）/],
+      ["night_talk_laine", /和?莱因.*聊|莱因（已交谈）/],
     ],
     [POST_BLUE_SHOAL_IDS.fortressOuter]: [
       ["enter_laine_password", /莱因的黑缆口令/],
@@ -2925,75 +2898,32 @@ function resolveLaineDecision(
   }
 
   if (id === "ask_laine_draw_fortress_route") {
-    if (result !== "critical") {
-      patch.laine_truth_level = Math.max(
-        Number(state.laine_truth_level || 0),
-        result === "great" ? 3 : strong ? 2 : 1,
-      );
-      adjustScore(state, patch, "truthScore", result === "great" ? 2 : 1);
-    }
-    if (result === "great") {
-      addItemPatch(state, patch, "莱因标记的堡垒路线图");
-      patch.location_unlock_fortress_maintenance_well = true;
-      adjustScore(state, patch, "black_root_decisive_score", 2);
-      adjustScore(state, patch, "reverse_clock_anchor_score", 1);
-      adjustLaineRelationship(state, patch, 10);
-    } else if (result === "success") {
-      addItemPatch(state, patch, "莱因标记的堡垒路线图");
-      adjustScore(state, patch, "black_root_decisive_score", 1);
-      adjustLaineRelationship(state, patch, 6);
-    } else if (result === "partial") {
-      addCluePatch(state, patch, "clue_fortress_side_route");
-      patch.fortress_first_mechanism_bonus = 1;
-    } else if (result === "critical") patch.laine_route_mimic_ambush = true;
-    if (result === "failure")
-      addCluePatch(state, patch, "clue_gatekeeper_order_forged");
+    patch.laine_truth_level = Math.max(Number(state.laine_truth_level || 0), 2);
+    addItemPatch(state, patch, "莱因标记的堡垒路线图");
+    patch.location_unlock_fortress_maintenance_well = true;
+    adjustScore(state, patch, "truthScore", 1);
+    adjustScore(state, patch, "black_root_decisive_score", 1);
+    adjustLaineRelationship(state, patch, 6);
     lines.push(
-      "莱因用颤抖的手画下堡垒轮廓；即使路线残缺，门卫与伪造命令的方向仍被标了出来。",
+      "莱因用颤抖的手画下堡垒轮廓。维护井、外环门禁和黑石门卫所在方向被逐一标出，队伍获得了一条足够可靠的前进路线。",
     );
   }
 
   if (id === "ask_laine_gatekeeper_true_name") {
-    if (result !== "critical") {
-      patch.laine_truth_level = Math.max(
-        Number(state.laine_truth_level || 0),
-        result === "great" ? 3 : 2,
-      );
-      setStoryFlag(
-        state,
-        patch,
-        "guardian_name_known",
-        result === "great" || result === "success",
-      );
-      adjustScore(state, patch, "truthScore", result === "great" ? 2 : 1);
-    }
-    if (result === "great") {
-      patch.gatekeeper_true_name_known = true;
-      setStoryFlag(state, patch, "laine_knows_gatekeeper_name");
-      addCluePatch(state, patch, "clue_laine_heard_true_name");
-      addDocumentPatch(state, patch, "doc_gatekeeper_protocol_fragment");
-      adjustScore(state, patch, "guardian_mercy_score", 3);
-      trust(state, patch, "serin", 4);
-      lines.push(
-        "莱因记起真名“阿格洛恩”：“真名不是命令，是让它想起自己为什么站在门前。”",
-      );
-    } else if (result === "success" || result === "partial") {
-      addCluePatch(state, patch, "clue_true_name_command");
-      patch.true_name_command_bonus = result === "success" ? 2 : 1;
-      if (result === "success")
-        adjustScore(state, patch, "guardian_mercy_score", 1);
-      lines.push(
-        "莱因只记得残缺协议：“守门者，回到门前。”这仍足以削弱伪造命令。",
-      );
-    } else {
-      if (result === "critical") {
-        adjustLaineRelationship(state, patch, -8);
-        trust(state, patch, "ailin", -2);
-        setStoryFlag(state, patch, "laine_spore_worsened");
-      }
-      addCluePatch(state, patch, "clue_gatekeeper_order_forged");
-      lines.push("莱因无法想起真名，但他对伪造命令的证词仍被保留下来。");
-    }
+    patch.laine_truth_level = Math.max(Number(state.laine_truth_level || 0), 3);
+    setStoryFlag(state, patch, "guardian_name_known");
+    setStoryFlag(state, patch, "laine_knows_gatekeeper_name");
+    patch.gatekeeper_true_name_known = true;
+    patch.true_name_command_bonus = 2;
+    addCluePatch(state, patch, "clue_laine_heard_true_name");
+    addCluePatch(state, patch, "clue_true_name_command");
+    addDocumentPatch(state, patch, "doc_gatekeeper_protocol_fragment");
+    adjustScore(state, patch, "truthScore", 2);
+    adjustScore(state, patch, "guardian_mercy_score", 3);
+    trust(state, patch, "serin", 4);
+    lines.push(
+      "莱因记起黑石门卫的真名“阿格洛恩”，也说出残缺协议：“守门者，回到门前。”他说，真名不是命令，而是让它想起自己为什么站在门前。",
+    );
   }
 
   if (id === "leave_laine_behind") {
@@ -3027,19 +2957,37 @@ function resolveLaineDecision(
   }
 }
 
+function campNightTargetForActionId(
+  id: string,
+): CampNightTalkTarget | null {
+  return (
+    Object.entries(CAMP_NIGHT_TALK_DEFS).find(
+      ([, definition]) => definition.actionId === id,
+    )?.[0] as CampNightTalkTarget | undefined
+  ) || null;
+}
+
 function resolveCampNight(
   state: GameState,
   patch: GameState,
   lines: string[],
   id: string,
 ) {
+  const target = campNightTargetForActionId(id);
+  if (!target) return;
+  if (target === "laine" && !isLaineHelpedForCampNight(state)) return;
+
+  patch[CAMP_NIGHT_TALK_DEFS[target].stateKey] = true;
+  patch.campNightTalkLogs = {
+    ...(state.campNightTalkLogs || {}),
+    [target]: CAMP_NIGHT_FALLBACK_LINES[target],
+  };
+  lines.push(...CAMP_NIGHT_FALLBACK_LINES[target]);
+
   if (id === "night_talk_eileen") {
     trust(state, patch, "ailin", 6);
     patch.eileen_backstory_known = true;
     addItemPatch(state, patch, "艾琳的白线护符");
-    lines.push(
-      "艾琳望着火说：“我们只是站得离死亡太近，所以必须学会不移开眼睛。”",
-    );
   }
   if (id === "night_talk_brock") {
     const complete = Number(state.active_spore_sample_count || 0) >= 3;
@@ -3048,65 +2996,16 @@ function resolveCampNight(
       patch.brock_sample_promise_completed = true;
       addItemPatch(state, patch, "布洛克孢子滤片");
     }
-    lines.push(
-      complete
-        ? "布洛克收好样本：“你没把孢海当成一堆该烧掉的烂蘑菇。回去我请你喝一杯。”"
-        : "布洛克点点头：“还差点样本，不过你至少知道脚下踩的是活东西。”",
-    );
   }
   if (id === "night_talk_kaia") {
     trust(state, patch, "kaiya", 6);
     patch.kaia_backstory_known = true;
     addItemPatch(state, patch, "凯娅的备用锁针");
-    lines.push(
-      "凯娅拨着火：“我不是突然变成好人。我只是讨厌有人把整座城当成可以抵押的筹码。”",
-    );
   }
   if (id === "night_talk_serin") {
     trust(state, patch, "serin", 6);
     patch.reverse_clock_method_known = true;
     addItemPatch(state, patch, "逆钟粉笔");
-    lines.push(
-      "瑟琳在石面画出逆行符文：“不能让封印重新开始，但也许能让它记起，自己原本该停在哪里。”",
-    );
-  }
-  if (id === "night_laine_walk_to_gate") {
-    adjustLaineRelationship(state, patch, 8);
-    trust(state, patch, "ailin", 2);
-    adjustScore(state, patch, "guardian_mercy_score", 1);
-    setStoryFlag(state, patch, "laine_joined_final_chamber");
-    lines.push(
-      "你告诉莱因，他会亲自走到门前。莱因握住裂开的徽记，第一次没有回避明天。",
-    );
-  }
-  if (id === "night_laine_full_truth") {
-    adjustLaineRelationship(state, patch, 4);
-    trust(state, patch, "serin", 2);
-    setStoryFlag(state, patch, "laine_testimony_obtained");
-    if (state.laine_testimony_obtained || state.laine_stabilized) {
-      addDocumentPatch(state, patch, "doc_laine_full_testimony");
-      setStoryFlag(state, patch, "laine_full_testimony_obtained");
-    } else addDocumentPatch(state, patch, "doc_laine_testimony");
-    lines.push(
-      "莱因从队长死亡讲到假命令进入堡垒。瑟琳把每一句证词都写进远征记录。",
-    );
-  }
-  if (id === "night_laine_safe_end") {
-    trust(state, patch, "kaiya", 2);
-    adjustScore(state, patch, "black_root_decisive_score", 1);
-    lines.push(
-      "莱因点头：“如果救不了它，就准确地结束污染。别让门里的东西继续借它的手。”",
-    );
-  }
-  if (id === "night_laine_accept_sacrifice") {
-    trust(state, patch, "serin", 3);
-    adjustScore(state, patch, "reverse_clock_anchor_score", 1);
-    adjustScore(state, patch, "reverseClockScore", 1);
-    setStoryFlag(state, patch, "laine_memory_anchor_obtained");
-    addItemPatch(state, patch, "莱因的记忆锚点");
-    lines.push(
-      "莱因把识别牌放在火光里：“如果需要一个锚点，至少让留下的人知道自己为什么留下。”",
-    );
   }
 }
 
@@ -3294,14 +3193,8 @@ function resolveEnding(
   patch.laine_helped_for_ending = helpedLaine;
 
   if (id === "stabilize_boss_core") {
-    if (!helpedLaine) {
-      // 没有净化之心救回莱因，就没有“核心可净化”的情报；非法或旧存档中的
-      // 稳定指令不能绕过门槛，只能回到破坏核心的 D 结局。
-      patch.bossCoreChoice = "destroy";
-      return POST_BLUE_SHOAL_IDS.endingD;
-    }
     patch.bossCoreChoice = "stabilize";
-    return POST_BLUE_SHOAL_IDS.endingA;
+    return helpedLaine ? POST_BLUE_SHOAL_IDS.endingA : POST_BLUE_SHOAL_IDS.endingC;
   }
 
   patch.bossCoreChoice = "destroy";

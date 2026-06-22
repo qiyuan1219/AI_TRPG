@@ -1,11 +1,32 @@
 import { useMemo, useState } from 'react';
+import { DiceRollOverlay, type DieType } from './DiceRollOverlay';
 import { getIntelById, type IntelDocument } from '../data/intelDocuments';
 import { getItemSummaryByName, resolveItemIconPath } from '../data/itemIconPaths';
 import type { ArchiveDocument, GameState, InvestigationClue } from '../types/game';
 import { getLegacyInventoryDefinition } from '../core/items/ItemCatalog';
+import { rollDiceEvent } from '../core/dice/createDiceEvent';
+import {
+  buildHealingConsumablePatch,
+  getHealingConsumable,
+  getHealingTargets,
+  type HealingConsumableDefinition,
+  type HealingTargetId,
+} from '../features/inventory/healingConsumables';
+import type { DiceResult } from '../types/game';
+import { getRerollItemQuantity } from '../utils/battlePrep';
 
 type InventoryTab = 'all' | 'consumable' | 'equipment' | 'key_item' | 'archive' | 'clue';
 type InventoryItemType = 'consumable' | 'equipment' | 'key_item' | 'document' | 'clue';
+type StatPotionKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
+
+const STAT_POTION_EFFECTS: Record<string, { stat: StatPotionKey; label: string }> = {
+  strength_potion: { stat: 'str', label: '力量' },
+  dexterity_potion: { stat: 'dex', label: '敏捷' },
+  constitution_potion: { stat: 'con', label: '体质' },
+  intelligence_potion: { stat: 'int', label: '智力' },
+  wisdom_potion: { stat: 'wis', label: '感知' },
+  charisma_potion: { stat: 'cha', label: '魅力' },
+};
 
 interface InventoryPanelProps {
   state: GameState;
@@ -72,6 +93,14 @@ function changeInventoryQuantity(inventoryText: string, targetName: string, delt
   if (!found) return inventoryText;
   found.quantity = Math.max(0, found.quantity + delta);
   return formatInventoryText(entries);
+}
+
+function getStatPotionEffect(item: InventoryEntry) {
+  return STAT_POTION_EFFECTS[item.id] || null;
+}
+
+function isPurificationHeartItem(item: InventoryEntry) {
+  return item.id === 'purification_heart' || item.name === '净化之心';
 }
 
 function normalizeInventoryItems(inventoryText: string): InventoryEntry[] {
@@ -185,6 +214,7 @@ function isUsableInCurrentScene(item: InventoryEntry, state: GameState) {
 }
 
 function isEquipped(item: InventoryEntry, state: GameState) {
+  if (item.name === '长剑') return true;
   const equipment = (state.equipment || state.player?.equipment || {}) as Record<string, string | null>;
   return Object.values(equipment).includes(item.id) || Object.values(equipment).includes(item.name);
 }
@@ -213,6 +243,13 @@ export function InventoryPanel({ state, onStatePatch }: InventoryPanelProps) {
   const [selectedId, setSelectedId] = useState('');
   const [readingId, setReadingId] = useState('');
   const [viewedIds, setViewedIds] = useState<Set<string>>(() => new Set());
+  const [healingItem, setHealingItem] = useState<HealingConsumableDefinition | null>(null);
+  const [healingTargetId, setHealingTargetId] = useState<HealingTargetId>('player');
+  const [healingDice, setHealingDice] = useState<DiceResult | null>(null);
+  const [pendingHealingRoll, setPendingHealingRoll] = useState<number | null>(null);
+  const [initialHealingRoll, setInitialHealingRoll] = useState<number | null>(null);
+  const [healingReroll, setHealingReroll] = useState<number | null>(null);
+  const [healingRerollItem, setHealingRerollItem] = useState<'虚构骰子' | '万能骰子' | null>(null);
 
   const items = useMemo(() => {
     const inventoryItems = normalizeInventoryItems(String(state.inventory || ''));
@@ -234,6 +271,7 @@ export function InventoryPanel({ state, onStatePatch }: InventoryPanelProps) {
   const filteredItems = items.filter((item) => activeTab === 'all' || item.category === activeTab);
   const selectedItem = items.find((item) => item.id === selectedId) || null;
   const readingDocument = readingId ? getIntelById(readingId) || selectedItem : null;
+  const healingTargets = useMemo(() => getHealingTargets(state), [state]);
   const newItemIds = new Set(
     items
       .filter((item) => item.type === 'document' || item.type === 'clue')
@@ -250,24 +288,116 @@ export function InventoryPanel({ state, onStatePatch }: InventoryPanelProps) {
     setIsOpen(false);
     setSelectedId('');
     setReadingId('');
+    setHealingItem(null);
+    setHealingDice(null);
+    setPendingHealingRoll(null);
+    setInitialHealingRoll(null);
+    setHealingReroll(null);
+    setHealingRerollItem(null);
   }
 
   function useConsumable(item: InventoryEntry) {
     if (!onStatePatch) return;
+    const healing = getHealingConsumable(item.id, item.name);
+    if (healing) {
+      const firstInjured = healingTargets.find((target) => target.currentHp < target.maxHp);
+      setHealingTargetId(firstInjured?.id || 'player');
+      setHealingItem(healing);
+      return;
+    }
+    const statPotion = getStatPotionEffect(item);
+    if (statPotion) {
+      const nextInventory = changeInventoryQuantity(String(state.inventory || ''), item.name, -1);
+      const currentAttributes = {
+        ...((state.player?.attributes || {}) as Record<StatPotionKey, number>),
+      };
+      const nextValue = Number(currentAttributes[statPotion.stat] ?? state[statPotion.stat] ?? 10) + 2;
+      onStatePatch(
+        {
+          inventory: nextInventory,
+          player: {
+            ...(state.player || {}),
+            attributes: {
+              ...currentAttributes,
+              [statPotion.stat]: nextValue,
+            },
+          } as NonNullable<GameState['player']>,
+          // 兼容旧存档与仍读取顶层六维字段的逻辑；权威 UI 读取 player.attributes。
+          [statPotion.stat]: nextValue,
+          [`${item.id}_used`]: true,
+          last_event: `${item.name}生效：${statPotion.label}+2`,
+        },
+        `${item.name}生效：${statPotion.label}+2`,
+      );
+      setSelectedId('');
+      return;
+    }
+    if (isPurificationHeartItem(item)) return;
     const nextInventory = changeInventoryQuantity(String(state.inventory || ''), item.name, -1);
     const patch: Partial<GameState> = { inventory: nextInventory };
-    if (item.id === 'healing_potion') {
-      const maxHp = Number(state.max_hp || 30);
-      const currentHp = Number(state.current_hp || maxHp);
-      patch.current_hp = Math.min(maxHp, currentHp + 7);
-    }
     onStatePatch(patch, `使用 ${item.name}`);
+  }
+
+  function rollHealing() {
+    if (!healingItem || !onStatePatch) return;
+    const target = healingTargets.find((entry) => entry.id === healingTargetId);
+    if (!target || target.currentHp >= target.maxHp) return;
+    const event = rollDiceEvent('healing', 'legacy', healingItem.dieSides, 1, 0, {
+      actorId: 'inventory',
+      actorName: state.player_name || '冒险者',
+      targetId: target.id,
+      targetName: target.name,
+      itemId: healingItem.itemId,
+      skillName: healingItem.itemName,
+    });
+    setPendingHealingRoll(event.total);
+    setInitialHealingRoll(event.total);
+    setHealingReroll(null);
+    setHealingRerollItem(null);
+    setHealingDice({ type: 'dice_test', data: { 骰子: `D${healingItem.dieSides}`, 结果: event.total, 总计: event.total, 属性: healingItem.itemName }, event });
+  }
+
+  function rerollHealing(kind: 'fiction-dice' | 'omni-dice', chosen?: number) {
+    if (!healingItem || initialHealingRoll == null || healingRerollItem) return;
+    if (getRerollItemQuantity(state, kind) <= 0) return;
+    const itemName = kind === 'fiction-dice' ? '虚构骰子' : '万能骰子';
+    const reroll = kind === 'fiction-dice'
+      ? rollDiceEvent('reroll', 'fiction_dice', healingItem.dieSides, 1, 0, { itemId: healingItem.itemId }).total
+      : Math.max(1, Math.min(healingItem.dieSides, Math.floor(chosen ?? healingItem.dieSides)));
+    const selected = kind === 'fiction-dice' ? Math.max(initialHealingRoll, reroll) : reroll;
+    const event = rollDiceEvent('healing', kind === 'fiction-dice' ? 'fiction_dice' : 'omni_dice', healingItem.dieSides, 1, selected - reroll, {
+      actorId: 'inventory', targetId: healingTargetId, itemId: healingItem.itemId, metadata: { reroll },
+    });
+    event.rolls = [reroll];
+    event.total = selected;
+    setHealingReroll(reroll);
+    setHealingRerollItem(itemName);
+    setPendingHealingRoll(selected);
+    setHealingDice({ type: 'dice_test', data: { 骰子: `D${healingItem.dieSides}`, 结果: selected, 总计: selected, 属性: healingItem.itemName }, event });
+  }
+
+  function finishHealing() {
+    if (!healingItem || pendingHealingRoll == null || !onStatePatch) return;
+    const outcome = buildHealingConsumablePatch(state, healingItem, healingTargetId, pendingHealingRoll);
+    if (healingRerollItem) {
+      outcome.patch.inventory = changeInventoryQuantity(String(outcome.patch.inventory || ''), healingRerollItem, -1);
+      outcome.patch.last_event = `${outcome.patch.last_event}；消耗${healingRerollItem}`;
+    }
+    onStatePatch(outcome.patch, outcome.patch.last_event);
+    setHealingDice(null);
+    setPendingHealingRoll(null);
+    setHealingItem(null);
+    setSelectedId('');
+    setInitialHealingRoll(null);
+    setHealingReroll(null);
+    setHealingRerollItem(null);
   }
 
   function toggleEquip(item: InventoryEntry) {
     if (!item.equipSlot || !onStatePatch) return;
     const equipment = { ...((state.equipment || state.player?.equipment || {}) as Record<string, string | null>) };
     const equipped = isEquipped(item, state);
+    if (item.name === '长剑') return;
     equipment[item.equipSlot] = equipped ? null : item.id;
     onStatePatch({ equipment }, equipped ? `卸下 ${item.name}` : `装备 ${item.name}`);
   }
@@ -351,6 +481,89 @@ export function InventoryPanel({ state, onStatePatch }: InventoryPanelProps) {
           }}
         />
       )}
+
+      {isOpen && healingItem && !healingDice && (
+        <HealingTargetModal
+          item={healingItem}
+          targets={healingTargets}
+          selectedId={healingTargetId}
+          onSelect={setHealingTargetId}
+          onCancel={() => setHealingItem(null)}
+          onConfirm={rollHealing}
+        />
+      )}
+
+      <DiceRollOverlay
+        dice={healingDice}
+        dieType={(healingItem?.dieSides === 6 ? 'd6' : 'd12') as DieType}
+        diceKind="治疗掷骰"
+        charSkill={healingItem?.itemName}
+        onClose={finishHealing}
+        rerollDecision={healingDice && healingItem ? {
+          fictionQuantity: getRerollItemQuantity(state, 'fiction-dice'),
+          omniQuantity: getRerollItemQuantity(state, 'omni-dice'),
+          rerollUsed: Boolean(healingRerollItem),
+          omniMax: healingItem.dieSides,
+          onConfirm: finishHealing,
+          onUseFiction: () => rerollHealing('fiction-dice'),
+          onUseOmni: (value) => rerollHealing('omni-dice', value),
+        } : undefined}
+        comparisonRolls={initialHealingRoll != null && healingReroll != null ? {
+          initial: initialHealingRoll,
+          reroll: healingReroll,
+          selected: pendingHealingRoll === initialHealingRoll ? 'initial' : 'reroll',
+        } : undefined}
+      />
+    </div>
+  );
+}
+
+function HealingTargetModal({
+  item,
+  targets,
+  selectedId,
+  onSelect,
+  onCancel,
+  onConfirm,
+}: {
+  item: HealingConsumableDefinition;
+  targets: ReturnType<typeof getHealingTargets>;
+  selectedId: HealingTargetId;
+  onSelect: (id: HealingTargetId) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const selected = targets.find((target) => target.id === selectedId);
+  return (
+    <div className="healing-target-backdrop" role="presentation" onClick={onCancel}>
+      <section className="healing-target-modal" role="dialog" aria-modal="true" aria-label="选择治疗目标" onClick={(event) => event.stopPropagation()}>
+        <header>
+          <div><span>选择治疗目标</span><small>{item.itemName} · D{item.dieSides} 恢复</small></div>
+          <button type="button" aria-label="关闭" onClick={onCancel}>×</button>
+        </header>
+        <div className="healing-target-grid">
+          {targets.map((target) => {
+            const full = target.currentHp >= target.maxHp;
+            return (
+              <button
+                key={target.id}
+                type="button"
+                className={selectedId === target.id ? 'is-selected' : ''}
+                disabled={full}
+                onClick={() => onSelect(target.id)}
+              >
+                <img src={target.avatar} alt="" />
+                <span>{target.name}</span>
+                <small>HP {target.currentHp}/{target.maxHp}{full ? ' · 已满' : ''}</small>
+              </button>
+            );
+          })}
+        </div>
+        <footer>
+          <button type="button" onClick={onCancel}>取消</button>
+          <button type="button" onClick={onConfirm} disabled={!selected || selected.currentHp >= selected.maxHp}>使用并投 D{item.dieSides}</button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -392,6 +605,8 @@ function ItemDetailModal({
 }) {
   const usable = isUsableInCurrentScene(item, state);
   const equipped = isEquipped(item, state);
+  const lockedEquippedWeapon = item.name === '长剑' && equipped;
+  const consumableCanBeUsed = item.type === 'consumable' && !isPurificationHeartItem(item);
   const iconPath = resolveItemIconPath(item.icon, item.name);
   return (
     <div className="item-modal-backdrop" role="presentation" onClick={onClose}>
@@ -433,7 +648,7 @@ function ItemDetailModal({
         <p>{item.description || item.summary}</p>
         {item.effectText && <strong>{item.effectText}</strong>}
         <footer>
-          {item.type === 'consumable' && (
+          {consumableCanBeUsed && (
             <>
               <button type="button" onClick={onUse} disabled={!canPatch}>使用</button>
               <button type="button" disabled>丢弃</button>
@@ -441,7 +656,7 @@ function ItemDetailModal({
           )}
           {item.type === 'equipment' && (
             <>
-              <button type="button" onClick={onToggleEquip} disabled={!canPatch || !item.equipSlot}>{equipped ? '卸下' : '装备'}</button>
+              <button type="button" onClick={onToggleEquip} disabled={!canPatch || !item.equipSlot || lockedEquippedWeapon}>{lockedEquippedWeapon ? '已装备' : equipped ? '卸下' : '装备'}</button>
               <button type="button">查看</button>
             </>
           )}

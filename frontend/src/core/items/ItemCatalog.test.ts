@@ -10,6 +10,7 @@ describe('ItemCatalog', () => {
 
   it('defines rule effects for reroll and healing items', () => {
     expect(getItemDefinition('万能骰子')?.effects?.[0].type).toBe('reroll');
-    expect(getItemDefinition('治疗药水')?.effects?.[0]).toMatchObject({ type: 'heal', formula: '1d8+2' });
+    expect(getItemDefinition('治疗药水')?.effects?.[0]).toMatchObject({ type: 'heal', formula: '1d12' });
+    expect(getItemDefinition('小瓶治疗药水')?.effects?.[0]).toMatchObject({ type: 'heal', formula: '1d6' });
   });
 });

@@ -1,0 +1,274 @@
+"filename", "language", "Python", "Batch", "Markdown", "TypeScript", "JSON with Comments", "JavaScript", "Ini", "HTML", "JSON", "pip requirements", "XML", "TypeScript JSX", "PostCSS", "comment", "blank", "total"
+"c:\Users\黄锦意\Desktop\demo02\PPT_docs\ai_ppt_evidence_summary.md", "Markdown", 0, 0, 314, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 126, 440
+"c:\Users\黄锦意\Desktop\demo02\README.md", "Markdown", 0, 0, 218, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 258
+"c:\Users\黄锦意\Desktop\demo02\backend\api\routes_battles.py", "Python", 83, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 22, 110
+"c:\Users\黄锦意\Desktop\demo02\backend\api\routes_companion_events.py", "Python", 153, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 42, 196
+"c:\Users\黄锦意\Desktop\demo02\backend\api\routes_dice_poker.py", "Python", 260, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 71, 370
+"c:\Users\黄锦意\Desktop\demo02\backend\api\routes_dnd.py", "Python", 965, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 177, 1174
+"c:\Users\黄锦意\Desktop\demo02\backend\api\routes_tavern_dice_poker.py", "Python", 246, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 77, 343
+"c:\Users\黄锦意\Desktop\demo02\backend\config.py", "Python", 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18, 15, 84
+"c:\Users\黄锦意\Desktop\demo02\backend\content\core\__init__.py", "Python", 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 11
+"c:\Users\黄锦意\Desktop\demo02\backend\content\core\content_pack.py", "Python", 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 22
+"c:\Users\黄锦意\Desktop\demo02\backend\content\core\content_registry.py", "Python", 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 22
+"c:\Users\黄锦意\Desktop\demo02\backend\content\packs\base\__init__.py", "Python", 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 10
+"c:\Users\黄锦意\Desktop\demo02\backend\core\__init__.py", "Python", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2
+"c:\Users\黄锦意\Desktop\demo02\backend\core\ai_schemas.py", "Python", 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 48
+"c:\Users\黄锦意\Desktop\demo02\backend\core\battle_schemas.py", "Python", 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 24
+"c:\Users\黄锦意\Desktop\demo02\backend\core\context\__init__.py", "Python", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 5
+"c:\Users\黄锦意\Desktop\demo02\backend\core\context\context_budget.py", "Python", 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 48
+"c:\Users\黄锦意\Desktop\demo02\backend\core\context\scene_summary.py", "Python", 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8, 60
+"c:\Users\黄锦意\Desktop\demo02\backend\core\debug\__init__.py", "Python", 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 11
+"c:\Users\黄锦意\Desktop\demo02\backend\core\debug\debug_trace.py", "Python", 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 56
+"c:\Users\黄锦意\Desktop\demo02\backend\core\debug\state_diff.py", "Python", 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 38
+"c:\Users\黄锦意\Desktop\demo02\backend\core\events\__init__.py", "Python", 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4
+"c:\Users\黄锦意\Desktop\demo02\backend\core\events\schemas.py", "Python", 35, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 47
+"c:\Users\黄锦意\Desktop\demo02\backend\core\items\__init__.py", "Python", 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4
+"c:\Users\黄锦意\Desktop\demo02\backend\core\items\item_catalog.py", "Python", 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 58
+"c:\Users\黄锦意\Desktop\demo02\backend\core\npc\__init__.py", "Python", 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 5
+"c:\Users\黄锦意\Desktop\demo02\backend\core\npc\npc_profile.py", "Python", 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 26
+"c:\Users\黄锦意\Desktop\demo02\backend\core\npc\npc_registry.py", "Python", 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 32
+"c:\Users\黄锦意\Desktop\demo02\backend\core\replay\__init__.py", "Python", 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4
+"c:\Users\黄锦意\Desktop\demo02\backend\core\replay\replay_runner.py", "Python", 71, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 87
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\action_pipeline.py", "Python", 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 15, 60
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\battle_engine.py", "Python", 657, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 44, 711
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\companion_events.py", "Python", 888, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 57, 960
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\dice_poker.py", "Python", 223, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, 60, 333
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\dice_service.py", "Python", 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 10, 78
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\game_state.py", "Python", 164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 25, 197
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\investigation_rewards.py", "Python", 864, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 63, 932
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\rules_dnd.py", "Python", 309, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 63, 418
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\state_directives.py", "Python", 352, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 70, 434
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\tavern_dice_poker.py", "Python", 226, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 35, 286
+"c:\Users\黄锦意\Desktop\demo02\backend\engine\trust_system.py", "Python", 309, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 44, 356
+"c:\Users\黄锦意\Desktop\demo02\backend\kp\dm_service.py", "Python", 1006, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 249, 55, 1310
+"c:\Users\黄锦意\Desktop\demo02\backend\kp\memory.py", "Python", 602, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 101, 748
+"c:\Users\黄锦意\Desktop\demo02\backend\kp\prompt_builder_dnd.py", "Python", 835, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 54, 941
+"c:\Users\黄锦意\Desktop\demo02\backend\logger.py", "Python", 62, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 17, 87
+"c:\Users\黄锦意\Desktop\demo02\backend\main.py", "Python", 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 10, 65
+"c:\Users\黄锦意\Desktop\demo02\backend\pytest.ini", "Ini", 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 1, 7
+"c:\Users\黄锦意\Desktop\demo02\backend\requirements.txt", "pip requirements", 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 8, 7, 24
+"c:\Users\黄锦意\Desktop\demo02\backend\scripts\process_sprite.py", "Python", 129, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 21, 178
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_battle_dice_events.py", "Python", 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 64
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_battle_engine_ai.py", "Python", 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 41
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_investigation_rewards.py", "Python", 92, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 124
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_p1_contracts.py", "Python", 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 47
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_p2_contracts.py", "Python", 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 48
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_routes_dnd_fallback.py", "Python", 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 68
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_rules_dnd.py", "Python", 69, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 91
+"c:\Users\黄锦意\Desktop\demo02\backend\tests\test_state_directives.py", "Python", 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 45
+"c:\Users\黄锦意\Desktop\demo02\brock_drinking_game.md", "Markdown", 0, 0, 323, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 119, 442
+"c:\Users\黄锦意\Desktop\demo02\docs\P0_ARCHITECTURE_MIGRATION.md", "Markdown", 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 35
+"c:\Users\黄锦意\Desktop\demo02\docs\P1_ARCHITECTURE_AUDIT.md", "Markdown", 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 186
+"c:\Users\黄锦意\Desktop\demo02\documents\AI控制的伙伴信任值机制设计与实现提示词.md", "Markdown", 0, 0, 870, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 299, 1169
+"c:\Users\黄锦意\Desktop\demo02\documents\AI跑团大图标背包弹窗系统设计.md", "Markdown", 0, 0, 815, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 197, 1012
+"c:\Users\黄锦意\Desktop\demo02\documents\AI跑团行动检定与调查档案系统设计.md", "Markdown", 0, 0, 641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 150, 791
+"c:\Users\黄锦意\Desktop\demo02\documents\AI跑团项目_Codex自动对照审计清单.md", "Markdown", 0, 0, 1084, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 347, 1431
+"c:\Users\黄锦意\Desktop\demo02\documents\AI跑团项目_P1架构整改任务总清单.md", "Markdown", 0, 0, 1004, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 305, 1309
+"c:\Users\黄锦意\Desktop\demo02\documents\AI跑团项目_P2架构整改与工程化任务总清单.md", "Markdown", 0, 0, 932, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 299, 1231
+"c:\Users\黄锦意\Desktop\demo02\documents\AI跑团项目_当前架构审计报告.md", "Markdown", 0, 0, 222, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 75, 297
+"c:\Users\黄锦意\Desktop\demo02\documents\AI跑团项目_重构流程清单_按优先级排序版.md", "Markdown", 0, 0, 1119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 341, 1460
+"c:\Users\黄锦意\Desktop\demo02\documents\P1-1A_DiceEvent_EventEnvelope_最小闭环任务说明.md", "Markdown", 0, 0, 557, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 183, 740
+"c:\Users\黄锦意\Desktop\demo02\documents\earth_gate_after_blue_shoal_full_rewrite.md", "Markdown", 0, 0, 1302, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 887, 2189
+"c:\Users\黄锦意\Desktop\demo02\documents\earth_gate_after_blue_shoal_stage_detail_codex_patch.md", "Markdown", 0, 0, 1641, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 894, 2535
+"c:\Users\黄锦意\Desktop\demo02\documents\earth_gate_laine_story_and_four_endings_patch.md", "Markdown", 0, 0, 522, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 194, 716
+"c:\Users\黄锦意\Desktop\demo02\documents\earth_gate_story_expansion_codex_spec.md", "Markdown", 0, 0, 1597, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 554, 2151
+"c:\Users\黄锦意\Desktop\demo02\documents\reroll_mechanism_codex.md", "Markdown", 0, 0, 514, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 159, 673
+"c:\Users\黄锦意\Desktop\demo02\documents\冒险者流派替换职业_Codex实现说明.md", "Markdown", 0, 0, 534, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 131, 665
+"c:\Users\黄锦意\Desktop\demo02\documents\情报档案数据库.md", "Markdown", 0, 0, 518, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 321, 839
+"c:\Users\黄锦意\Desktop\demo02\documents\玩家攻略-地心之门.md", "Markdown", 0, 0, 355, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 181, 536
+"c:\Users\黄锦意\Desktop\demo02\documents\第一幕后半段主线支线多结局编程版.md", "Markdown", 0, 0, 1129, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 160, 1289
+"c:\Users\黄锦意\Desktop\demo02\documents\蓝伞浅滩后_道具档案线索与图标清单.md", "Markdown", 0, 0, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 117
+"c:\Users\黄锦意\Desktop\demo02\documents\蓝伞浅滩战后至第一幕结束_Codex实现说明.md", "Markdown", 0, 0, 1283, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 494, 1777
+"c:\Users\黄锦意\Desktop\demo02\documents\重要战斗遭遇流程统一规范_Codex实现说明.md", "Markdown", 0, 0, 544, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 173, 717
+"c:\Users\黄锦意\Desktop\demo02\fix_all_quotes.py", "Python", 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 19, 84
+"c:\Users\黄锦意\Desktop\demo02\frontend\index.html", "HTML", 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 2
+"c:\Users\黄锦意\Desktop\demo02\frontend\package-lock.json", "JSON", 0, 0, 0, 0, 0, 0, 0, 0, 3197, 0, 0, 0, 0, 0, 1, 3198
+"c:\Users\黄锦意\Desktop\demo02\frontend\package.json", "JSON", 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 0, 0, 1, 34
+"c:\Users\黄锦意\Desktop\demo02\frontend\postcss.config.js", "JavaScript", 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+"c:\Users\黄锦意\Desktop\demo02\frontend\public\assets\characters\npc\default.svg", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 1, 25
+"c:\Users\黄锦意\Desktop\demo02\frontend\public\d20.svg", "XML", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1
+"c:\Users\黄锦意\Desktop\demo02\frontend\scripts\buildGalleryManifest.mjs", "JavaScript", 0, 0, 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 14, 117
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\App.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4882, 0, 103, 413, 5398
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\ActionPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 0, 0, 5, 64
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\ApothecaryShop.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 226, 0, 0, 20, 246
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\BargainTestScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 347, 0, 13, 34, 394
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\BattlePrepPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 266, 0, 3, 21, 290
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\BattleTestScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1627, 0, 46, 165, 1838
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\CharacterPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 157, 0, 0, 15, 172
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\CompanionEventTestScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 608, 0, 5, 51, 664
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\DialogueLog.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 0, 5, 10, 114
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\DicePokerGame.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 272, 0, 32, 26, 330
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\DiceRollOverlay.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 905, 0, 29, 71, 1005
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\DrinkingDiceGame.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 517, 0, 2, 44, 563
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\EventFeed.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 4, 32
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\InventoryPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 582, 0, 0, 41, 623
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\LoadGameScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53, 0, 0, 4, 57
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\LoadingScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 0, 0, 5, 40
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\LuckyBoxGame.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 85, 0, 0, 10, 95
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\OpeningActionTutorial.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 105, 0, 0, 5, 110
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\OrlanBoxGame.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 341, 0, 0, 29, 370
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\PlayerStyleSelector.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 204, 0, 0, 21, 225
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\PortraitTestScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 178, 0, 10, 24, 212
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\SaveLoadPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 102, 0, 0, 13, 115
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\SceneBgTestScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 254, 0, 14, 24, 292
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\SkillEffectOverlay.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 213, 0, 12, 25, 250
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\StartDND.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 135, 0, 0, 12, 147
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\TavernDicePoker.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 732, 0, 2, 65, 799
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\TestScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 231, 0, 0, 24, 255
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\TitleMenu.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 72, 0, 0, 7, 79
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\TutorialOverlay.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 200, 0, 8, 15, 223
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\VisualNovelStage.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 227, 0, 12, 36, 275
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\components\YachtDiceTestScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 420, 0, 10, 53, 483
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\content\core\contentPack.test.ts", "TypeScript", 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 14
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\content\core\contentPack.ts", "TypeScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 49
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\content\core\contentRegistry.ts", "TypeScript", 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 20
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\content\core\validateContentPack.ts", "TypeScript", 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 23
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\content\packs\base\index.ts", "TypeScript", 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 15
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\actions\battlePrepResolver.ts", "TypeScript", 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 22
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\actions\battleResolver.ts", "TypeScript", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 40
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\actions\itemResolver.ts", "TypeScript", 0, 0, 0, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 42
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\actions\registry.ts", "TypeScript", 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 24
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\actions\types.ts", "TypeScript", 0, 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 48
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\battle\authoritativeAdapter.test.ts", "TypeScript", 0, 0, 0, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 45
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\battle\authoritativeAdapter.ts", "TypeScript", 0, 0, 0, 236, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 17, 254
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\context\ContextBudgetPolicy.ts", "TypeScript", 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 13
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\context\SceneSummary.ts", "TypeScript", 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 28
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\context\buildAiContext.test.ts", "TypeScript", 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 17
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\context\buildAiContext.ts", "TypeScript", 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 20
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\debug\DebugTrace.test.ts", "TypeScript", 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 17
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\debug\DebugTrace.ts", "TypeScript", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 41
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\debug\createDebugTrace.ts", "TypeScript", 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 49
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\debug\stateDiff.ts", "TypeScript", 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 47
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\dice\DiceEvent.test.ts", "TypeScript", 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 28
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\dice\DiceEvent.ts", "TypeScript", 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 57
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\dice\DiceEventMapper.ts", "TypeScript", 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 43
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\dice\createDiceEvent.ts", "TypeScript", 0, 0, 0, 75, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 9, 89
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\events\EventEnvelope.ts", "TypeScript", 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 34
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\events\GameEvent.ts", "TypeScript", 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\items\ItemCatalog.test.ts", "TypeScript", 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 17
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\items\ItemCatalog.ts", "TypeScript", 0, 0, 0, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 127
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\items\ItemResolver.ts", "TypeScript", 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 14
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\items\ItemTypes.ts", "TypeScript", 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 30
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\items\legacyItemAliases.ts", "TypeScript", 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\npc\NPCProfile.test.ts", "TypeScript", 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 13
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\npc\NPCProfile.ts", "TypeScript", 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 24
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\npc\getNpcProfile.ts", "TypeScript", 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 11
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\npc\validateNpcProfiles.ts", "TypeScript", 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 32
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\random\secureRandom.ts", "TypeScript", 0, 0, 0, 23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 27
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\replay\ReplayInput.ts", "TypeScript", 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 16
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\replay\ReplayResult.ts", "TypeScript", 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 17
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\replay\ReplayRunner.test.ts", "TypeScript", 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 32
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\replay\ReplayRunner.ts", "TypeScript", 0, 0, 0, 73, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 84
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\core\state\gameState.ts", "TypeScript", 0, 0, 0, 81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 13, 95
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\battleConfigs.ts", "TypeScript", 0, 0, 0, 378, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 10, 403
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\characterRegistry.ts", "TypeScript", 0, 0, 0, 286, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 303
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\companionSideQuests.ts", "TypeScript", 0, 0, 0, 732, 0, 0, 0, 0, 0, 0, 0, 0, 0, 78, 86, 896
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\compressedAct1Route.test.ts", "TypeScript", 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 58
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\dndClasses.ts", "TypeScript", 0, 0, 0, 532, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 552
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\dndScenes.ts", "TypeScript", 0, 0, 0, 137, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 141
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\encounterFlows.ts", "TypeScript", 0, 0, 0, 135, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 146
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\generated\galleryManifest.ts", "TypeScript", 0, 0, 0, 3684, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3688
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\intelDocuments.ts", "TypeScript", 0, 0, 0, 848, 0, 0, 0, 0, 0, 0, 0, 0, 0, 80, 55, 983
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\itemIconPaths.ts", "TypeScript", 0, 0, 0, 245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 253
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\missingItemIcons.ts", "TypeScript", 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 33
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\npc\npcAliases.ts", "TypeScript", 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 10
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\npc\npcProfiles.ts", "TypeScript", 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 35
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\postBlueShoalStory.test.ts", "TypeScript", 0, 0, 0, 238, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 254
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\postBlueShoalStory.ts", "TypeScript", 0, 0, 0, 3233, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 72, 3315
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\scriptedScenes.ts", "TypeScript", 0, 0, 0, 2899, 0, 0, 0, 0, 0, 0, 0, 0, 0, 97, 72, 3068
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\shopItems.ts", "TypeScript", 0, 0, 0, 122, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 124
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\storyTestCheckpoints.ts", "TypeScript", 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 259
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\data\updateAnnouncements.ts", "TypeScript", 0, 0, 0, 68, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 70
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\ai\AiStreamController.ts", "TypeScript", 0, 0, 0, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 42
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\app\AppModals.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 110, 0, 0, 6, 116
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\app\AppTopActions.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 60, 0, 0, 5, 65
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battlePrep\BattlePrepSelectionController.test.ts", "TypeScript", 0, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 46
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battlePrep\BattlePrepSelectionController.ts", "TypeScript", 0, 0, 0, 125, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 139
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleActionBar.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 147, 0, 0, 8, 155
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleActorSprite.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 93, 0, 0, 5, 98
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleController.ts", "TypeScript", 0, 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 24
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleDiceBinding.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 9, 65
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleEffectPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 0, 0, 4, 63
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleField.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 5, 61
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleLogPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 0, 0, 2, 15
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleResultPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 3, 34
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleTutorialIntro.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 72, 0, 0, 8, 80
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleUnitDetailModal.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 181, 0, 0, 10, 191
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleViewModel.test.ts", "TypeScript", 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 26
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\BattleViewModel.ts", "TypeScript", 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 27
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\RosterPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 4, 60
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\SkillCard.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 46, 0, 0, 4, 50
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\battle\battleDebugConfig.ts", "TypeScript", 0, 0, 0, 1044, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 22, 1079
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\debug\DebugPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 0, 0, 6, 68
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\debug\ReplayPanel.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 0, 0, 5, 32
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\encounter\BattlePrepController.ts", "TypeScript", 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 37
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\GalleryAssetCard.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 0, 0, 4, 31
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\GalleryAssetGrid.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 0, 0, 5, 28
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\GalleryCategoryTabs.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 4, 28
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\GalleryPreviewModal.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 84, 0, 0, 10, 94
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\GalleryScreen.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 75, 0, 0, 9, 84
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\galleryTypes.ts", "TypeScript", 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 31
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\galleryUtils.ts", "TypeScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 49
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\gallery\useGalleryUnlocks.ts", "TypeScript", 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 12
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\inventory\healingConsumables.test.ts", "TypeScript", 0, 0, 0, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 31
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\inventory\healingConsumables.ts", "TypeScript", 0, 0, 0, 95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 107
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\inventory\inventoryStatePatch.test.ts", "TypeScript", 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 32
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\inventory\inventoryStatePatch.ts", "TypeScript", 0, 0, 0, 47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 56
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\minigames\blackMarketDrawFlow.test.ts", "TypeScript", 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 36
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\minigames\blackMarketDrawFlow.ts", "TypeScript", 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 139
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\save\SaveLoadBinding.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66, 0, 0, 4, 70
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\save\saveRestore.test.ts", "TypeScript", 0, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 51
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\save\saveRestore.ts", "TypeScript", 0, 0, 0, 81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 89
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\save\saveSnapshot.test.ts", "TypeScript", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 41
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\save\saveSnapshot.ts", "TypeScript", 0, 0, 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 65
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\shop\shopFlow.test.ts", "TypeScript", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 42
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\shop\shopFlow.ts", "TypeScript", 0, 0, 0, 65, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 73
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\Act1EndingSummary.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 0, 14, 110
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\Act1EndingSummary.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 0, 0, 6, 64
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\StoryController.ts", "TypeScript", 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 20
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\StoryRewardNotices.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 82, 0, 0, 7, 89
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\act1CompressedEnding.test.ts", "TypeScript", 0, 0, 0, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 39
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\act1CompressedEnding.ts", "TypeScript", 0, 0, 0, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 12, 115
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\storyRewardDiff.test.ts", "TypeScript", 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 49
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\features\story\storyRewardDiff.ts", "TypeScript", 0, 0, 0, 94, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 103
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\index.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1, 4
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\main.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 1, 7
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\services\api.ts", "TypeScript", 0, 0, 0, 590, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 84, 675
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\services\dndRuntime.test.ts", "TypeScript", 0, 0, 0, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 42
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\services\dndRuntime.ts", "TypeScript", 0, 0, 0, 262, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 21, 288
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\ApothecaryShop.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 351, 0, 57, 408
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\bargain.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 256, 8, 39, 303
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\base.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 129, 0, 20, 149
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\battle.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3157, 17, 469, 3643
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\dialogue-log.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 165, 4, 25, 194
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\dice-overlay.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 351, 11, 47, 409
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\dice-poker.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 334, 11, 49, 394
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\drinking-dice.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 304, 0, 50, 354
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\gallery.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 364, 0, 56, 420
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\game.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2312, 12, 349, 2673
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\index.ts", "TypeScript", 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 16
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\menu-test.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 635, 2, 93, 730
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\orlan-box.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 328, 0, 47, 375
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\portrait-test.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 249, 13, 11, 273
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\skill-effects.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 59, 3, 9, 71
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\tavern-dice.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 329, 0, 51, 380
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\yacht-classic.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 256, 0, 48, 304
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\styles\yacht-vn.css", "PostCSS", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 164, 13, 23, 200
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\types\game.ts", "TypeScript", 0, 0, 0, 236, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 29, 267
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\assetPreloader.ts", "TypeScript", 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 117
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\audio.ts", "TypeScript", 0, 0, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 10, 72
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\battlePrep.test.ts", "TypeScript", 0, 0, 0, 113, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 123
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\battlePrep.ts", "TypeScript", 0, 0, 0, 489, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 62, 599
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\narrative.test.ts", "TypeScript", 0, 0, 0, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 135
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\narrative.ts", "TypeScript", 0, 0, 0, 695, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26, 138, 859
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\selectionAction.test.ts", "TypeScript", 0, 0, 0, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 42
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\selectionAction.ts", "TypeScript", 0, 0, 0, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 9, 63
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\utils\trust.ts", "TypeScript", 0, 0, 0, 81, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 93
+"c:\Users\黄锦意\Desktop\demo02\frontend\src\vite-env.d.ts", "TypeScript", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2
+"c:\Users\黄锦意\Desktop\demo02\frontend\tailwind.config.js", "JavaScript", 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0, 1, 1, 52
+"c:\Users\黄锦意\Desktop\demo02\frontend\tsconfig.json", "JSON with Comments", 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+"c:\Users\黄锦意\Desktop\demo02\frontend\vite.config.ts", "TypeScript", 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 45
+"c:\Users\黄锦意\Desktop\demo02\start.bat", "Batch", 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 26
+"c:\Users\黄锦意\Desktop\demo02\战斗系统属性完整参考.md", "Markdown", 0, 0, 612, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 169, 781
+"c:\Users\黄锦意\Desktop\demo02\服务器使用反馈(3).md", "Markdown", 0, 0, 269, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 68, 337
+"Total", "-", 9472, 20, 19170, 20628, 1, 154, 6, 1, 3230, 9, 25, 15676, 9842, 1515, 12522, 92271

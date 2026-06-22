@@ -7,15 +7,15 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '倒挂在穹顶下的奇迹城邦',
     aliases: ['逆穹悬城', '逆穹城', '倒挂城市', '城市', '城中', '主缆街', '入城平台'],
     themeClass: 'scene-crown-city',
-    backgroundImage: '/assets/scenes/01inverse-city-first-sight.webp',
+    backgroundImage: '/assets/scenes/01.webp',
     bgStages: [
       {
         trigger: '你们刚离开主缆街口，前方忽然传来一阵刺耳的金属摩擦声',
-        image: '/assets/scenes/02tutorial-battle-trigger.webp',
+        image: '/assets/scenes/02.webp',
       },
       {
         trigger: '最后一只裂隙爬兽被银白色光芒逼退',
-        image: '/assets/scenes/03post-battle-street.webp',
+        image: '/assets/scenes/03.webp',
       },
     ],
   },
@@ -25,11 +25,11 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '委托、远征档案与失踪者名单',
     aliases: ['冒险者公会', '公会', '公会大厅'],
     themeClass: 'scene-guild',
-    backgroundImage: '/assets/scenes/04guild-interior.webp',
+    backgroundImage: '/assets/scenes/04.webp',
     bgStages: [
       {
         trigger: '推开厚重的橡木门',
-        image: '/assets/scenes/04guild-interior.webp',
+        image: '/assets/scenes/04.webp',
       },
     ],
   },
@@ -39,7 +39,7 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '传闻、情报与一杯暖酒',
     aliases: ['回声酒馆', '酒馆', '萨洛'],
     themeClass: 'scene-guild',
-    backgroundImage: '/assets/scenes/06tavern-interior.webp',
+    backgroundImage: '/assets/scenes/06.webp',
   },
   {
     id: 'market',
@@ -47,7 +47,7 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '抗孢面罩、冷光灯、远征工具与黑市讲价',
     aliases: ['补给市场', '市场', '黑市', '黑市摊位', '奥兰', '讲价'],
     themeClass: 'scene-library',
-    backgroundImage: '/assets/scenes/07blackmarket-stall.webp',
+    backgroundImage: '/assets/scenes/07.webp',
   },
   {
     id: 'forge',
@@ -62,11 +62,11 @@ export const DND_SCENES: SceneVisual[] = [
     subtitle: '治疗、安魂与远征者遗录',
     aliases: ['静默神殿', '神殿'],
     themeClass: 'scene-sanctum',
-    backgroundImage: '/assets/scenes/05temple-interior.png',
+    backgroundImage: '/assets/scenes/05.webp',
     bgStages: [
       {
         trigger: '静默神殿',
-        image: '/assets/scenes/05temple-interior.png',
+        image: '/assets/scenes/05.webp',
       },
     ],
   },
@@ -131,6 +131,26 @@ export const DND_SCENES: SceneVisual[] = [
 
 export function resolveDndScene(state: GameState): SceneVisual {
   const area = String(state.current_area || '');
+  const node = String(state.currentNodeId || state.currentBattleId || '');
+  const nodeSceneId = /blue-shoal|blue_cap|浅滩/.test(node)
+    ? 'blue-cap-shallows'
+    : /bone|骨柱/.test(node)
+      ? 'bone-pillar-marsh'
+      : /blackstone|black-root|laine|camp-night|营地夜谈/.test(node)
+        ? 'blackstone-root'
+        : /dark-gate|gatekeeper|ending|final-choice|黑暗之门/.test(node)
+          ? 'dark-gate-vestibule'
+          : /spore-outpost|孢海据点/.test(node)
+            ? 'spore-outpost'
+            : /elevator|降渊缆梯/.test(node)
+              ? 'cable-elevator'
+              : /guild|公会/.test(node)
+                ? 'guild'
+                : '';
+  if (nodeSceneId) {
+    const byNode = DND_SCENES.find((scene) => scene.id === nodeSceneId);
+    if (byNode) return byNode;
+  }
   const matched = DND_SCENES.find((scene) =>
     scene.aliases.some((alias) => area.includes(alias)),
   );

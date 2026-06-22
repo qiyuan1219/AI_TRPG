@@ -2,9 +2,10 @@ import { shopItems } from '../../data/shopItems';
 import type { ItemDefinition } from './ItemTypes';
 
 const CORE_ITEMS: ItemDefinition[] = [
-  { catalogId: 'fiction_dice', name: '虚构骰子', aliases: ['fiction-dice'], type: 'consumable', description: '剧情判定后重投一次 D20，取较高总值。', icon: 'fiction-dice', rarity: 'rare', stackable: true, effects: [{ type: 'reroll', rerollType: 'fiction_dice' }] },
-  { catalogId: 'omni_dice', name: '万能骰子', aliases: ['omni-dice'], type: 'consumable', description: '剧情判定后指定一个 D20 点数。', icon: 'omni-dice', rarity: 'rare', stackable: true, effects: [{ type: 'reroll', rerollType: 'omni_dice' }] },
-  { catalogId: 'healing_potion', name: '治疗药水', aliases: ['小红瓶', '回血'], type: 'consumable', description: '普通冒险者常备的红色药剂。', icon: 'potion-red', rarity: 'common', stackable: true, effects: [{ type: 'heal', formula: '1d8+2' }] },
+  { catalogId: 'fiction_dice', name: '虚构骰子', aliases: ['fiction-dice'], type: 'consumable', description: '可用于骰子判定重投一次 D20，取较高总值。', icon: 'fiction-dice', rarity: 'rare', stackable: true, effects: [{ type: 'reroll', rerollType: 'fiction_dice' }] },
+  { catalogId: 'omni_dice', name: '万能骰子', aliases: ['omni-dice'], type: 'consumable', description: '可用于骰子判定重投，并指定合法骰面点数。', icon: 'omni-dice', rarity: 'rare', stackable: true, effects: [{ type: 'reroll', rerollType: 'omni_dice' }] },
+  { catalogId: 'healing_potion', name: '治疗药水', aliases: ['小红瓶', '回血'], type: 'consumable', description: '普通冒险者常备的红色药剂。', icon: 'potion-red', rarity: 'common', stackable: true, effects: [{ type: 'heal', formula: '1d12' }] },
+  { catalogId: 'small_healing_potion', name: '小瓶治疗药水', aliases: ['小瓶治疗液'], type: 'consumable', description: '容量较小的应急治疗药剂。', icon: 'small_bottle_therapeutic_solution', rarity: 'common', stackable: true, effects: [{ type: 'heal', formula: '1d6' }] },
   { catalogId: 'coagulation_powder', name: '止血粉', type: 'consumable', description: '用于处理流血与浅层创口。', icon: 'powder', rarity: 'common', stackable: true },
   { catalogId: 'antitoxin', name: '解毒剂', aliases: ['弱效解毒剂'], type: 'consumable', description: '缓解常见毒素与孢粉刺激。', icon: 'vial-green', rarity: 'common', stackable: true },
   { catalogId: 'purification_heart', name: '净化之心', type: 'consumable', description: '用于压制深层污染的高阶药剂。', icon: 'heart-vial', rarity: 'rare', stackable: false },
@@ -67,6 +68,12 @@ const CORE_ITEMS: ItemDefinition[] = [
   { catalogId: 'cracked_gatekeeper_core', name: '裂纹守门者核心', type: 'quest', description: '斩断黑根后留下的门卫核心残片。', icon: 'black-obelisk-shard', rarity: 'story', stackable: false },
   { catalogId: 'reverse_clock_anchor_shard', name: '逆钟锚点碎片', type: 'quest', description: '从被延长的封印瞬间中析出的银色碎片。', icon: 'silver-staff-charm', rarity: 'story', stackable: false },
   { catalogId: 'silent_gate_report', name: '寂静之门报告', type: 'quest', description: '记录强制暂封真相、等待下一次远征开启的密封报告。', icon: 'scroll-sealed', rarity: 'story', stackable: false },
+  { catalogId: 'helman_personal_note', name: '赫尔曼的抽屉笔记', type: 'document', description: '一张从赫尔曼私人抽屉夹层中找到的便签，字迹潦草而急促。', icon: 'note-pencil', rarity: 'rare', stackable: false },
+  { catalogId: 'commission_letter_detail', name: '指名委托书原件', type: 'document', description: '三个月前送达的指名委托书，羊皮纸边缘略微发黄。', icon: 'scroll-quill', rarity: 'common', stackable: false },
+  { catalogId: 'salo_intel_notes', name: '萨洛的情报卡片', type: 'document', description: '几张用细绳捆在一起的情报卡片，每条情报写在一张扑克牌大小的硬纸片上。', icon: 'cards', rarity: 'uncommon', stackable: false },
+  { catalogId: 'tavern_rumor_board', name: '酒馆传闻便条', type: 'document', description: '钉在酒馆布告栏角落的几张便条，写着矿工和守卫的零星见闻。', icon: 'note-pin', rarity: 'common', stackable: false },
+  { catalogId: 'nibu_patrol_journal', name: '尼布的巡逻日志', type: 'document', description: '孢海据点守夜人尼布的皮面日志，记录了最近几周的据点周边巡逻情况。', icon: 'journal', rarity: 'common', stackable: false },
+  { catalogId: 'yunling_expedition_medicine_record', name: '远征队用药记录', type: 'document', description: '云苓保存的一份用药记录，追踪了每一支远征队的药剂需求变化。', icon: 'scroll-medicine', rarity: 'uncommon', stackable: false },
 ];
 
 const SHOP_CATALOG: ItemDefinition[] = shopItems.map((item) => ({

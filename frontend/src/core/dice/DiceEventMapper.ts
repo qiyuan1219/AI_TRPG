@@ -1,5 +1,6 @@
 import { createDiceEvent } from './createDiceEvent';
 import { DICE_EVENT_SCHEMA_VERSION, type DiceEvent, type DiceEventSource, type DiceEventType } from './DiceEvent';
+import { randomUuid } from '../random/secureRandom';
 
 const TYPES = new Set<DiceEventType>([
   'attack', 'damage', 'initiative', 'saving_throw', 'story_check', 'reroll',
@@ -21,7 +22,7 @@ export function normalizeDiceEvent(raw: unknown): DiceEvent {
   const diceSides = Number(value.diceSides || formula.match(/d(\d+)/i)?.[1] || 20);
   const modifier = Number(value.modifier ?? value.fixed ?? 0);
   const total = Number(value.total ?? value.rawDamage ?? rolls.reduce((sum, item) => sum + item, 0) + modifier);
-  const rollId = String(value.rollId || value.id || crypto.randomUUID());
+  const rollId = String(value.rollId || value.id || randomUuid());
 
   return createDiceEvent({
     ...value,

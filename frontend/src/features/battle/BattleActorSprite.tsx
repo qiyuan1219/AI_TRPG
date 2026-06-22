@@ -4,6 +4,7 @@ export interface BattleActorSpriteUnit {
   model: string;
   hp: number;
   faction: 'ally' | 'enemy' | string;
+  statuses?: unknown[];
 }
 
 export interface BattleActorFeedback {
@@ -39,11 +40,13 @@ export function BattleActorSprite<TUnit extends BattleActorSpriteUnit>({
   getSpriteSheetUrl,
 }: BattleActorSpriteProps<TUnit>) {
   const spriteSheetUrl = getSpriteSheetUrl(unit.model);
+  const statusText = JSON.stringify(unit.statuses ?? []);
+  const guarded = /防御|damage_reduction_once|护盾|减伤/.test(statusText);
 
   return (
     <button
       type="button"
-      className={`battle-combatant ${active ? 'is-active' : ''} ${targetable ? 'is-targetable' : ''} ${casting ? 'is-casting' : ''} ${impacted ? 'is-impacted' : ''} ${feedback?.tone === 'miss' ? 'is-missed' : ''} ${unit.hp <= 0 ? 'is-defeated' : ''} ${unit.faction === 'enemy' ? 'is-enemy' : 'is-ally'}`}
+      className={`battle-combatant battle-model-${unit.model} ${active ? 'is-active' : ''} ${targetable ? 'is-targetable' : ''} ${casting ? 'is-casting' : ''} ${impacted ? 'is-impacted' : ''} ${feedback?.tone === 'miss' ? 'is-missed' : ''} ${guarded ? 'is-guarded' : ''} ${unit.hp <= 0 ? 'is-defeated' : ''} ${unit.faction === 'enemy' ? 'is-enemy' : 'is-ally'}`}
       onClick={onClick}
       aria-label={unit.name}
     >

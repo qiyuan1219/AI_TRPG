@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { BattlePrepChoice, BattlePrepResolveResult, BattlePrepResultType } from '../utils/battlePrep';
 import { evaluateCondition, getRerollItemQuantity, resolveBattlePrepChoice } from '../utils/battlePrep';
@@ -81,13 +81,17 @@ const BattlePrepPanel: React.FC<BattlePrepPanelProps> = ({
   const [showOmniPicker, setShowOmniPicker] = React.useState(false);
   const [chosenD20, setChosenD20] = React.useState(20);
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
   const handleSelect = (choice: BattlePrepChoice) => {
     if (selected || submitting) return;
     setSubmitting(true);
     setSelected(true);
 
     // 小型延迟让点击反馈可见
-    setTimeout(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
       const result = resolveBattlePrepChoice(choice, gameState);
       onResolve(choice, result);
       setSubmitting(false);

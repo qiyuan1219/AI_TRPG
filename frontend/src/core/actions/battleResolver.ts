@@ -11,6 +11,8 @@ registerActionResolver('battle.skill', async (state, action) => {
       actorId: action.actorId,
       skillId: action.skillId,
       targetIds: action.targetIds,
+      seed: Number.isFinite(Number((action as any).seed)) ? Number((action as any).seed) : undefined,
+      fixed_rolls: Array.isArray((action as any).fixed_rolls) ? (action as any).fixed_rolls.map(Number) : undefined,
     });
     return {
       schemaVersion: 1,

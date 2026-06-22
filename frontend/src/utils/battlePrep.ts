@@ -164,12 +164,13 @@ function formatInventory(items: Map<string, number>): string {
 }
 
 export function migrateRerollInventory(state: any): any {
+  if (state?.reroll_inventory_migrated) return state;
   const items = parseInventory(state?.inventory || '');
   let changed = false;
   Object.values(REROLL_ITEM_NAMES).forEach((name) => {
     if (!items.has(name)) { items.set(name, 3); changed = true; }
   });
-  return changed ? { ...state, inventory: formatInventory(items) } : state;
+  return { ...state, ...(changed ? { inventory: formatInventory(items) } : {}), reroll_inventory_migrated: true };
 }
 
 export function getRerollItemQuantity(state: any, itemId: RerollItemId): number {

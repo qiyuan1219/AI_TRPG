@@ -667,6 +667,7 @@ export function parseNarrativeSegments(
 function lastCompleteBoundary(input: string) {
   let quoteClose = '';
   let lastEnd = -1;
+  let prevSentenceEnd = -1;
 
   for (let i = 0; i < input.length; i += 1) {
     const char = input[i];
@@ -674,16 +675,22 @@ function lastCompleteBoundary(input: string) {
       const close = closingQuoteFor(char);
       if (close) {
         quoteClose = close;
+        prevSentenceEnd = -1;
         continue;
       }
     } else if (isQuoteClose(char, quoteClose)) {
       quoteClose = '';
+      if (prevSentenceEnd >= 0) {
+        lastEnd = i + 1;
+        prevSentenceEnd = -1;
+      }
       continue;
     }
 
     if (!SENTENCE_END_CHARS.has(char)) continue;
 
     if (quoteClose) {
+      prevSentenceEnd = i;
       // 中文标点在引号内，向前看是否紧接后引号
       let cursor = i + 1;
       while (cursor < input.length && (input[cursor] === ' ' || input[cursor] === '\t' || input[cursor] === '\u3000')) {
@@ -692,6 +699,7 @@ function lastCompleteBoundary(input: string) {
       if (cursor < input.length && isQuoteClose(input[cursor], quoteClose)) {
         lastEnd = cursor + 1;
         quoteClose = '';
+        prevSentenceEnd = -1;
         i = cursor; // 跳过后引号
       }
       continue;
@@ -699,6 +707,7 @@ function lastCompleteBoundary(input: string) {
 
     // 不在引号中
     lastEnd = i + 1;
+    prevSentenceEnd = -1;
   }
 
   return lastEnd;
